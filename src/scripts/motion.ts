@@ -74,3 +74,45 @@ if (nav) {
     onScroll()
     addEventListener('scroll', onScroll, { passive: true })
 }
+
+// Scroll-linked word reveal: [data-words] text lights up word by word as it
+// passes through the viewport (the muted tail is the unread part).
+const wordEls = [...document.querySelectorAll<HTMLElement>('[data-words]')]
+for (const el of wordEls) {
+    const words = (el.textContent ?? '').trim().split(/\s+/)
+    const sr = document.createElement('span')
+    sr.className = 'visually-hidden'
+    sr.textContent = words.join(' ')
+    el.replaceChildren(
+        sr,
+        ...words.flatMap((w, i) => {
+            const s = document.createElement('span')
+            s.className = 'w'
+            s.setAttribute('aria-hidden', 'true')
+            s.textContent = w
+            return i < words.length - 1 ? [s, document.createTextNode(' ')] : [s]
+        }),
+    )
+}
+// Clip reveal: [data-clip] gets --clip from 1 (inset) to 0 (full) as it enters.
+const clipEls = [...document.querySelectorAll<HTMLElement>('[data-clip]')]
+const onScrollFx = () => {
+    const vh = innerHeight
+    for (const el of wordEls) {
+        const r = el.getBoundingClientRect()
+        const p = Math.min(1, Math.max(0, (vh * 0.85 - r.top) / (r.height + vh * 0.45)))
+        const spans = el.querySelectorAll('.w')
+        const lit = reduce ? spans.length : Math.round(p * spans.length)
+        spans.forEach((s, i) => s.classList.toggle('on', i < lit))
+    }
+    for (const el of clipEls) {
+        const r = el.getBoundingClientRect()
+        const p = Math.min(1, Math.max(0, (vh - r.top) / (vh * 0.7)))
+        el.style.setProperty('--clip', reduce ? '0' : String(1 - p))
+    }
+}
+if (wordEls.length || clipEls.length) {
+    onScrollFx()
+    addEventListener('scroll', () => requestAnimationFrame(onScrollFx), { passive: true })
+    addEventListener('resize', onScrollFx)
+}

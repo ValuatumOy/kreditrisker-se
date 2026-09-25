@@ -145,9 +145,11 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
 <style>
     .hc {
         margin: 0;
-        background: linear-gradient(180deg, rgb(12 22 42 / 0.72), rgb(6 12 26 / 0.78)) !important;
+        background: linear-gradient(180deg, #17332a, #0d1f18) !important;
+        border: 1px solid #0d1f18 !important;
+        box-shadow: 0 50px 90px -40px rgb(13 31 24 / 0.75), 0 2px 0 rgb(255 255 255 / 0.06) inset !important;
         padding: 20px;
-        border-radius: 24px;
+        border-radius: 16px;
         color: var(--ice);
         transition: transform 500ms var(--ease-out);
         will-change: transform;
@@ -177,7 +179,7 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
         display: flex;
         gap: 2px;
         padding: 3px;
-        border-radius: 999px;
+        border-radius: 5px;
         background: rgb(0 0 0 / 0.25);
         border: 1px solid rgb(255 255 255 / 0.08);
     }
@@ -185,7 +187,7 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
         min-height: 30px;
         padding: 0 12px;
         border: 0;
-        border-radius: 999px;
+        border-radius: 3px;
         background: transparent;
         color: var(--ice-3);
         font: 500 0.78rem var(--sans);
@@ -210,11 +212,11 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
         width: 42px;
         height: 42px;
         flex-shrink: 0;
-        border-radius: 12px;
-        background: linear-gradient(145deg, #2a5bb8, #0f2146);
+        border-radius: 6px;
+        background: #2b5444;
         border: 1px solid rgb(255 255 255 / 0.16);
-        font-family: var(--serif);
-        font-size: 1.3rem;
+        font-size: 1.15rem;
+        font-weight: 500;
         color: var(--ice);
     }
     .hc__who {
@@ -241,7 +243,7 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
     }
     .hc__kf > div {
         padding: 12px;
-        border-radius: 14px;
+        border-radius: 6px;
         background: rgb(0 0 0 / 0.22);
         border: 1px solid rgb(255 255 255 / 0.07);
     }
@@ -264,7 +266,7 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
     }
     .hc__chart {
         padding: 14px 14px 8px;
-        border-radius: 16px;
+        border-radius: 6px;
         background: rgb(0 0 0 / 0.22);
         border: 1px solid rgb(255 255 255 / 0.07);
     }

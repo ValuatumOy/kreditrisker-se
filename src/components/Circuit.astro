@@ -1,0 +1,151 @@
+---
+// Circuit traces: thin orthogonal lines with labelled nodes (the data sources
+// and the steps they pass through), with light pulses travelling along them
+// toward the centre, where the product sits. Decorative; aria-hidden.
+interface Props {
+    tone?: 'light' | 'dark'
+    class?: string
+}
+const { tone = 'light', class: cls } = Astro.props
+
+// Orthogonal routes in a 1440 x 820 canvas, each ending near the centre column.
+const r = 14 // corner radius
+const route = (pts: [number, number][]) => {
+    let d = `M${pts[0][0]},${pts[0][1]}`
+    for (let i = 1; i < pts.length; i++) {
+        const [x, y] = pts[i]
+        const next = pts[i + 1]
+        if (!next) {
+            d += ` L${x},${y}`
+            break
+        }
+        const [px, py] = pts[i - 1]
+        const dx1 = Math.sign(x - px), dy1 = Math.sign(y - py)
+        const dx2 = Math.sign(next[0] - x), dy2 = Math.sign(next[1] - y)
+        d += ` L${x - dx1 * r},${y - dy1 * r} Q${x},${y} ${x + dx2 * r},${y + dy2 * r}`
+    }
+    return d
+}
+const traces: { d: string; dur: number; delay: number }[] = [
+    { d: route([[0, 150], [260, 150], [260, 330], [520, 330]]), dur: 6.5, delay: 0 },
+    { d: route([[0, 470], [180, 470], [180, 560], [470, 560]]), dur: 7.5, delay: 2.2 },
+    { d: route([[120, 820], [120, 690], [420, 690], [420, 640]]), dur: 8, delay: 4 },
+    { d: route([[1440, 120], [1210, 120], [1210, 300], [930, 300]]), dur: 7, delay: 1 },
+    { d: route([[1440, 430], [1260, 430], [1260, 540], [980, 540]]), dur: 6, delay: 3.4 },
+    { d: route([[1320, 820], [1320, 700], [1030, 700], [1030, 640]]), dur: 8.5, delay: 5 },
+    { d: route([[560, 0], [560, 70], [640, 70], [640, 130]]), dur: 5.5, delay: 1.6 },
+    { d: route([[900, 0], [900, 90], [820, 90], [820, 130]]), dur: 5, delay: 3 },
+]
+const nodes: { x: number; y: number; label: string; w?: number }[] = [
+    { x: 260, y: 150, label: 'Bolagsverket', w: 96 },
+    { x: 180, y: 470, label: 'iXBRL', w: 54 },
+    { x: 420, y: 690, label: 'K2 · K3', w: 62 },
+    { x: 1210, y: 120, label: 'SCB', w: 44 },
+    { x: 1260, y: 430, label: 'SNI 2007', w: 72 },
+    { x: 1030, y: 700, label: 'Nyckeltal', w: 76 },
+    { x: 60, y: 300, label: '', w: 22 },
+    { x: 1380, y: 280, label: '', w: 22 },
+    { x: 1150, y: 620, label: '', w: 22 },
+    { x: 300, y: 610, label: '', w: 22 },
+]
+---
+
+<svg class:list={['circuit', `circuit--${tone}`, cls]} viewBox="0 0 1440 820" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <g class="circuit__traces">
+        {traces.map((t) => <path d={t.d} />)}
+    </g>
+    <g class="circuit__pulses">
+        {traces.map((t) => <path d={t.d} pathLength="100" style={`--dur:${t.dur}s;--delay:${t.delay}s`} />)}
+    </g>
+    <g class="circuit__nodes">
+        {
+            nodes.map((n) => (
+                <g transform={`translate(${n.x - (n.w ?? 22) / 2}, ${n.y - 11})`}>
+                    <rect width={n.w ?? 22} height="22" rx="4" />
+                    {n.label ? (
+                        <text x={(n.w ?? 22) / 2} y="15" text-anchor="middle">
+                            {n.label}
+                        </text>
+                    ) : (
+                        <circle cx="11" cy="11" r="2.5" />
+                    )}
+                </g>
+            ))
+        }
+    </g>
+</svg>
+
+<style>
+    .circuit {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+    }
+    .circuit__traces path {
+        fill: none;
+        stroke: var(--rule-2);
+        stroke-width: 1;
+        vector-effect: non-scaling-stroke;
+    }
+    .circuit__pulses path {
+        fill: none;
+        stroke: var(--forest);
+        stroke-width: 1.6;
+        stroke-linecap: round;
+        stroke-dasharray: 6 94;
+        stroke-dashoffset: 100;
+        opacity: 0;
+        vector-effect: non-scaling-stroke;
+    }
+    .circuit__nodes rect {
+        fill: var(--paper);
+        stroke: var(--rule-2);
+    }
+    .circuit__nodes text {
+        font: 500 10.5px var(--sans);
+        fill: var(--ink-3);
+        letter-spacing: 0.01em;
+    }
+    .circuit__nodes circle {
+        fill: var(--rule-2);
+    }
+    .circuit--dark .circuit__traces path {
+        stroke: rgb(255 255 255 / 0.1);
+    }
+    .circuit--dark .circuit__pulses path {
+        stroke: var(--glow);
+    }
+    .circuit--dark .circuit__nodes rect {
+        fill: var(--night);
+        stroke: rgb(255 255 255 / 0.16);
+    }
+    .circuit--dark .circuit__nodes text {
+        fill: var(--ice-3);
+    }
+    .circuit--dark .circuit__nodes circle {
+        fill: rgb(255 255 255 / 0.3);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .circuit__pulses path {
+            animation: pulse var(--dur) linear var(--delay) infinite;
+        }
+    }
+    @keyframes pulse {
+        0% {
+            stroke-dashoffset: 100;
+            opacity: 0;
+        }
+        8% {
+            opacity: 1;
+        }
+        92% {
+            opacity: 1;
+        }
+        100% {
+            stroke-dashoffset: 0;
+            opacity: 0;
+        }
+    }
+</style>

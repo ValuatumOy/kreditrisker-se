@@ -205,8 +205,9 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         align-items: center;
         background: var(--sheet);
         border: 1px solid var(--rule-2);
-        border-radius: 999px;
-        box-shadow: var(--card-shadow);
+        border-radius: 6px;
+        background: #fff;
+        box-shadow: 0 1px 2px rgb(15 33 26 / 0.06), 0 16px 32px -24px rgb(15 33 26 / 0.35);
         transition:
             border-color 200ms var(--ease-out),
             box-shadow 200ms var(--ease-out);
@@ -218,7 +219,7 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
             var(--card-shadow);
     }
     :global(.dark) .sbox__field {
-        background: linear-gradient(180deg, rgb(12 22 42 / 0.72), rgb(6 12 26 / 0.82));
+        background: rgb(255 255 255 / 0.06);
         border-color: rgb(255 255 255 / 0.18);
         backdrop-filter: blur(20px) saturate(1.4);
         -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -242,8 +243,8 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         font: inherit;
         color: var(--ink);
         padding: 0 12px 0 52px;
-        height: 56px;
-        font-size: 1.05rem;
+        height: 52px;
+        font-size: 1rem;
         outline: none;
     }
     .sbox input::placeholder {
@@ -260,9 +261,9 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         place-items: center;
         width: 24px;
         height: 24px;
-        border-radius: 6px;
+        border-radius: 3px;
         border: 1px solid var(--rule-2);
-        font: 500 0.75rem var(--mono);
+        font: 500 0.72rem var(--sans);
         color: var(--ink-3);
         margin-right: 8px;
     }
@@ -272,18 +273,18 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         gap: 8px;
         height: calc(100% - 12px);
         min-height: 44px;
-        margin: 6px;
-        padding: 0 20px;
+        margin: 5px;
+        padding: 0 18px;
         border: 0;
-        border-radius: 999px;
-        background: var(--ink);
-        color: var(--paper);
-        font: 500 0.95rem var(--sans);
+        border-radius: 4px;
+        background: var(--forest);
+        color: #f3f6f2;
+        font: 500 0.875rem var(--sans);
         cursor: pointer;
         transition: translate 180ms var(--ease-out);
     }
     :global(.dark) .sbox__go {
-        background: var(--ice);
+        background: #f3f6f2;
         color: var(--night);
     }
     .sbox__go:hover {
@@ -294,8 +295,8 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         height: 16px;
     }
     .sbox--hero input {
-        height: 68px;
-        font-size: 1.15rem;
+        height: 60px;
+        font-size: 1.05rem;
         padding-left: 58px;
     }
     .sbox--hero .sbox__field :global(.sbox__icon) {
@@ -313,8 +314,8 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         background: #fff;
         color: #0a1426;
         border: 1px solid #dde3ed;
-        border-radius: 16px;
-        box-shadow: 0 30px 60px -20px rgb(0 0 0 / 0.45);
+        border-radius: 8px;
+        box-shadow: 0 30px 60px -20px rgb(15 33 26 / 0.35);
         max-height: min(420px, 60vh);
         overflow-y: auto;
     }
@@ -322,21 +323,20 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         display: grid;
         gap: 2px;
         padding: 10px 14px;
-        border-radius: 10px;
-        color: #0a1426;
+        border-radius: 4px;
+        color: #0f211a;
         text-decoration: none;
     }
     .sbox__list :global([aria-selected='true'] a),
     .sbox__list :global(a:hover) {
-        background: #eef3fb;
+        background: #e4ede6;
     }
     .sbox__list :global(.sbox__name) {
         font-weight: 600;
     }
     .sbox__list :global(.sbox__meta) {
         font-size: var(--step--1);
-        color: #5a6781;
-        font-family: var(--mono);
+        color: #5d6b64;
     }
     @media (max-width: 560px) {
         .sbox__go span,

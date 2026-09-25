@@ -3,17 +3,18 @@ import { Picture } from 'astro:assets'
 import Base from '../layouts/Base.astro'
 import SearchBox from '../components/SearchBox.astro'
 import HeroCard from '../components/HeroCard.astro'
+import Circuit from '../components/Circuit.astro'
 import Val from '../components/Val.astro'
 import Icon from '../components/Icon.astro'
 import { getDemoSite, getSite } from '../lib/store.ts'
 import { SITE, FLAGS } from '../config/site.ts'
 import { compactSek, percent } from '../lib/format.ts'
-import { FORMULAS } from '../lib/metrics.ts'
+import { FORMULAS, computeMetrics, numeric } from '../lib/metrics.ts'
 import { staticReportState } from '../lib/reports/availability.ts'
 import { STATE_LABEL } from '../lib/reports/labels.ts'
 import type { Value } from '../lib/contract/types.ts'
 import { GUIDES } from '../content/guides.ts'
-import heroImg from '../assets/photos/stockholm-blue-hour.jpg'
+import cityImg from '../assets/photos/stockholm-blue-hour.jpg'
 import auroraImg from '../assets/photos/aurora-lake.jpg'
 import laplandImg from '../assets/photos/lapland-aerial.jpg'
 
@@ -27,13 +28,13 @@ const samples = [
 ]
 const typing = demo.companies.slice(0, 6).map((c) => c.record.name).concat(['002000-1012'])
 
-// Skyline of the hero photo traced as a chart line (image pixel coordinates, 2800 x 1867).
-const sky = [
-    [0, 1197], [70, 1155], [175, 1155], [301, 1162], [319, 1043], [336, 1162], [420, 1162], [616, 1141], [826, 1141], [840, 1204],
-    [1050, 1190], [1071, 1008], [1092, 833], [1113, 1008], [1134, 1190], [1260, 1204], [1400, 1232], [1736, 1232], [1820, 1225],
-    [2072, 1204], [2142, 1148], [2163, 1190], [2366, 1176], [2380, 1064], [2401, 1176], [2590, 1176], [2800, 1204],
-]
-const skyPath = sky.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ')
+// Two small satellite cards next to the hero card (same synthetic company).
+const main = pick('Exempel Mjukvara').record
+const [p0, p1] = main.periods
+const m0 = computeMetrics(p0, p1)
+const salesSpark = [...main.periods].reverse().map((p) => numeric(p.income.netSales) ?? 0)
+const sparkMax = Math.max(...salesSpark)
+const eqPct = (numeric(m0.equityRatio) ?? 0) * 100
 
 const src = { source: 'synthetic', retrievedAt: '2026-09-01' } as const
 const states: { label: string; value: Value; fmt: 'sek' | 'pct'; means: string }[] = [
@@ -43,7 +44,6 @@ const states: { label: string; value: Value; fmt: 'sek' | 'pct'; means: string }
     { label: 'Saknas', value: { status: 'missing', reason: 'not_in_source' }, fmt: 'sek', means: 'Posten finns inte i källan. Aldrig 0.' },
     { label: 'Ej jämförbar', value: { status: 'incomparable', reason: 'period_length' }, fmt: 'pct', means: 'T.ex. tillväxt efter ett 18-månadersår.' },
 ]
-const industries = [...new Set(demo.companies.flatMap((c) => c.record.sni.map((s) => s.label)))]
 const reports = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, null) }))
 const explore = [
     { href: '/branscher/', title: 'Branscher', text: 'Företag efter huvudbransch (SNI).', n: `${site.industries.length}` },
@@ -51,6 +51,8 @@ const explore = [
     { href: '/topplistor/', title: 'Topplistor', text: 'Störst, snabbast växande, högst soliditet.', n: `${site.rankings.length}` },
     { href: '/guider/', title: 'Guider', text: 'Läs en årsredovisning, förstå nyckeltalen.', n: `${GUIDES.length}` },
 ]
+const statement =
+    'Kreditrisker samlar bokslut, nyckeltal och källor för svenska företag, så att du kan se hur en kund eller leverantör faktiskt ser ut innan du skickar fakturan.'
 ---
 
 <Base
@@ -60,70 +62,79 @@ const explore = [
     jsonLd={[{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: SITE.origin + '/', inLanguage: 'sv-SE', potentialAction: { '@type': 'SearchAction', target: `${SITE.origin}/sok/?q={q}`, 'query-input': 'required name=q' } }]}
 >
     <!-- ============================================================ HERO -->
-    <section class="hero dark grain">
-        <div class="hero__media" aria-hidden="true">
-            <Picture src={heroImg} alt="" formats={['avif', 'webp']} widths={[900, 1600, 2400]} sizes="100vw" loading="eager" fetchpriority="high" class="hero__img" />
-            <svg class="hero__sky" viewBox="0 0 2800 1867" preserveAspectRatio="xMidYMid slice">
-                <defs>
-                    <linearGradient id="skyline-stroke" x1="0" x2="1" y1="0" y2="0">
-                        <stop offset="0" stop-color="#f4bf72" stop-opacity="0"></stop>
-                        <stop offset="0.25" stop-color="#f4bf72" stop-opacity="0.9"></stop>
-                        <stop offset="0.8" stop-color="#ffd9a0" stop-opacity="1"></stop>
-                        <stop offset="1" stop-color="#f4bf72" stop-opacity="0.2"></stop>
-                    </linearGradient>
-                </defs>
-                {[820, 960, 1100].map((y) => <line x1="0" x2="2800" y1={y} y2={y} class="hero__gridline" />)}
-                <path d={skyPath} class="hero__skyline" pathLength="1" id="skyline"></path>
-                <circle r="9" class="hero__runner">
-                    <animateMotion dur="14s" repeatCount="indefinite" rotate="auto">
-                        <mpath href="#skyline"></mpath>
-                    </animateMotion>
-                </circle>
-                {[[1092, 833], [319, 1043], [2380, 1064]].map(([x, y]) => <circle cx={x} cy={y} r="7" class="hero__peak" />)}
-            </svg>
-            <div class="hero__shade"></div>
+    <section class="hero">
+        <Circuit />
+        <div class="shell hero__inner">
+            <p class="hero__badge reveal"><span class="hero__sq" aria-hidden="true">V</span> Byggt av Valuatum</p>
+            <h1 class="reveal" style="--d:1">Se siffrorna bakom <span class="tone">varje svenskt företag</span></h1>
+            <p class="hero__sub reveal" style="--d:2">Bokslut, nyckeltal och källor på ett ställe. Varje siffra visar räkenskapsår och hur aktuell den är.</p>
+            <div class="hero__search reveal" style="--d:3">
+                <SearchBox size="hero" id="hero-q" typing={typing} />
+            </div>
+            <p class="hero__links small reveal" style="--d:4">
+                Eller bläddra bland <a href="/branscher/">branscher</a>, <a href="/kommuner/">kommuner</a> och <a href="/topplistor/">topplistor</a>
+            </p>
         </div>
 
-        <div class="shell hero__grid">
-            <div class="hero__copy">
-                <h1 class="reveal" style="--d:1">Se siffrorna bakom varje <em>svenskt företag.</em></h1>
-                <p class="lede reveal" style="--d:2">Bokslut, nyckeltal och källor på ett ställe. Varje siffra visar räkenskapsår och hur aktuell den är, och det som saknas står som saknas.</p>
-                <div class="hero__search reveal" style="--d:3">
-                    <SearchBox size="hero" id="hero-q" typing={typing} />
-                </div>
-                <ul class="hero__facts reveal" style="--d:4">
-                    <li><b class="num">5</b> års bokslut per profil</li>
-                    <li><b class="num">{Object.keys(FORMULAS).length}</b> nyckeltal med öppna formler</li>
-                    <li><b class="num">0</b> gissade värden</li>
-                </ul>
-            </div>
+        <div class="shell hero__stage">
+            <p class="hero__left reveal" style="--d:2">
+                <span class="hero__mini" aria-hidden="true"><Icon name="doc" /> Så fungerar det</span>
+                Kreditrisker hjälper dig att <b>läsa ett företag på en minut</b>: fem års bokslut, nyckeltal med öppna formler
+                <span class="tone">och luckor som visas som luckor, aldrig som nollor.</span>
+            </p>
             <div class="hero__card reveal" style="--d:3">
                 <HeroCard samples={samples} />
+            </div>
+            <div class="hero__sats">
+                <div class="sat reveal" style="--d:4">
+                    <p class="sat__head"><span>Nettoomsättning</span><span class="sat__tag">Exempel</span></p>
+                    <p class="sat__v num" data-count={(numeric(p0.income.netSales) ?? 0) / 1e6} data-decimals="1" data-suffix=" Mkr">{compactSek(p0.income.netSales).text}</p>
+                    <svg class="sat__spark" viewBox="0 0 120 40" aria-hidden="true">
+                        {salesSpark.map((v, i) => <rect x={i * 25 + 2} y={40 - (v / sparkMax) * 36} width="16" height={(v / sparkMax) * 36} rx="2" class:list={{ last: i === salesSpark.length - 1 }} />)}
+                    </svg>
+                    <p class="sat__foot">2021–2025 · +9,0 % senaste året</p>
+                </div>
+                <div class="sat reveal" style="--d:5">
+                    <p class="sat__head"><span>Soliditet</span><span class="sat__tag">Exempel</span></p>
+                    <p class="sat__v num" data-count={eqPct} data-decimals="1" data-suffix=" %">{percent(m0.equityRatio).text}</p>
+                    <div class="sat__meter" aria-hidden="true"><i style={`--w:${eqPct}%`}></i></div>
+                    <p class="sat__foot">(Eget kapital + 79,4 % av obesk. res.) / tillgångar</p>
+                </div>
             </div>
         </div>
     </section>
 
-    <!-- ============================================================ MARQUEE -->
-    <section class="marquee dark" aria-label="Exempel på branscher">
-        <div class="marquee__track">
-            {[0, 1].map((k) => (
-                <ul aria-hidden={k === 1 ? 'true' : undefined}>
-                    {industries.map((i) => <li>{i}</li>)}
-                </ul>
-            ))}
+    <!-- ============================================================ STATEMENT (dark slab) -->
+    <section class="slab dark">
+        <Circuit tone="dark" class="slab__circuit" />
+        <div class="shell slab__inner">
+            <p class="chip reveal"><Icon name="info" /> Om tjänsten</p>
+            <p class="statement" data-words>{statement}</p>
+            <dl class="stats">
+                <div class="reveal"><dt>Års bokslut per profil</dt><dd class="num" data-count="5">5</dd></div>
+                <div class="reveal" style="--d:1"><dt>Nyckeltal med öppna formler</dt><dd class="num" data-count={Object.keys(FORMULAS).length}>{Object.keys(FORMULAS).length}</dd></div>
+                <div class="reveal" style="--d:2"><dt>Gissade värden</dt><dd class="num">0</dd></div>
+            </dl>
+            <figure class="city" data-clip>
+                <Picture src={cityImg} alt="Riddarholmen i Stockholm i blå timmen" formats={['avif', 'webp']} widths={[900, 1600, 2400]} sizes="(max-width: 1320px) 100vw, 1320px" class="city__img" />
+                <figcaption class="city__cap glass">
+                    <span>Byggt för svenska företag</span>
+                    <span class="tone">Organisationsnummer, SNI, kommun och bokslut enligt svensk redovisning (K2/K3).</span>
+                </figcaption>
+            </figure>
         </div>
     </section>
 
     <!-- ============================================================ BENTO -->
-    <section class="section dark bento-wrap">
+    <section class="section">
         <div class="shell">
             <div class="section__head">
-                <h2 class="reveal">Allt du vill veta innan du skickar fakturan.</h2>
+                <h2 class="reveal">Allt du vill veta <span class="tone">innan du skickar fakturan.</span></h2>
                 <p class="reveal" style="--d:1">En profil per organisationsnummer, byggd på inlämnade årsredovisningar och uppdaterad när nya bokslut registreras.</p>
             </div>
             <div class="bento">
                 <article class="tile tile--search reveal" data-spotlight>
-                    <div class="tile__demo demo-search" aria-hidden="true">
+                    <div class="tile__demo dark demo-search" aria-hidden="true">
                         <div class="ds__bar"><Icon name="search" /><span class="ds__typed">Exempel Bygg</span><span class="ds__caret"></span></div>
                         <ul class="ds__list">
                             <li><b>Exempel Byggnads i Göteborg AB</b><span class="num">002000-1020 · Göteborg</span></li>
@@ -135,14 +146,14 @@ const explore = [
                     <p>Förslag medan du skriver. Tidigare namn hittas också, och ett felskrivet organisationsnummer fångas av kontrollsiffran.</p>
                 </article>
                 <article class="tile tile--bars reveal" style="--d:1" data-spotlight>
-                    <div class="tile__demo demo-bars" aria-hidden="true">
+                    <div class="tile__demo dark demo-bars" aria-hidden="true">
                         {[42, 51, 58, 71, 86].map((h, i) => <span style={`--h:${h}%;--i:${i}`}><i class="num">{2021 + i}</i></span>)}
                     </div>
                     <h3>Fem års bokslut</h3>
                     <p>Resultat- och balansräkning år för år, med period och källa i varje kolumn.</p>
                 </article>
                 <article class="tile tile--gaps reveal" data-spotlight>
-                    <div class="tile__demo demo-gaps" aria-hidden="true">
+                    <div class="tile__demo dark demo-gaps" aria-hidden="true">
                         <div><span>Nettoomsättning</span><b class="num">2,3 Mkr</b></div>
                         <div><span>Eget kapital</span><b class="gap">saknas</b></div>
                         <div><span>Rörelsemarginal</span><b class="gap">ej jämförbar</b></div>
@@ -152,12 +163,12 @@ const explore = [
                     <p>En uppgift som saknas blir aldrig en nolla, och en negativ siffra syns direkt.</p>
                 </article>
                 <article class="tile tile--report reveal" style="--d:1" data-spotlight>
-                    <div class="tile__demo demo-report" aria-hidden="true">
+                    <div class="tile__demo dark demo-report" aria-hidden="true">
                         <div class="dr__page dr__page--3"></div>
                         <div class="dr__page dr__page--2"></div>
                         <div class="dr__page dr__page--1">
                             <i></i><i></i><i class="short"></i>
-                            <svg viewBox="0 0 120 40"><path d="M0,34 C20,30 30,26 45,24 C60,22 70,14 85,12 C100,10 110,6 120,4" /></svg>
+                            <svg viewBox="0 0 120 40"><path d="M0,34 C20,30 30,26 45,24 C60,22 70,14 85,12 C100,10 110,6 120,4"></path></svg>
                             <i></i><i class="short"></i>
                         </div>
                         <div class="dr__scan"></div>
@@ -169,11 +180,11 @@ const explore = [
         </div>
     </section>
 
-    <!-- ============================================================ STATES (day) -->
+    <!-- ============================================================ STATES -->
     <section class="section states">
         <div class="shell">
             <div class="section__head">
-                <h2 class="reveal">Varje värde har ett tillstånd, inte bara en siffra.</h2>
+                <h2 class="reveal">Varje värde har ett tillstånd, <span class="tone">inte bara en siffra.</span></h2>
                 <p class="reveal" style="--d:1">Små bolag lämnar ofta förkortade bokslut, och alla räkenskapsår är inte tolv månader. Därför skiljer vi på fem sorters värden.</p>
             </div>
             <ol class="states__row">
@@ -195,42 +206,43 @@ const explore = [
         </div>
     </section>
 
-    <!-- ============================================================ SOURCES (day, photo) -->
+    <!-- ============================================================ SOURCES -->
     <section class="section sources">
         <div class="shell sources__grid">
-            <div class="sources__photo reveal">
+            <div class="sources__photo" data-clip>
                 <Picture src={laplandImg} alt="Snötäckt fjällandskap i Lappland i kvällsljus" formats={['avif', 'webp']} widths={[700, 1200]} sizes="(max-width: 900px) 100vw, 50vw" class="sources__img" />
-                <div class="sources__chip glass dark">
-                    <span class="num">Bolagsverket</span>
+                <div class="sources__chip">
+                    <b>Bolagsverket</b>
                     <span>Årsredovisning 2025 · registrerad 15 maj 2026</span>
                 </div>
             </div>
             <div class="sources__copy">
-                <h2 class="reveal">Källan först. Alltid.</h2>
+                <p class="chip reveal"><Icon name="doc" /> Källor</p>
+                <h2 class="reveal">Källan först. <span class="tone">Alltid.</span></h2>
                 <p class="lede reveal" style="--d:1">Under varje tabell står varifrån siffrorna kommer, vilket räkenskapsår de gäller och när vi hämtade dem.</p>
-                <ol class="sources__list">
-                    <li class="reveal" style="--d:2"><div><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></div></li>
-                    <li class="reveal" style="--d:3"><div><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></div></li>
-                    <li class="reveal" style="--d:4"><div><b>Valuatum</b><span>Nyckeltal med publicerade formler. Kreditbetyg först när modellen är validerad för Sverige.</span></div></li>
-                </ol>
+                <ul class="sources__list">
+                    <li class="reveal" style="--d:2"><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></li>
+                    <li class="reveal" style="--d:3"><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></li>
+                    <li class="reveal" style="--d:4"><b>Valuatum</b><span>Nyckeltal med publicerade formler. Kreditbetyg först när modellen är validerad för Sverige.</span></li>
+                </ul>
                 <p class="small muted reveal">Källorna kräver avtal om datalicens innan publicering. <a href="/kallor/">Om datakällorna</a></p>
             </div>
         </div>
     </section>
 
     <!-- ============================================================ REPORTS (aurora) -->
-    <section class="reports dark grain">
+    <section class="reports dark">
         <Picture src={auroraImg} alt="" formats={['avif', 'webp']} widths={[1000, 1800, 2600]} sizes="100vw" class="reports__img" aria-hidden="true" />
         <div class="reports__shade" aria-hidden="true"></div>
         <div class="shell reports__inner">
             <div class="section__head">
-                <h2 class="reveal">Två rapporter. När de är redo.</h2>
+                <h2 class="reveal">Två rapporter. <span class="tone">När de är redo.</span></h2>
                 <p class="reveal" style="--d:1">Rapporterna om svenska företag är under utveckling. Vi visar inga priser och tar inga beställningar förrän allt är granskat.</p>
             </div>
             <div class="reports__grid">
                 {
                     reports.map(({ p, s }, i) => (
-                        <article class="rcard glass reveal" style={`--d:${i}`} data-spotlight>
+                        <article class="rcard reveal" style={`--d:${i}`} data-spotlight>
                             <div class="rcard__top">
                                 <h3>{p === 'basic' ? 'Basrapport' : 'AI-rapport'}</h3>
                                 <span class="tag tag--warn">{STATE_LABEL[s.kind]}</span>
@@ -250,8 +262,8 @@ const explore = [
                             </ul>
                             <div class="rcard__foot">
                                 <span class="rcard__price">Pris: inte fastställt</span>
-                                <a class="btn btn--quiet" href={p === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'}>
-                                    Läs mer <Icon name="arrow" />
+                                <a class="btn" href={p === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'}>
+                                    Läs mer
                                 </a>
                             </div>
                         </article>
@@ -261,11 +273,11 @@ const explore = [
         </div>
     </section>
 
-    <!-- ============================================================ EXPLORE (day) -->
+    <!-- ============================================================ EXPLORE -->
     <section class="section explore">
         <div class="shell">
             <div class="section__head">
-                <h2 class="reveal">Hitta företag på fler sätt.</h2>
+                <h2 class="reveal">Hitta företag <span class="tone">på fler sätt.</span></h2>
                 <p class="reveal" style="--d:1">Bläddra efter bransch och ort, jämför i topplistor eller läs på om nyckeltal.</p>
             </div>
             <ul class="explore__list">
@@ -288,10 +300,10 @@ const explore = [
     </section>
 
     <!-- ============================================================ CTA -->
-    <section class="cta dark grain">
-        <div class="cta__glow" aria-hidden="true"></div>
+    <section class="cta dark">
+        <Circuit tone="dark" />
         <div class="shell cta__inner">
-            <h2 class="reveal">Börja med ett organisations&shy;nummer.</h2>
+            <h2 class="reveal">Börja med ett <span class="tone">organisations&shy;nummer.</span></h2>
             <div class="cta__search reveal" style="--d:1"><SearchBox id="cta-q" /></div>
             {!FLAGS.checkout && <p class="small reveal" style="--d:2">Profilerna är gratis. Rapporter säljs inte ännu.</p>}
         </div>
@@ -302,261 +314,365 @@ const explore = [
     /* ---------------- hero */
     .hero {
         position: relative;
-        min-height: max(760px, min(100svh, 1000px));
-        display: flex;
-        align-items: center;
         overflow: hidden;
         isolation: isolate;
+        padding-top: clamp(40px, 7vw, 88px);
     }
-    .hero__media {
-        position: absolute;
-        inset: 0;
+    .hero :global(.circuit) {
         z-index: -1;
+        mask-image: radial-gradient(ellipse 75% 70% at 50% 45%, transparent 22%, #000 62%);
     }
-    .hero__media :global(.hero__img),
-    .hero__media :global(picture) {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-    }
-    .hero__media :global(img) {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        object-position: 50% 50%;
-        transform: scale(1.04);
-        animation: hero-drift 30s ease-in-out infinite alternate;
-    }
-    @keyframes hero-drift {
-        to {
-            transform: scale(1.1) translate(-1%, -0.5%);
-        }
-    }
-    .hero__sky {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-        transform: scale(1.04);
-        animation: hero-drift 30s ease-in-out infinite alternate;
-    }
-    .hero__gridline {
-        stroke: rgb(238 243 250 / 0.12);
-        stroke-width: 1.6;
-        stroke-dasharray: 6 14;
-    }
-    .hero__skyline {
-        fill: none;
-        stroke: url(#skyline-stroke);
-        stroke-width: 4;
-        stroke-linejoin: round;
-        stroke-dasharray: 1;
-        stroke-dashoffset: 1;
-        animation: sky-draw 3.4s var(--ease-out) 0.5s forwards;
-    }
-    @keyframes sky-draw {
-        to {
-            stroke-dashoffset: 0;
-        }
-    }
-    .hero__runner {
-        fill: #ffe2b0;
-    }
-    .hero__peak {
-        fill: #f4bf72;
-        opacity: 0;
-        animation: peak 3.2s ease-in-out 3s infinite;
-    }
-    @keyframes peak {
-        0%,
-        100% {
-            opacity: 0.2;
-            r: 6;
-        }
-        50% {
-            opacity: 0.95;
-            r: 11;
-        }
-    }
-    .hero__shade {
-        position: absolute;
-        inset: 0;
-        background:
-            linear-gradient(180deg, rgb(5 10 21 / 0.85) 0%, rgb(5 10 21 / 0.35) 30%, rgb(5 10 21 / 0) 55%, rgb(5 10 21 / 0.55) 82%, var(--night) 100%),
-            linear-gradient(90deg, rgb(5 10 21 / 0.82) 0%, rgb(5 10 21 / 0.45) 40%, rgb(5 10 21 / 0) 62%);
-    }
-    .hero__grid {
+    .hero__inner {
         display: grid;
-        grid-template-columns: repeat(12, minmax(0, 1fr));
-        column-gap: var(--col-gap);
-        row-gap: 48px;
-        align-items: center;
-        padding-top: 120px;
-        padding-bottom: 72px;
+        justify-items: center;
+        text-align: center;
     }
-    .hero__copy {
-        grid-column: 1 / span 6;
+    .hero__badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--ink-2);
+    }
+    .hero__sq {
+        display: grid;
+        place-items: center;
+        width: 18px;
+        height: 18px;
+        border-radius: 3px;
+        background: var(--forest);
+        color: #f3f6f2;
+        font-size: 0.7rem;
+        font-weight: 600;
     }
     .hero h1 {
-        margin-top: 0;
-        font-size: clamp(3rem, 1.4rem + 5vw, 5.4rem);
+        margin-top: 22px;
+        font-size: clamp(2.4rem, 1.2rem + 5.2vw, 5.6rem);
         line-height: 0.98;
-        letter-spacing: -0.045em;
+        letter-spacing: -0.055em;
         font-weight: 300;
-        max-width: 12ch;
-        color: #fff;
+        max-width: 17ch;
     }
-    .hero h1 em {
-        font-style: normal;
-        color: var(--gold);
-    }
-    .hero .lede {
-        margin-top: 24px;
-        color: var(--ice-2);
-        max-width: 44ch;
+    .hero__sub {
+        margin-top: 22px;
+        max-width: 40ch;
+        color: var(--ink-3);
+        font-size: 1.02rem;
     }
     .hero__search {
-        margin-top: 36px;
-        max-width: 580px;
+        margin-top: 30px;
+        width: min(560px, 100%);
     }
-    .hero__facts {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px 28px;
-        list-style: none;
-        margin: 26px 0 0;
-        padding: 0;
-        font-size: 0.86rem;
-        color: var(--ice-3);
+    .hero__links {
+        margin-top: 14px;
+        color: var(--ink-3);
     }
-    .hero__facts b {
-        color: var(--ice);
+    .hero__stage {
+        position: relative;
+        display: grid;
+        grid-template-columns: 1fr minmax(0, 520px) 1fr;
+        gap: 28px;
+        align-items: end;
+        margin-top: clamp(48px, 7vw, 88px);
+    }
+    .hero__left {
+        align-self: end;
+        max-width: 30ch;
+        padding-bottom: 48px;
+        font-size: 1.15rem;
+        line-height: 1.3;
+        letter-spacing: -0.02em;
+        color: var(--ink);
+    }
+    .hero__left b {
         font-weight: 500;
-        margin-right: 4px;
+    }
+    .hero__mini {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 12px;
+        font-size: 0.72rem;
+        color: var(--ink-3);
+        letter-spacing: 0;
+    }
+    .hero__mini :global(svg) {
+        width: 13px;
+        height: 13px;
     }
     .hero__card {
-        grid-column: 8 / span 5;
-        align-self: end;
-        margin-bottom: -8px;
+        position: relative;
+        z-index: 2;
+        margin-bottom: -40px;
     }
-    @media (max-width: 1080px) {
-        .hero__shade {
-            background: linear-gradient(180deg, rgb(5 10 21 / 0.78) 0%, rgb(5 10 21 / 0.5) 35%, rgb(5 10 21 / 0.2) 60%, rgb(5 10 21 / 0.55) 85%, var(--night) 100%);
+    .hero__sats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        padding-bottom: 48px;
+    }
+    .sat {
+        padding: 14px;
+        border-radius: 10px;
+        background: var(--night-2);
+        color: var(--ice);
+        box-shadow: 0 24px 50px -30px rgb(15 33 26 / 0.7);
+    }
+    .sat__head {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+        font-size: 0.7rem;
+        color: var(--ice-3);
+    }
+    .sat__tag {
+        padding: 0 5px;
+        border-radius: 2px;
+        border: 1px solid rgb(255 255 255 / 0.16);
+        font-size: 0.62rem;
+        color: var(--gold);
+    }
+    .sat__v {
+        margin-top: 6px;
+        font-size: 1.35rem;
+        font-weight: 400;
+        letter-spacing: -0.03em;
+    }
+    .sat__spark {
+        width: 100%;
+        height: 34px;
+        margin-top: 8px;
+    }
+    .sat__spark rect {
+        fill: rgb(159 212 176 / 0.35);
+        transform-box: fill-box;
+        transform-origin: bottom;
+    }
+    .sat__spark rect.last {
+        fill: var(--glow);
+    }
+    .sat__meter {
+        height: 6px;
+        margin-top: 18px;
+        border-radius: 2px;
+        background: rgb(255 255 255 / 0.1);
+        overflow: hidden;
+    }
+    .sat__meter i {
+        display: block;
+        width: var(--w);
+        height: 100%;
+        background: var(--glow);
+        transform-origin: left;
+    }
+    .sat__foot {
+        margin-top: 10px;
+        font-size: 0.66rem;
+        color: var(--ice-3);
+        line-height: 1.35;
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .sat.in .sat__spark rect {
+            animation: grow 1s var(--ease-out) both;
         }
-        .hero__media {
-            bottom: auto;
-            height: min(100svh, 900px);
+        .sat.in .sat__spark rect:nth-child(2) {
+            animation-delay: 80ms;
         }
-        .hero__media :global(img),
-        .hero__sky {
-            object-position: 38% 50%;
+        .sat.in .sat__spark rect:nth-child(3) {
+            animation-delay: 160ms;
         }
-        .hero .lede,
-        .hero__facts {
-            color: var(--ice);
+        .sat.in .sat__spark rect:nth-child(4) {
+            animation-delay: 240ms;
         }
-        .hero__copy,
+        .sat.in .sat__spark rect:nth-child(5) {
+            animation-delay: 320ms;
+        }
+        .sat.in .sat__meter i {
+            animation: fill 1.4s var(--ease-out) 200ms both;
+        }
+    }
+    @keyframes grow {
+        from {
+            transform: scaleY(0);
+        }
+    }
+    @keyframes fill {
+        from {
+            transform: scaleX(0);
+        }
+    }
+    @media (max-width: 1100px) {
+        .hero__stage {
+            grid-template-columns: 1fr;
+            justify-items: center;
+        }
+        .hero__left {
+            order: 2;
+            padding-bottom: 0;
+            text-align: center;
+        }
+        .hero__mini {
+            justify-content: center;
+        }
+        .hero__stage > * {
+            min-width: 0;
+        }
         .hero__card {
-            grid-column: 1 / -1;
-        }
-        .hero__card {
+            width: 100%;
             max-width: 560px;
+            margin-bottom: 0;
         }
-        .hero {
-            align-items: flex-start;
-        }
-    }
-    @media (max-width: 560px) {
-        .hero__grid {
-            padding-top: 104px;
-        }
-        .hero__facts {
-            font-size: 0.8rem;
-            gap: 6px 16px;
+        .hero__sats {
+            order: 3;
+            width: min(560px, 100%);
         }
     }
 
-    /* ---------------- marquee */
-    .marquee {
+    /* ---------------- dark slab */
+    .slab {
+        position: relative;
+        z-index: 1;
         overflow: hidden;
-        border-block: 1px solid rgb(255 255 255 / 0.07);
-        padding-block: 18px;
+        border-radius: 28px 28px 0 0;
+        padding-block: clamp(112px, 12vw, 168px) clamp(72px, 9vw, 120px);
+        background: var(--night);
     }
-    .marquee__track {
+    .slab :global(.slab__circuit) {
+        opacity: 0.6;
+        mask-image: linear-gradient(180deg, #000, transparent 50%);
+    }
+    .slab__inner {
+        position: relative;
+        display: grid;
+        justify-items: center;
+        text-align: center;
+    }
+    .statement {
+        margin-top: 28px;
+        max-width: 26ch;
+        font-size: clamp(1.9rem, 1rem + 3vw, 3.4rem);
+        font-weight: 300;
+        line-height: 1.12;
+        letter-spacing: -0.045em;
+        color: var(--ice);
+    }
+    .statement :global(.w) {
+        color: #50675b;
+        transition: color 400ms var(--ease-out);
+    }
+    .statement :global(.w.on) {
+        color: var(--ice);
+    }
+    .stats {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        max-width: 1000px;
+        margin: clamp(56px, 7vw, 88px) 0 0;
+    }
+    .stats > div {
         display: flex;
-        width: max-content;
-        animation: marquee 50s linear infinite;
-        mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+        flex-direction: column-reverse;
+        gap: 8px;
+        padding: 8px 24px;
     }
-    .marquee ul {
-        display: flex;
-        gap: 48px;
-        list-style: none;
-        margin: 0;
-        padding: 0 24px;
+    .stats > div + div {
+        border-left: 1px solid rgb(255 255 255 / 0.14);
     }
-    .marquee li {
-        font-family: var(--serif);
-        font-size: 1.15rem;
-        font-weight: 350;
+    .stats dt {
+        font-size: 0.85rem;
         color: var(--ice-3);
-        white-space: nowrap;
     }
-    .marquee li::before {
-        content: '';
-        display: inline-block;
-        width: 5px;
-        height: 5px;
-        margin-right: 48px;
-        border-radius: 50%;
-        background: var(--gold);
-        vertical-align: middle;
-        opacity: 0.7;
+    .stats dd {
+        margin: 0;
+        font-size: clamp(2.6rem, 1.6rem + 3vw, 4rem);
+        font-weight: 300;
+        letter-spacing: -0.05em;
+        color: var(--ice);
     }
-    @keyframes marquee {
-        to {
-            transform: translateX(-50%);
+    .city {
+        position: relative;
+        width: 100%;
+        margin: clamp(64px, 8vw, 104px) 0 0;
+        aspect-ratio: 16 / 7;
+        border-radius: 16px;
+        overflow: hidden;
+        clip-path: inset(calc(var(--clip, 0) * 10%) calc(var(--clip, 0) * 16%) round 16px);
+    }
+    .city :global(picture),
+    .city :global(img) {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 62%;
+        scale: calc(1 + var(--clip, 0) * 0.12);
+    }
+    .city__cap {
+        position: absolute;
+        left: 20px;
+        bottom: 20px;
+        display: grid;
+        gap: 2px;
+        max-width: 380px;
+        padding: 14px 16px;
+        border-radius: 8px;
+        text-align: left;
+        font-size: 0.85rem;
+        background: rgb(13 31 24 / 0.55) !important;
+    }
+    @media (max-width: 700px) {
+        .stats {
+            grid-template-columns: 1fr;
+        }
+        .stats > div + div {
+            border-left: 0;
+            border-top: 1px solid rgb(255 255 255 / 0.14);
+        }
+        .stats > div {
+            padding: 20px 0;
+        }
+        .city {
+            aspect-ratio: 4 / 5;
+        }
+        .city__cap {
+            right: 16px;
+            left: 16px;
+            bottom: 16px;
         }
     }
 
     /* ---------------- bento */
-    .bento-wrap {
-        background:
-            radial-gradient(60% 50% at 80% 10%, rgb(42 91 184 / 0.18), transparent 70%),
-            var(--night);
-    }
     .bento {
         display: grid;
         grid-template-columns: repeat(12, minmax(0, 1fr));
-        gap: 16px;
+        gap: 14px;
     }
     .tile {
         position: relative;
         overflow: hidden;
-        padding: 24px;
-        border-radius: 24px;
-        background: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.02));
-        border: 1px solid rgb(255 255 255 / 0.09);
+        padding: 12px 12px 24px;
+        border-radius: var(--radius-lg);
+        background: var(--sheet);
+        border: 1px solid var(--rule);
         display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
+        transition: box-shadow 300ms var(--ease-out);
     }
-    .tile::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(360px circle at var(--mx, -500px) var(--my, -500px), rgb(127 178 255 / 0.12), transparent 60%);
-        pointer-events: none;
+    .tile:hover {
+        box-shadow: var(--card-shadow);
     }
     .tile h3 {
-        font-size: 1.4rem;
+        font-size: 1.35rem;
         font-weight: 400;
-        margin-top: auto;
+        letter-spacing: -0.035em;
+        margin: 10px 12px 0;
     }
-    .tile p {
-        color: var(--ice-3);
-        font-size: 0.95rem;
+    .tile > p {
+        margin: 0 12px;
+        color: var(--ink-3);
+        font-size: 0.93rem;
         max-width: 48ch;
     }
     .tile--search {
@@ -573,31 +689,38 @@ const explore = [
     }
     .tile__demo {
         position: relative;
-        min-height: 220px;
-        margin-bottom: 14px;
+        min-height: 240px;
+        padding: 22px;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .tile__demo::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(320px circle at var(--mx, -500px) var(--my, -500px), rgb(159 212 176 / 0.14), transparent 60%);
+        pointer-events: none;
     }
     @media (max-width: 900px) {
         .tile {
             grid-column: 1 / -1 !important;
         }
     }
-
-    /* search demo */
     .ds__bar {
         display: flex;
         align-items: center;
         gap: 10px;
-        height: 50px;
-        padding: 0 18px;
-        border-radius: 999px;
-        background: rgb(255 255 255 / 0.08);
-        border: 1px solid rgb(255 255 255 / 0.14);
+        height: 46px;
+        padding: 0 14px;
+        border-radius: 6px;
+        background: rgb(255 255 255 / 0.07);
+        border: 1px solid rgb(255 255 255 / 0.12);
         font-size: 0.95rem;
         color: var(--ice);
     }
     .ds__bar :global(svg) {
-        width: 18px;
-        height: 18px;
+        width: 17px;
+        height: 17px;
         color: var(--ice-3);
     }
     .ds__typed {
@@ -610,7 +733,7 @@ const explore = [
     .ds__caret {
         width: 2px;
         height: 20px;
-        background: var(--gold);
+        background: var(--glow);
         margin-left: -8px;
         animation: blink 1s steps(1) infinite;
     }
@@ -633,22 +756,22 @@ const explore = [
     }
     .ds__list {
         list-style: none;
-        margin: 10px 0 0;
-        padding: 6px;
-        border-radius: 18px;
-        background: rgb(255 255 255 / 0.95);
-        color: #0a1426;
+        margin: 8px 0 0;
+        padding: 5px;
+        border-radius: 8px;
+        background: #f8f9f6;
+        color: var(--night);
     }
     .ds__list li {
         display: grid;
-        padding: 8px 12px;
-        border-radius: 10px;
-        font-size: 0.86rem;
+        padding: 7px 10px;
+        border-radius: 4px;
+        font-size: 0.84rem;
         opacity: 0;
         animation: row 6s var(--ease-out) infinite;
     }
     .ds__list li:nth-child(1) {
-        background: #eef3fb;
+        background: #e4ede6;
         animation-delay: 0.2s;
     }
     .ds__list li:nth-child(2) {
@@ -658,8 +781,8 @@ const explore = [
         animation-delay: 0.5s;
     }
     .ds__list span {
-        font-size: 0.74rem;
-        color: #5a6781;
+        font-size: 0.72rem;
+        color: #5d6b64;
     }
     @keyframes row {
         0%,
@@ -676,27 +799,24 @@ const explore = [
             opacity: 0;
         }
     }
-
-    /* bars demo */
     .demo-bars {
         display: flex;
         align-items: flex-end;
-        gap: 14px;
-        padding: 10px 6px 26px;
-        border-bottom: 1px solid rgb(255 255 255 / 0.12);
+        gap: 12px;
+        padding-bottom: 42px;
     }
     .demo-bars span {
         position: relative;
         flex: 1;
         height: var(--h);
-        border-radius: 10px 10px 4px 4px;
-        background: linear-gradient(180deg, rgb(127 178 255 / 0.85), rgb(127 178 255 / 0.15));
+        border-radius: 3px;
+        background: rgb(159 212 176 / 0.28);
         transform-origin: bottom;
         animation: bar 5s var(--ease-out) infinite;
         animation-delay: calc(var(--i) * 120ms);
     }
     .demo-bars span:last-child {
-        background: linear-gradient(180deg, #ffd9a0, rgb(244 191 114 / 0.25));
+        background: var(--glow);
     }
     .demo-bars i {
         position: absolute;
@@ -719,22 +839,20 @@ const explore = [
             transform: scaleY(0.05);
         }
     }
-
-    /* gaps demo */
     .demo-gaps {
         display: grid;
         align-content: center;
-        gap: 8px;
+        gap: 6px;
     }
     .demo-gaps div {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 12px 16px;
-        border-radius: 14px;
+        padding: 11px 14px;
+        border-radius: 6px;
         background: rgb(255 255 255 / 0.05);
         border: 1px solid rgb(255 255 255 / 0.08);
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         color: var(--ice-2);
     }
     .demo-gaps b {
@@ -742,17 +860,16 @@ const explore = [
         color: var(--ice);
     }
     .demo-gaps b.neg {
-        color: #ff8a7f;
+        color: var(--red);
     }
     .demo-gaps b.gap {
-        font-family: var(--sans);
         font-style: italic;
         font-weight: 400;
         color: var(--gold);
-        padding: 2px 10px;
-        border-radius: 999px;
-        border: 1px dashed rgb(244 191 114 / 0.5);
-        background: repeating-linear-gradient(45deg, rgb(244 191 114 / 0.1) 0 6px, transparent 6px 12px);
+        padding: 1px 8px;
+        border-radius: 3px;
+        border: 1px dashed rgb(220 181 108 / 0.5);
+        background: repeating-linear-gradient(45deg, rgb(220 181 108 / 0.1) 0 6px, transparent 6px 12px);
         background-size: 200% 100%;
         animation: hatch 4s linear infinite;
     }
@@ -761,18 +878,16 @@ const explore = [
             background-position: -34px 0;
         }
     }
-
-    /* report demo */
     .demo-report {
         display: grid;
         place-items: center;
     }
     .dr__page {
         position: absolute;
-        width: 150px;
-        height: 196px;
-        border-radius: 10px;
-        background: #f6f8fc;
+        width: 140px;
+        height: 184px;
+        border-radius: 6px;
+        background: #f8f9f6;
         box-shadow: 0 20px 40px -20px rgb(0 0 0 / 0.8);
     }
     .dr__page--3 {
@@ -788,7 +903,7 @@ const explore = [
     .dr__page--1 {
         rotate: 5deg;
         translate: 30px 0;
-        padding: 18px 16px;
+        padding: 16px 14px;
         display: flex;
         flex-direction: column;
         gap: 8px;
@@ -797,8 +912,8 @@ const explore = [
     .dr__page--1 i {
         display: block;
         height: 6px;
-        border-radius: 3px;
-        background: #d9e0ec;
+        border-radius: 2px;
+        background: #d3d9d1;
     }
     .dr__page--1 i.short {
         width: 60%;
@@ -806,7 +921,7 @@ const explore = [
     .dr__page--1 i:first-child {
         height: 10px;
         width: 70%;
-        background: #0a1426;
+        background: var(--night);
     }
     .dr__page--1 svg {
         width: 100%;
@@ -814,15 +929,15 @@ const explore = [
     }
     .dr__page--1 path {
         fill: none;
-        stroke: #1f56d6;
+        stroke: #1d5c45;
         stroke-width: 2.5;
     }
     .dr__scan {
         position: absolute;
-        width: 190px;
+        width: 180px;
         height: 2px;
         translate: 30px 0;
-        background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        background: linear-gradient(90deg, transparent, var(--glow), transparent);
         animation: scan 3.4s ease-in-out infinite;
     }
     @keyframes float {
@@ -833,7 +948,7 @@ const explore = [
     @keyframes scan {
         0%,
         100% {
-            top: 12px;
+            top: 24px;
             opacity: 0;
         }
         15%,
@@ -841,15 +956,18 @@ const explore = [
             opacity: 1;
         }
         50% {
-            top: 196px;
+            top: 200px;
         }
     }
 
     /* ---------------- states */
+    .states {
+        padding-top: 0;
+    }
     .states__row {
         display: grid;
         grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 12px;
+        gap: 10px;
         list-style: none;
         margin: 0;
         padding: 0;
@@ -858,29 +976,28 @@ const explore = [
         display: grid;
         gap: 10px;
         align-content: start;
-        padding: 22px;
+        padding: 20px;
         border-radius: var(--radius-lg);
         background: var(--sheet);
         border: 1px solid var(--rule);
-        box-shadow: var(--card-shadow);
     }
     .states__label {
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         font-weight: 500;
         color: var(--ink-3);
     }
     .states__v {
-        font-family: var(--mono);
-        font-size: 1.7rem;
-        letter-spacing: -0.03em;
+        font-size: 1.8rem;
+        font-weight: 300;
+        letter-spacing: -0.04em;
         min-height: 2.4rem;
     }
     .states__means {
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         color: var(--ink-2);
     }
     .states__foot {
-        margin-top: 24px;
+        margin-top: 22px;
     }
     @media (max-width: 1000px) {
         .states__row {
@@ -905,66 +1022,59 @@ const explore = [
     }
     .sources__photo {
         position: relative;
-        border-radius: 28px;
+        border-radius: 16px;
         overflow: hidden;
-        aspect-ratio: 4 / 4.2;
-        box-shadow: 0 40px 80px -40px rgb(10 20 38 / 0.5);
+        aspect-ratio: 4 / 4.3;
+        clip-path: inset(calc(var(--clip, 0) * 8%) round 16px);
     }
     .sources__photo :global(img),
     .sources__photo :global(picture) {
         width: 100%;
         height: 100%;
         object-fit: cover;
+        scale: calc(1 + var(--clip, 0) * 0.1);
     }
     .sources__chip {
         position: absolute;
-        left: 20px;
-        bottom: 20px;
+        left: 16px;
+        bottom: 16px;
         display: grid;
-        gap: 2px;
-        padding: 14px 18px;
-        border-radius: 16px;
-        font-size: 0.82rem;
-        background: rgb(5 10 21 / 0.45) !important;
-        color: var(--ice-2);
+        gap: 1px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        background: var(--sheet);
+        color: var(--ink);
+        font-size: 0.8rem;
+        box-shadow: var(--card-shadow);
     }
-    .sources__chip .num {
-        color: var(--ice);
-        font-weight: 500;
+    .sources__chip span {
+        color: var(--ink-3);
+    }
+    .sources__copy h2 {
+        margin-top: 18px;
     }
     .sources__copy .lede {
         margin-top: 18px;
     }
     .sources__list {
         list-style: none;
-        margin: 32px 0 24px;
+        margin: 30px 0 22px;
         padding: 0;
-        display: grid;
-        gap: 10px;
+        border-top: 1px solid var(--rule-2);
     }
     .sources__list li {
-        display: flex;
-        gap: 18px;
-        padding: 18px 20px;
-        border-radius: 16px;
-        background: var(--sheet);
-        border: 1px solid var(--rule);
-    }
-    .sources__list div {
         display: grid;
-        gap: 2px;
+        grid-template-columns: 9rem 1fr;
+        gap: 16px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--rule-2);
     }
     .sources__list b {
-        font-weight: 600;
+        font-weight: 500;
     }
-    .sources__list span:not(.sources__n) {
+    .sources__list span {
         color: var(--ink-2);
         font-size: 0.93rem;
-    }
-    .sources__n {
-        color: var(--ochre-ink);
-        font-size: 0.85rem;
-        padding-top: 2px;
     }
     @media (max-width: 900px) {
         .sources__grid {
@@ -973,6 +1083,10 @@ const explore = [
         .sources__photo {
             aspect-ratio: 4 / 3;
         }
+        .sources__list li {
+            grid-template-columns: 1fr;
+            gap: 2px;
+        }
     }
 
     /* ---------------- reports */
@@ -980,7 +1094,9 @@ const explore = [
         position: relative;
         overflow: hidden;
         isolation: isolate;
-        padding-block: clamp(96px, 12vw, 180px);
+        border-radius: 28px;
+        margin-inline: clamp(8px, 1.4vw, 20px);
+        padding-block: clamp(96px, 11vw, 160px);
     }
     .reports :global(.reports__img),
     .reports > :global(picture) {
@@ -998,12 +1114,12 @@ const explore = [
         position: absolute;
         inset: 0;
         z-index: -1;
-        background: linear-gradient(180deg, var(--night) 0%, rgb(5 10 21 / 0.55) 30%, rgb(5 10 21 / 0.55) 70%, var(--night) 100%);
+        background: linear-gradient(180deg, rgb(13 31 24 / 0.9) 0%, rgb(13 31 24 / 0.55) 40%, rgb(13 31 24 / 0.85) 100%);
     }
     .reports__grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
-        gap: 20px;
+        gap: 14px;
     }
     .rcard {
         position: relative;
@@ -1011,14 +1127,18 @@ const explore = [
         display: flex;
         flex-direction: column;
         gap: 18px;
-        padding: 32px;
-        border-radius: 28px;
+        padding: 28px;
+        border-radius: 14px;
+        background: rgb(13 31 24 / 0.72);
+        border: 1px solid rgb(255 255 255 / 0.1);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
     }
     .rcard::before {
         content: '';
         position: absolute;
         inset: 0;
-        background: radial-gradient(420px circle at var(--mx, -500px) var(--my, -500px), rgb(244 191 114 / 0.1), transparent 60%);
+        background: radial-gradient(420px circle at var(--mx, -500px) var(--my, -500px), rgb(159 212 176 / 0.1), transparent 60%);
         pointer-events: none;
     }
     .rcard__top {
@@ -1028,33 +1148,32 @@ const explore = [
         gap: 12px;
     }
     .rcard h3 {
-        font-size: 2rem;
-        font-weight: 350;
-        letter-spacing: -0.03em;
+        font-size: 1.9rem;
+        font-weight: 300;
+        letter-spacing: -0.045em;
     }
     .rcard__lede {
         color: var(--ice-2);
-        font-size: 1.02rem;
     }
     .rcard__list {
         list-style: none;
         margin: 0;
-        padding: 18px 0 0;
+        padding: 16px 0 0;
         border-top: 1px solid rgb(255 255 255 / 0.1);
         display: grid;
-        gap: 12px;
+        gap: 11px;
     }
     .rcard__list li {
         display: flex;
         gap: 10px;
         align-items: center;
         color: var(--ice);
-        font-size: 0.95rem;
+        font-size: 0.94rem;
     }
     .rcard__list :global(svg) {
-        width: 18px;
-        height: 18px;
-        color: var(--gold);
+        width: 16px;
+        height: 16px;
+        color: var(--glow);
         flex-shrink: 0;
     }
     .rcard__foot {
@@ -1063,10 +1182,9 @@ const explore = [
         align-items: center;
         gap: 12px;
         margin-top: auto;
-        padding-top: 10px;
+        padding-top: 8px;
     }
     .rcard__price {
-        font-family: var(--mono);
         font-size: 0.85rem;
         color: var(--ice-3);
     }
@@ -1075,7 +1193,7 @@ const explore = [
             grid-template-columns: 1fr;
         }
         .rcard {
-            padding: 24px;
+            padding: 22px;
         }
     }
 
@@ -1094,13 +1212,13 @@ const explore = [
         grid-template-columns: 4rem 1fr 1.2fr auto;
         align-items: center;
         gap: 24px;
-        padding: 28px 8px;
+        padding: 26px 8px;
         color: var(--ink);
         text-decoration: none;
         transition:
             padding 300ms var(--ease-out),
             background 300ms var(--ease-out);
-        border-radius: 16px;
+        border-radius: 8px;
     }
     .explore__list a:hover {
         background: var(--sheet);
@@ -1111,10 +1229,9 @@ const explore = [
         color: var(--ink-3);
     }
     .explore__t {
-        font-family: var(--serif);
         font-size: clamp(1.8rem, 1.2rem + 2vw, 2.8rem);
-        font-weight: 350;
-        letter-spacing: -0.03em;
+        font-weight: 300;
+        letter-spacing: -0.05em;
     }
     .explore__x {
         color: var(--ink-2);
@@ -1122,23 +1239,26 @@ const explore = [
     .explore__go {
         display: grid;
         place-items: center;
-        width: 48px;
-        height: 48px;
-        border-radius: 50%;
+        width: 42px;
+        height: 42px;
+        border-radius: 4px;
         border: 1px solid var(--rule-2);
         transition:
             background 300ms var(--ease-out),
-            color 300ms var(--ease-out),
-            rotate 300ms var(--ease-out);
+            color 300ms var(--ease-out);
     }
     .explore__go :global(svg) {
-        width: 18px;
-        height: 18px;
+        width: 17px;
+        height: 17px;
+        transition: translate 300ms var(--ease-out);
     }
     .explore__list a:hover .explore__go {
-        background: var(--ink);
-        color: var(--paper);
-        rotate: -45deg;
+        background: var(--forest);
+        color: #f3f6f2;
+        border-color: var(--forest);
+    }
+    .explore__list a:hover .explore__go :global(svg) {
+        translate: 2px 0;
     }
     @media (max-width: 760px) {
         .explore__list a {
@@ -1162,42 +1282,29 @@ const explore = [
     .cta {
         position: relative;
         overflow: hidden;
+        isolation: isolate;
         padding-block: clamp(96px, 12vw, 160px);
         text-align: center;
+        border-radius: 28px 28px 0 0;
     }
-    .cta__glow {
-        position: absolute;
-        left: 50%;
-        top: 100%;
-        width: 1400px;
-        height: 700px;
-        translate: -50% -45%;
-        border-radius: 50%;
-        background: radial-gradient(closest-side, rgb(42 91 184 / 0.55), rgb(244 191 114 / 0.08) 60%, transparent);
-        filter: blur(20px);
-        animation: breathe 9s ease-in-out infinite;
-    }
-    @keyframes breathe {
-        50% {
-            scale: 1.08;
-            opacity: 0.8;
-        }
+    .cta :global(.circuit) {
+        z-index: -1;
+        mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 25%, #000 70%);
     }
     .cta__inner {
         position: relative;
         display: grid;
         justify-items: center;
-        gap: 28px;
+        gap: 26px;
     }
     .cta h2 {
         font-size: clamp(2.1rem, 1rem + 5vw, 4.6rem);
-        overflow-wrap: anywhere;
-        hyphens: auto;
         font-weight: 300;
         max-width: 16ch;
+        hyphens: manual;
     }
     .cta__search {
-        width: min(600px, 100%);
+        width: min(560px, 100%);
     }
     .cta .small {
         color: var(--ice-3);

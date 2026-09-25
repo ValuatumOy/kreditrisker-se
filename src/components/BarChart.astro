@@ -32,8 +32,8 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
 
 <svg class="bars" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`${title}. ${summary}`}>
     <defs>
-        <linearGradient id={`${uid}-bar`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8db4ff" /><stop offset="1" stop-color="#dce8ff" /></linearGradient>
-        <linearGradient id={`${uid}-last`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f56d6" /><stop offset="1" stop-color="#6d97f0" /></linearGradient>
+        <linearGradient id={`${uid}-bar`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc9ab" /><stop offset="1" stop-color="#d8e7dc" /></linearGradient>
+        <linearGradient id={`${uid}-last`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d5c45" /><stop offset="1" stop-color="#4f8a6c" /></linearGradient>
         <linearGradient id={`${uid}-neg`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f1a198" /><stop offset="1" stop-color="#c2362b" /></linearGradient>
         <pattern id={uid} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
             <line x1="0" y1="0" x2="0" y2="6" stroke="var(--rule-2)" stroke-width="1.2"></line>
@@ -65,7 +65,7 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
                     {n === 0 ? (
                         <line x1={cx - barW / 2} x2={cx + barW / 2} y1={zeroY} y2={zeroY} class="bars__zero" />
                     ) : (
-                        <rect x={cx - barW / 2} y={Math.min(yv, zeroY)} width={barW} height={Math.max(h, 1)} rx="6" fill={n < 0 ? `url(#${uid}-neg)` : last ? `url(#${uid}-last)` : `url(#${uid}-bar)`} />
+                        <rect x={cx - barW / 2} y={Math.min(yv, zeroY)} width={barW} height={Math.max(h, 1)} rx="3" fill={n < 0 ? `url(#${uid}-neg)` : last ? `url(#${uid}-last)` : `url(#${uid}-bar)`} />
                     )}
                     <text x={cx} y={n < 0 ? zeroY + h + 15 : yv - 8} text-anchor="middle" class="bars__v">
                         {d.text}
@@ -84,7 +84,7 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
         width: 100%;
         height: auto;
         overflow: visible;
-        font-family: var(--mono);
+        font-family: var(--sans);
     }
     .bars__base {
         stroke: var(--rule-2);
