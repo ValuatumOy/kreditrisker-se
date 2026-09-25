@@ -6,3 +6,6 @@ data/staging/
 data/releases/*
 !data/releases/.gitkeep
 dist-mock/
+
+.vercel
+.env*
