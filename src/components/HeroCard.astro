@@ -1,0 +1,306 @@
+---
+// Floating glass profile card in the home hero. Renders three synthetic
+// fixtures (full, sparse, stale) with the real formatting and state rules;
+// numbers count up, the chart draws itself, tabs cycle when idle.
+import type { PublishedCompany, Value } from '../lib/contract/types.ts'
+import { compactSek, count, FRESHNESS_TEXT, kommunName, percent, periodLabel, type Display } from '../lib/format.ts'
+import { formatOrgnr } from '../lib/orgnr.ts'
+import { computeMetrics } from '../lib/metrics.ts'
+import LineChart from './LineChart.astro'
+import { SITE } from '../config/site.ts'
+
+interface Props {
+    samples: { key: string; tab: string; note: string; company: PublishedCompany }[]
+}
+const { samples } = Astro.props
+const expectedLastYear = Number(SITE.asOf.slice(0, 4)) - (Number(SITE.asOf.slice(5, 7)) >= 8 ? 1 : 2)
+
+type Cell = { label: string; d: Display; count?: { to: number; decimals: number; suffix: string } }
+const sek = (v: Value): Cell['count'] => {
+    if (v.status !== 'reported') return undefined
+    const a = Math.abs(v.value)
+    if (a >= 1e6) return { to: v.value / 1e6, decimals: 1, suffix: ' Mkr' }
+    if (a >= 1e3) return { to: Math.round(v.value / 1e3), decimals: 0, suffix: ' tkr' }
+    return undefined
+}
+const pct = (v: Value, decimals = 1): Cell['count'] => (v.status === 'derived' ? { to: v.value * 100, decimals, suffix: ' %' } : undefined)
+const cellsFor = (c: PublishedCompany): Cell[] => {
+    const [p, prior] = c.record.periods
+    const m = computeMetrics(p, prior)
+    return [
+        { label: 'Nettoomsättning', d: compactSek(p.income.netSales), count: sek(p.income.netSales) },
+        { label: 'Rörelseresultat', d: compactSek(p.income.operatingProfit), count: sek(p.income.operatingProfit) },
+        { label: 'Soliditet', d: percent(m.equityRatio), count: pct(m.equityRatio) },
+        { label: 'Anställda', d: count(p.employees), count: p.employees.status === 'reported' ? { to: p.employees.value, decimals: 0, suffix: '' } : undefined },
+    ]
+}
+---
+
+<figure class="hc glass" data-hero-card data-tilt="5">
+    <div class="hc__top">
+        <span class="hc__label"><span class="hc__dot" aria-hidden="true"></span> Syntetiskt exempel</span>
+        <div class="hc__tabs" role="tablist" aria-label="Exempeldata">
+            {
+                samples.map((s, i) => (
+                    <button role="tab" id={`hc-tab-${s.key}`} aria-controls={`hc-panel-${s.key}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+                        {s.tab}
+                    </button>
+                ))
+            }
+        </div>
+    </div>
+    {
+        samples.map((s, i) => {
+            const r = s.company.record
+            const f = FRESHNESS_TEXT[s.company.freshness]
+            const series = [...r.periods].reverse().slice(-5).map((p) => ({ label: periodLabel(p), value: p.income.netSales }))
+            if (s.company.freshness === 'stale') for (let y = Number(r.periods[0].end.slice(0, 4)) + 1; y <= expectedLastYear && series.length < 6; y++) series.push({ label: String(y), value: { status: 'missing', reason: 'not_filed' } })
+            return (
+                <section class="hc__panel" role="tabpanel" id={`hc-panel-${s.key}`} aria-labelledby={`hc-tab-${s.key}`} hidden={i !== 0}>
+                    <div class="hc__id">
+                        <div class="hc__mark" aria-hidden="true">
+                            {r.name.replace('Exempel ', '').slice(0, 1)}
+                        </div>
+                        <div class="hc__who">
+                            <p class="hc__name">{r.name}</p>
+                            <p class="hc__meta num">
+                                {formatOrgnr(r.orgnr)} · {r.municipality && kommunName(r.municipality.name)}
+                            </p>
+                        </div>
+                        <span class:list={['tag', s.company.freshness === 'current' ? 'tag--ok' : 'tag--warn']}>
+                            {f.label} {periodLabel(r.periods[0])}
+                        </span>
+                    </div>
+                    <dl class="hc__kf">
+                        {cellsFor(s.company).map((c) => (
+                            <div>
+                                <dt>{c.label}</dt>
+                                <dd
+                                    class:list={['num', `val--${c.d.state}`]}
+                                    title={c.d.note}
+                                    data-count={c.count?.to}
+                                    data-decimals={c.count?.decimals}
+                                    data-suffix={c.count?.suffix}
+                                >
+                                    {c.d.text}
+                                </dd>
+                            </div>
+                        ))}
+                    </dl>
+                    <div class="hc__chart">
+                        <div class="hc__charthead">
+                            <span>Nettoomsättning</span>
+                            <span class="num">{series[0].label}–{series.at(-1)!.label}</span>
+                        </div>
+                        <LineChart title={`Nettoomsättning, ${r.name}`} points={series} height={140} />
+                    </div>
+                    <p class="hc__note">{s.note}</p>
+                </section>
+            )
+        })
+    }
+    <figcaption class="visually-hidden">Syntetiska testdata. Företagen finns inte.</figcaption>
+</figure>
+
+<script>
+    for (const root of document.querySelectorAll<HTMLElement>('[data-hero-card]')) {
+        const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role=tab]')]
+        const panels = [...root.querySelectorAll<HTMLElement>('[role=tabpanel]')]
+        let current = 0
+        let auto: number | undefined
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+        const show = (i: number, focus = false) => {
+            current = i
+            tabs.forEach((t, j) => {
+                t.setAttribute('aria-selected', String(j === i))
+                t.tabIndex = j === i ? 0 : -1
+            })
+            panels.forEach((p, j) => {
+                p.hidden = j !== i
+                if (j === i) {
+                    // restart the chart draw animation
+                    p.querySelectorAll('svg').forEach((svg) => svg.replaceWith(svg.cloneNode(true)))
+                    p.classList.remove('is-in')
+                    void p.offsetWidth
+                    p.classList.add('is-in')
+                }
+            })
+            if (focus) tabs[i].focus()
+        }
+        const stop = () => clearInterval(auto)
+        tabs.forEach((t, i) => t.addEventListener('click', () => (stop(), show(i))))
+        root.querySelector('[role=tablist]')!.addEventListener('keydown', (e) => {
+            const k = (e as KeyboardEvent).key
+            if (k !== 'ArrowRight' && k !== 'ArrowLeft') return
+            stop()
+            show((current + (k === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length, true)
+        })
+        if (!reduce) {
+            auto = window.setInterval(() => show((current + 1) % tabs.length), 7000)
+            root.addEventListener('focusin', stop, { once: true })
+        }
+    }
+</script>
+
+<style>
+    .hc {
+        margin: 0;
+        background: linear-gradient(180deg, rgb(12 22 42 / 0.72), rgb(6 12 26 / 0.78)) !important;
+        padding: 20px;
+        border-radius: 24px;
+        color: var(--ice);
+        transition: transform 500ms var(--ease-out);
+        will-change: transform;
+    }
+    .hc__top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+    .hc__label {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.76rem;
+        color: var(--gold);
+        white-space: nowrap;
+    }
+    .hc__dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gold);
+    }
+    .hc__tabs {
+        display: flex;
+        gap: 2px;
+        padding: 3px;
+        border-radius: 999px;
+        background: rgb(0 0 0 / 0.25);
+        border: 1px solid rgb(255 255 255 / 0.08);
+    }
+    .hc__tabs button {
+        min-height: 30px;
+        padding: 0 12px;
+        border: 0;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--ice-3);
+        font: 500 0.78rem var(--sans);
+        cursor: pointer;
+        transition:
+            background 200ms,
+            color 200ms;
+    }
+    .hc__tabs button[aria-selected='true'] {
+        background: rgb(255 255 255 / 0.14);
+        color: var(--ice);
+    }
+    .hc__id {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+    .hc__mark {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex-shrink: 0;
+        border-radius: 12px;
+        background: linear-gradient(145deg, #2a5bb8, #0f2146);
+        border: 1px solid rgb(255 255 255 / 0.16);
+        font-family: var(--serif);
+        font-size: 1.3rem;
+        color: var(--ice);
+    }
+    .hc__who {
+        flex: 1;
+        min-width: 0;
+    }
+    .hc__name {
+        font-weight: 600;
+        font-size: 1.02rem;
+        letter-spacing: -0.01em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .hc__meta {
+        font-size: 0.76rem;
+        color: var(--ice-3);
+    }
+    .hc__kf {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin: 0 0 16px;
+    }
+    .hc__kf > div {
+        padding: 12px;
+        border-radius: 14px;
+        background: rgb(0 0 0 / 0.22);
+        border: 1px solid rgb(255 255 255 / 0.07);
+    }
+    .hc__kf dt {
+        font-size: 0.7rem;
+        color: var(--ice-3);
+        white-space: nowrap;
+    }
+    .hc__kf dd {
+        margin: 4px 0 0;
+        font-size: 1.08rem;
+        font-weight: 500;
+        color: var(--ice);
+        white-space: nowrap;
+    }
+    .hc__kf dd.val--missing,
+    .hc__kf dd.val--incomparable {
+        font-size: 0.9rem;
+        color: var(--gold);
+    }
+    .hc__chart {
+        padding: 14px 14px 8px;
+        border-radius: 16px;
+        background: rgb(0 0 0 / 0.22);
+        border: 1px solid rgb(255 255 255 / 0.07);
+    }
+    .hc__charthead {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.74rem;
+        color: var(--ice-3);
+        margin-bottom: 2px;
+    }
+    .hc__note {
+        margin-top: 14px;
+        font-size: 0.8rem;
+        color: var(--ice-2);
+        line-height: 1.5;
+    }
+    .hc__panel.is-in {
+        animation: hc-in 600ms var(--ease-out);
+    }
+    @keyframes hc-in {
+        from {
+            opacity: 0;
+            filter: blur(4px);
+            translate: 0 8px;
+        }
+    }
+    @media (max-width: 560px) {
+        .hc {
+            padding: 14px;
+        }
+        .hc__top {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+        .hc__kf {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+</style>

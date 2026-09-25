@@ -1,0 +1,24 @@
+---
+// Mark: blue-hour horizon with the last light (gold) and three rising bars.
+interface Props {
+    size?: number
+}
+const { size = 30 } = Astro.props
+---
+
+<svg width={size} height={size} viewBox="0 0 32 32" aria-hidden="true" class="logo">
+    <defs>
+        <linearGradient id="lg-sky" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#2a5bb8"></stop>
+            <stop offset="0.62" stop-color="#11244a"></stop>
+            <stop offset="1" stop-color="#070d1c"></stop>
+        </linearGradient>
+    </defs>
+    <rect width="32" height="32" rx="9" fill="url(#lg-sky)"></rect>
+    <rect x="0.5" y="0.5" width="31" height="31" rx="8.5" fill="none" stroke="rgb(255 255 255 / 0.18)"></rect>
+    <circle cx="16" cy="21" r="5.5" fill="#f4bf72"></circle>
+    <rect x="0" y="21" width="32" height="11" fill="#070d1c"></rect>
+    <rect x="8" y="15" width="2.6" height="10" rx="1.3" fill="#eef3fa"></rect>
+    <rect x="14.7" y="11" width="2.6" height="14" rx="1.3" fill="#eef3fa"></rect>
+    <rect x="21.4" y="7" width="2.6" height="18" rx="1.3" fill="#eef3fa"></rect>
+</svg>

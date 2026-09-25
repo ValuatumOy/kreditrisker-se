@@ -1,254 +1,1225 @@
 ---
+import { Picture } from 'astro:assets'
 import Base from '../layouts/Base.astro'
 import SearchBox from '../components/SearchBox.astro'
-import HeroPreview from '../components/HeroPreview.astro'
+import HeroCard from '../components/HeroCard.astro'
 import Val from '../components/Val.astro'
 import Icon from '../components/Icon.astro'
-import ReportComparison from '../components/ReportComparison.astro'
 import { getDemoSite, getSite } from '../lib/store.ts'
-import { SITE } from '../config/site.ts'
+import { SITE, FLAGS } from '../config/site.ts'
 import { compactSek, percent } from '../lib/format.ts'
+import { FORMULAS } from '../lib/metrics.ts'
+import { staticReportState } from '../lib/reports/availability.ts'
+import { STATE_LABEL } from '../lib/reports/labels.ts'
 import type { Value } from '../lib/contract/types.ts'
 import { GUIDES } from '../content/guides.ts'
+import heroImg from '../assets/photos/stockholm-blue-hour.jpg'
+import auroraImg from '../assets/photos/aurora-lake.jpg'
+import laplandImg from '../assets/photos/lapland-aerial.jpg'
 
 const site = getSite()
 const demo = getDemoSite()
 const pick = (prefix: string) => demo.companies.find((c) => c.record.name.startsWith(prefix))!
 const samples = [
-    { key: 'full', tab: 'Fullständiga', note: 'Fem bokslut, alla poster finns. Nyckeltalen räknas med formlerna på metodsidan.', company: pick('Exempel Mjukvara') },
-    { key: 'sparse', tab: 'Glesa', note: 'Förkortat bokslut: bara omsättning finns. Övriga poster visas som saknas, inte som noll.', company: pick('Exempel Fastigheter') },
-    { key: 'stale', tab: 'Inaktuella', note: 'Senaste bokslutet avser 2022. Profilen säger det rakt ut och indexeras inte.', company: pick('Exempel Metall') },
+    { key: 'full', tab: 'Fullständig', note: 'Fem bokslut och alla poster. Nyckeltalen räknas med öppna formler.', company: pick('Exempel Mjukvara') },
+    { key: 'sparse', tab: 'Gles', note: 'Förkortat bokslut: bara omsättningen finns. Resten står som saknas, inte som noll.', company: pick('Exempel Fastigheter') },
+    { key: 'stale', tab: 'Inaktuell', note: 'Senaste bokslutet avser 2022. Åren därefter visas som luckor.', company: pick('Exempel Metall') },
 ]
+const typing = demo.companies.slice(0, 6).map((c) => c.record.name).concat(['002000-1012'])
+
+// Skyline of the hero photo traced as a chart line (image pixel coordinates, 2800 x 1867).
+const sky = [
+    [0, 1197], [70, 1155], [175, 1155], [301, 1162], [319, 1043], [336, 1162], [420, 1162], [616, 1141], [826, 1141], [840, 1204],
+    [1050, 1190], [1071, 1008], [1092, 833], [1113, 1008], [1134, 1190], [1260, 1204], [1400, 1232], [1736, 1232], [1820, 1225],
+    [2072, 1204], [2142, 1148], [2163, 1190], [2366, 1176], [2380, 1064], [2401, 1176], [2590, 1176], [2800, 1204],
+]
+const skyPath = sky.map(([x, y], i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ')
 
 const src = { source: 'synthetic', retrievedAt: '2026-09-01' } as const
 const states: { label: string; value: Value; fmt: 'sek' | 'pct'; means: string }[] = [
-    { label: 'Rapporterat belopp', value: { status: 'reported', value: 30_200_000, source: src }, fmt: 'sek', means: 'Står i årsredovisningen. Källa och räkenskapsår anges vid varje tabell.' },
-    { label: 'Noll', value: { status: 'reported', value: 0, source: src }, fmt: 'sek', means: 'Bolaget har redovisat exakt noll, till exempel ingen omsättning i ett holdingbolag.' },
-    { label: 'Negativt', value: { status: 'reported', value: -412_000, source: src }, fmt: 'sek', means: 'Förlust eller negativt eget kapital. Visas med minustecken och i rött.' },
-    { label: 'Saknas', value: { status: 'missing', reason: 'not_in_source' }, fmt: 'sek', means: 'Posten finns inte i källan. Vi skriver aldrig 0 i stället.' },
-    { label: 'Ej jämförbar', value: { status: 'incomparable', reason: 'period_length' }, fmt: 'pct', means: 'Till exempel tillväxt när räkenskapsåret var 18 månader.' },
+    { label: 'Rapporterat', value: { status: 'reported', value: 30_200_000, source: src }, fmt: 'sek', means: 'Står i årsredovisningen, med källa och räkenskapsår.' },
+    { label: 'Noll', value: { status: 'reported', value: 0, source: src }, fmt: 'sek', means: 'Bolaget har redovisat exakt noll.' },
+    { label: 'Negativt', value: { status: 'reported', value: -412_000, source: src }, fmt: 'sek', means: 'Förlust eller negativt eget kapital.' },
+    { label: 'Saknas', value: { status: 'missing', reason: 'not_in_source' }, fmt: 'sek', means: 'Posten finns inte i källan. Aldrig 0.' },
+    { label: 'Ej jämförbar', value: { status: 'incomparable', reason: 'period_length' }, fmt: 'pct', means: 'T.ex. tillväxt efter ett 18-månadersår.' },
 ]
+const industries = [...new Set(demo.companies.flatMap((c) => c.record.sni.map((s) => s.label)))]
+const reports = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, null) }))
 const explore = [
-    { href: '/branscher/', title: 'Branscher', text: 'Företag grupperade efter huvudbransch (SNI-kod).', n: site.industries.length, unit: 'branscher' },
-    { href: '/kommuner/', title: 'Kommuner', text: 'Företag efter säteskommun.', n: site.municipalities.length, unit: 'kommuner' },
-    { href: '/topplistor/', title: 'Topplistor', text: 'Störst omsättning, snabbast växande, högst soliditet och marginal.', n: site.rankings.length, unit: 'listor' },
-    { href: '/guider/', title: 'Guider', text: 'Läs en årsredovisning, förstå nyckeltalen, kontrollera en ny kund.', n: GUIDES.length, unit: 'guider' },
+    { href: '/branscher/', title: 'Branscher', text: 'Företag efter huvudbransch (SNI).', n: `${site.industries.length}` },
+    { href: '/kommuner/', title: 'Kommuner', text: 'Företag efter säteskommun.', n: `${site.municipalities.length}` },
+    { href: '/topplistor/', title: 'Topplistor', text: 'Störst, snabbast växande, högst soliditet.', n: `${site.rankings.length}` },
+    { href: '/guider/', title: 'Guider', text: 'Läs en årsredovisning, förstå nyckeltalen.', n: `${GUIDES.length}` },
 ]
 ---
 
 <Base
     title="Bokslut, nyckeltal och kreditrisk för svenska företag"
-    description="Sök svenska företag på namn eller organisationsnummer. Bokslut i flera år, nyckeltal med formler och tydliga källor för varje siffra."
+    description="Sök svenska företag på namn eller organisationsnummer. Bokslut i flera år, nyckeltal med öppna formler och tydliga källor för varje siffra."
     path="/"
     jsonLd={[{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: SITE.origin + '/', inLanguage: 'sv-SE', potentialAction: { '@type': 'SearchAction', target: `${SITE.origin}/sok/?q={q}`, 'query-input': 'required name=q' } }]}
 >
-    <section class="hero">
+    <!-- ============================================================ HERO -->
+    <section class="hero dark grain">
+        <div class="hero__media" aria-hidden="true">
+            <Picture src={heroImg} alt="" formats={['avif', 'webp']} widths={[900, 1600, 2400]} sizes="100vw" loading="eager" fetchpriority="high" class="hero__img" />
+            <svg class="hero__sky" viewBox="0 0 2800 1867" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <linearGradient id="skyline-stroke" x1="0" x2="1" y1="0" y2="0">
+                        <stop offset="0" stop-color="#f4bf72" stop-opacity="0"></stop>
+                        <stop offset="0.25" stop-color="#f4bf72" stop-opacity="0.9"></stop>
+                        <stop offset="0.8" stop-color="#ffd9a0" stop-opacity="1"></stop>
+                        <stop offset="1" stop-color="#f4bf72" stop-opacity="0.2"></stop>
+                    </linearGradient>
+                </defs>
+                {[820, 960, 1100].map((y) => <line x1="0" x2="2800" y1={y} y2={y} class="hero__gridline" />)}
+                <path d={skyPath} class="hero__skyline" pathLength="1" id="skyline"></path>
+                <circle r="9" class="hero__runner">
+                    <animateMotion dur="14s" repeatCount="indefinite" rotate="auto">
+                        <mpath href="#skyline"></mpath>
+                    </animateMotion>
+                </circle>
+                {[[1092, 833], [319, 1043], [2380, 1064]].map(([x, y]) => <circle cx={x} cy={y} r="7" class="hero__peak" />)}
+            </svg>
+            <div class="hero__shade"></div>
+        </div>
+
         <div class="shell hero__grid">
             <div class="hero__copy">
-                <h1>Bokslut, nyckeltal och källor för svenska företag.</h1>
-                <p class="lede">Sök på namn eller organisationsnummer. Varje siffra visar källa, räkenskapsår och hur aktuell den är. Det som saknas står som saknas.</p>
-                <div class="hero__search">
-                    <SearchBox size="hero" id="hero-q" />
+                <p class="hero__pill reveal"><span class="hero__pulse" aria-hidden="true"></span> Under uppbyggnad för svenska företag</p>
+                <h1 class="reveal" style="--d:1">Se siffrorna bakom varje <em>svenskt företag.</em></h1>
+                <p class="lede reveal" style="--d:2">Bokslut, nyckeltal och källor på ett ställe. Varje siffra visar räkenskapsår och hur aktuell den är, och det som saknas står som saknas.</p>
+                <div class="hero__search reveal" style="--d:3">
+                    <SearchBox size="hero" id="hero-q" typing={typing} />
                 </div>
-                <p class="hero__browse small">
-                    Eller bläddra bland <a href="/branscher/">branscher</a>, <a href="/kommuner/">kommuner</a> och <a href="/topplistor/">topplistor</a>.
-                </p>
-                {
-                    site.synthetic && (
-                        <div class="notice hero__notice" role="note">
-                            <Icon name="info" />
-                            <p>
-                                <strong>Under uppbyggnad.</strong> Svenska företagsuppgifter publiceras när datalicenser och juridisk granskning är klara. Just nu innehåller sajten bara syntetiska testföretag.
-                            </p>
+                <ul class="hero__facts reveal" style="--d:4">
+                    <li><b class="num">5</b> års bokslut per profil</li>
+                    <li><b class="num">{Object.keys(FORMULAS).length}</b> nyckeltal med öppna formler</li>
+                    <li><b class="num">0</b> gissade värden</li>
+                </ul>
+            </div>
+            <div class="hero__card reveal" style="--d:3">
+                <HeroCard samples={samples} />
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ MARQUEE -->
+    <section class="marquee dark" aria-label="Exempel på branscher">
+        <div class="marquee__track">
+            {[0, 1].map((k) => (
+                <ul aria-hidden={k === 1 ? 'true' : undefined}>
+                    {industries.map((i) => <li>{i}</li>)}
+                </ul>
+            ))}
+        </div>
+    </section>
+
+    <!-- ============================================================ BENTO -->
+    <section class="section dark bento-wrap">
+        <div class="shell">
+            <div class="section__head">
+                <h2 class="reveal">Allt du vill veta innan du skickar fakturan.</h2>
+                <p class="reveal" style="--d:1">En profil per organisationsnummer, byggd på inlämnade årsredovisningar och uppdaterad när nya bokslut registreras.</p>
+            </div>
+            <div class="bento">
+                <article class="tile tile--search reveal" data-spotlight>
+                    <div class="tile__demo demo-search" aria-hidden="true">
+                        <div class="ds__bar"><Icon name="search" /><span class="ds__typed">Exempel Bygg</span><span class="ds__caret"></span></div>
+                        <ul class="ds__list">
+                            <li><b>Exempel Byggnads i Göteborg AB</b><span class="num">002000-1020 · Göteborg</span></li>
+                            <li><b>Exempel Snickeri & Bygg Umeå AB</b><span class="num">002000-1178 · Umeå</span></li>
+                            <li><b>Exempel Installationsteknik Göteborg AB</b><span class="num">002000-1186 · Göteborg</span></li>
+                        </ul>
+                    </div>
+                    <h3>Sök på namn eller org.nr</h3>
+                    <p>Förslag medan du skriver. Tidigare namn hittas också, och ett felskrivet organisationsnummer fångas av kontrollsiffran.</p>
+                </article>
+                <article class="tile tile--bars reveal" style="--d:1" data-spotlight>
+                    <div class="tile__demo demo-bars" aria-hidden="true">
+                        {[42, 51, 58, 71, 86].map((h, i) => <span style={`--h:${h}%;--i:${i}`}><i class="num">{2021 + i}</i></span>)}
+                    </div>
+                    <h3>Fem års bokslut</h3>
+                    <p>Resultat- och balansräkning år för år, med period och källa i varje kolumn.</p>
+                </article>
+                <article class="tile tile--gaps reveal" data-spotlight>
+                    <div class="tile__demo demo-gaps" aria-hidden="true">
+                        <div><span>Nettoomsättning</span><b class="num">2,3 Mkr</b></div>
+                        <div><span>Eget kapital</span><b class="gap">saknas</b></div>
+                        <div><span>Rörelsemarginal</span><b class="gap">ej jämförbar</b></div>
+                        <div><span>Årets resultat</span><b class="num neg">−490 tkr</b></div>
+                    </div>
+                    <h3>Luckor visas som luckor</h3>
+                    <p>En uppgift som saknas blir aldrig en nolla, och en negativ siffra syns direkt.</p>
+                </article>
+                <article class="tile tile--report reveal" style="--d:1" data-spotlight>
+                    <div class="tile__demo demo-report" aria-hidden="true">
+                        <div class="dr__page dr__page--3"></div>
+                        <div class="dr__page dr__page--2"></div>
+                        <div class="dr__page dr__page--1">
+                            <i></i><i></i><i class="short"></i>
+                            <svg viewBox="0 0 120 40"><path d="M0,34 C20,30 30,26 45,24 C60,22 70,14 85,12 C100,10 110,6 120,4" /></svg>
+                            <i></i><i class="short"></i>
                         </div>
-                    )
+                        <div class="dr__scan"></div>
+                    </div>
+                    <h3>Basrapport och AI-rapport</h3>
+                    <p>Två rapporter från varje profil när de är klara för svenska företag. <a href="/rapporter/">Läs om rapporterna</a>.</p>
+                </article>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ STATES (day) -->
+    <section class="section states">
+        <div class="shell">
+            <div class="section__head">
+                <h2 class="reveal">Varje värde har ett tillstånd, inte bara en siffra.</h2>
+                <p class="reveal" style="--d:1">Små bolag lämnar ofta förkortade bokslut, och alla räkenskapsår är inte tolv månader. Därför skiljer vi på fem sorters värden.</p>
+            </div>
+            <ol class="states__row">
+                {
+                    states.map((s, i) => (
+                        <li class="states__card reveal" style={`--d:${i}`}>
+                            <span class="states__label">{s.label}</span>
+                            <span class="states__v">
+                                <Val d={s.fmt === 'sek' ? compactSek(s.value) : percent(s.value)} />
+                            </span>
+                            <span class="states__means">{s.means}</span>
+                        </li>
+                    ))
+                }
+            </ol>
+            <p class="states__foot small muted reveal">
+                Profiler med för få uppgifter eller bokslut äldre än 31 månader visas men indexeras inte. Tröskeln står på <a href="/metod/#index">metodsidan</a>.
+            </p>
+        </div>
+    </section>
+
+    <!-- ============================================================ SOURCES (day, photo) -->
+    <section class="section sources">
+        <div class="shell sources__grid">
+            <div class="sources__photo reveal">
+                <Picture src={laplandImg} alt="Snötäckt fjällandskap i Lappland i kvällsljus" formats={['avif', 'webp']} widths={[700, 1200]} sizes="(max-width: 900px) 100vw, 50vw" class="sources__img" />
+                <div class="sources__chip glass dark">
+                    <span class="num">Bolagsverket</span>
+                    <span>Årsredovisning 2025 · registrerad 15 maj 2026</span>
+                </div>
+            </div>
+            <div class="sources__copy">
+                <h2 class="reveal">Källan först. Alltid.</h2>
+                <p class="lede reveal" style="--d:1">Under varje tabell står varifrån siffrorna kommer, vilket räkenskapsår de gäller och när vi hämtade dem.</p>
+                <ol class="sources__list">
+                    <li class="reveal" style="--d:2"><span class="sources__n num">01</span><div><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></div></li>
+                    <li class="reveal" style="--d:3"><span class="sources__n num">02</span><div><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></div></li>
+                    <li class="reveal" style="--d:4"><span class="sources__n num">03</span><div><b>Valuatum</b><span>Nyckeltal med publicerade formler. Kreditbetyg först när modellen är validerad för Sverige.</span></div></li>
+                </ol>
+                <p class="small muted reveal">Källorna kräver avtal om datalicens innan publicering. <a href="/kallor/">Om datakällorna</a></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================ REPORTS (aurora) -->
+    <section class="reports dark grain">
+        <Picture src={auroraImg} alt="" formats={['avif', 'webp']} widths={[1000, 1800, 2600]} sizes="100vw" class="reports__img" aria-hidden="true" />
+        <div class="reports__shade" aria-hidden="true"></div>
+        <div class="shell reports__inner">
+            <div class="section__head">
+                <h2 class="reveal">Två rapporter. När de är redo.</h2>
+                <p class="reveal" style="--d:1">Rapporterna om svenska företag är under utveckling. Vi visar inga priser och tar inga beställningar förrän allt är granskat.</p>
+            </div>
+            <div class="reports__grid">
+                {
+                    reports.map(({ p, s }, i) => (
+                        <article class="rcard glass reveal" style={`--d:${i}`} data-spotlight>
+                            <div class="rcard__top">
+                                <h3>{p === 'basic' ? 'Basrapport' : 'AI-rapport'}</h3>
+                                <span class="tag tag--warn">{STATE_LABEL[s.kind]}</span>
+                            </div>
+                            <p class="rcard__lede">
+                                {p === 'basic' ? 'Bokslut, nyckeltal och branschjämförelse samlade i en PDF.' : 'Basrapporten plus en skriven analys och en genomgång av offentliga källor.'}
+                            </p>
+                            <ul class="rcard__list">
+                                {(p === 'basic'
+                                    ? ['Registeruppgifter och fem års bokslut', 'Nyckeltal med förklaringar', 'Jämförelse med branschen', 'Kreditbetyg när modellen validerats']
+                                    : ['Allt i basrapporten', 'Analys av lönsamhet, soliditet och likviditet', 'Offentliga källor med länkar', 'Slutsatser och begränsningar']
+                                ).map((x) => (
+                                    <li>
+                                        <Icon name="check" /> {x}
+                                    </li>
+                                ))}
+                            </ul>
+                            <div class="rcard__foot">
+                                <span class="rcard__price">Pris: inte fastställt</span>
+                                <a class="btn btn--quiet" href={p === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'}>
+                                    Läs mer <Icon name="arrow" />
+                                </a>
+                            </div>
+                        </article>
+                    ))
                 }
             </div>
-            <div class="hero__fig">
-                <HeroPreview samples={samples} />
-            </div>
         </div>
     </section>
 
-    <section class="section shell">
-        <div class="section__head">
-            <h2>Allt på profilen har en källa</h2>
-            <p>En företagsprofil består av registeruppgifter, bokslut och nyckeltal som vi räknar själva. Här är vad som visas och var det kommer ifrån.</p>
-        </div>
-        <figure class="fig">
-            <div class="fig__head"><span class="fig__no">Tabell 1</span><span class="fig__title">Innehåll i en företagsprofil</span></div>
-            <div class="table-wrap" tabindex="0" role="region" aria-label="Tabell 1, innehåll i en företagsprofil">
-                <table class="data contents">
-                    <thead><tr><th scope="col">Uppgift</th><th scope="col">Källa</th><th scope="col">Hur ofta</th></tr></thead>
-                    <tbody>
-                        <tr><th scope="row">Namn, företagsform, status, säte</th><td>Bolagsverket</td><td>Vid varje dataleverans</td></tr>
-                        <tr><th scope="row">Bransch (SNI-kod)</th><td>Bolagsverket och SCB</td><td>Vid varje dataleverans</td></tr>
-                        <tr><th scope="row">Resultat- och balansräkning, flera år</th><td>Digitalt inlämnade årsredovisningar, Bolagsverket</td><td>När ett nytt bokslut registreras</td></tr>
-                        <tr><th scope="row">Nyckeltal</th><td>Beräknas av oss med <a href="/metod/">publicerade formler</a></td><td>Samtidigt som bokslutet</td></tr>
-                        <tr><th scope="row">Riskbedömning</th><td>Valuatums kreditriskmodell</td><td>Visas först när modellen är validerad för Sverige</td></tr>
-                    </tbody>
-                </table>
+    <!-- ============================================================ EXPLORE (day) -->
+    <section class="section explore">
+        <div class="shell">
+            <div class="section__head">
+                <h2 class="reveal">Hitta företag på fler sätt.</h2>
+                <p class="reveal" style="--d:1">Bläddra efter bransch och ort, jämför i topplistor eller läs på om nyckeltal.</p>
             </div>
-            <figcaption class="fig__src"><b>Anm.</b> Källorna är planerade och kräver avtal om datalicens innan publicering. Se <a href="/kallor/">datakällor</a>.</figcaption>
-        </figure>
+            <ul class="explore__list">
+                {
+                    explore.map((e, i) => (
+                        <li class="reveal" style={`--d:${i}`}>
+                            <a href={e.href}>
+                                <span class="explore__n num">{e.n}</span>
+                                <span class="explore__t">{e.title}</span>
+                                <span class="explore__x">{e.text}</span>
+                                <span class="explore__go">
+                                    <Icon name="arrow" />
+                                </span>
+                            </a>
+                        </li>
+                    ))
+                }
+            </ul>
+        </div>
     </section>
 
-    <section class="section shell">
-        <div class="section__head">
-            <h2>Luckor visas som luckor</h2>
-            <p>Små bolag lämnar ofta förkortade bokslut, och alla räkenskapsår är inte tolv månader. Därför har varje värde ett tillstånd, inte bara en siffra.</p>
+    <!-- ============================================================ CTA -->
+    <section class="cta dark grain">
+        <div class="cta__glow" aria-hidden="true"></div>
+        <div class="shell cta__inner">
+            <h2 class="reveal">Börja med ett organisationsnummer.</h2>
+            <div class="cta__search reveal" style="--d:1"><SearchBox id="cta-q" /></div>
+            {!FLAGS.checkout && <p class="small reveal" style="--d:2">Profilerna är gratis. Rapporter säljs inte ännu.</p>}
         </div>
-        <figure class="fig">
-            <div class="fig__head"><span class="fig__no">Tabell 2</span><span class="fig__title">Så skiljer vi på värden</span></div>
-            <div class="table-wrap" tabindex="0" role="region" aria-label="Tabell 2, så skiljer vi på värden">
-                <table class="data states">
-                    <thead><tr><th scope="col">Tillstånd</th><th scope="col">Så ser det ut</th><th scope="col">Betyder</th></tr></thead>
-                    <tbody>
-                        {
-                            states.map((s) => (
-                                <tr>
-                                    <th scope="row">{s.label}</th>
-                                    <td><Val d={s.fmt === 'sek' ? compactSek(s.value) : percent(s.value)} /></td>
-                                    <td>{s.means}</td>
-                                </tr>
-                            ))
-                        }
-                    </tbody>
-                </table>
-            </div>
-            <figcaption class="fig__src"><b>Anm.</b> Profiler med för få uppgifter eller bokslut äldre än 31 månader visas men indexeras inte i sökmotorer. Tröskeln beskrivs på <a href="/metod/#index">metodsidan</a>.</figcaption>
-        </figure>
-    </section>
-
-    <section class="section shell">
-        <div class="section__head">
-            <h2>Två rapporter när du behöver mer</h2>
-            <p>Från varje profil går det att beställa en rapport om företaget. Rapporterna för svenska företag är under utveckling och säljs inte ännu.</p>
-        </div>
-        <ReportComparison />
-    </section>
-
-    <section class="section shell">
-        <div class="section__head">
-            <h2>Utforska</h2>
-            <p>Hitta företag via bransch och ort, eller läs hur man tolkar ett bokslut.</p>
-        </div>
-        <figure class="fig">
-            <div class="fig__head"><span class="fig__no">Tabell 4</span><span class="fig__title">Ingångar till företagen</span></div>
-            <div class="table-wrap" tabindex="0" role="region" aria-label="Tabell 4, ingångar till företagen">
-                <table class="data explore">
-                    <thead><tr><th scope="col">Ingång</th><th scope="col">Innehåll</th><th scope="col">Antal</th></tr></thead>
-                    <tbody>
-                        {
-                            explore.map((e) => (
-                                <tr>
-                                    <th scope="row"><a href={e.href}>{e.title}</a></th>
-                                    <td>{e.text}</td>
-                                    <td class="num">{e.n} {e.unit}</td>
-                                </tr>
-                            ))
-                        }
-                    </tbody>
-                </table>
-            </div>
-            <figcaption class="fig__src"><b>Anm.</b> Bransch- och kommunsidor visas i sökmotorer först när minst tre profiler i gruppen klarar kvalitetströskeln.</figcaption>
-        </figure>
     </section>
 </Base>
 
 <style>
+    /* ---------------- hero */
     .hero {
-        padding-block: clamp(40px, 7vw, 96px) clamp(48px, 7vw, 88px);
-        border-bottom: 1px solid var(--rule);
+        position: relative;
+        min-height: max(760px, min(100svh, 1000px));
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        isolation: isolate;
+    }
+    .hero__media {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+    }
+    .hero__media :global(.hero__img),
+    .hero__media :global(picture) {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+    }
+    .hero__media :global(img) {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 50%;
+        transform: scale(1.04);
+        animation: hero-drift 30s ease-in-out infinite alternate;
+    }
+    @keyframes hero-drift {
+        to {
+            transform: scale(1.1) translate(-1%, -0.5%);
+        }
+    }
+    .hero__sky {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        transform: scale(1.04);
+        animation: hero-drift 30s ease-in-out infinite alternate;
+    }
+    .hero__gridline {
+        stroke: rgb(238 243 250 / 0.12);
+        stroke-width: 1.6;
+        stroke-dasharray: 6 14;
+    }
+    .hero__skyline {
+        fill: none;
+        stroke: url(#skyline-stroke);
+        stroke-width: 4;
+        stroke-linejoin: round;
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        animation: sky-draw 3.4s var(--ease-out) 0.5s forwards;
+    }
+    @keyframes sky-draw {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+    .hero__runner {
+        fill: #ffe2b0;
+    }
+    .hero__peak {
+        fill: #f4bf72;
+        opacity: 0;
+        animation: peak 3.2s ease-in-out 3s infinite;
+    }
+    @keyframes peak {
+        0%,
+        100% {
+            opacity: 0.2;
+            r: 6;
+        }
+        50% {
+            opacity: 0.95;
+            r: 11;
+        }
+    }
+    .hero__shade {
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(180deg, rgb(5 10 21 / 0.85) 0%, rgb(5 10 21 / 0.35) 30%, rgb(5 10 21 / 0) 55%, rgb(5 10 21 / 0.55) 82%, var(--night) 100%),
+            linear-gradient(90deg, rgb(5 10 21 / 0.82) 0%, rgb(5 10 21 / 0.45) 40%, rgb(5 10 21 / 0) 62%);
     }
     .hero__grid {
         display: grid;
         grid-template-columns: repeat(12, minmax(0, 1fr));
         column-gap: var(--col-gap);
         row-gap: 48px;
-        align-items: start;
+        align-items: center;
+        padding-top: 120px;
+        padding-bottom: 72px;
     }
     .hero__copy {
-        grid-column: 1 / span 7;
-        padding-top: clamp(0px, 2vw, 28px);
+        grid-column: 1 / span 6;
     }
-    .hero__copy h1 {
-        font-size: var(--step-5);
-        max-width: 13ch;
-        letter-spacing: -0.032em;
-        line-height: 1.02;
+    .hero__pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 14px 6px 10px;
+        border-radius: 999px;
+        border: 1px solid rgb(255 255 255 / 0.16);
+        background: rgb(255 255 255 / 0.06);
+        backdrop-filter: blur(10px);
+        font-size: 0.82rem;
+        color: var(--ice-2);
     }
-    .hero__copy .lede {
+    .hero__pulse {
+        position: relative;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--gold);
+    }
+    .hero__pulse::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        background: var(--gold);
+        animation: ping 2s ease-out infinite;
+    }
+    @keyframes ping {
+        to {
+            transform: scale(3);
+            opacity: 0;
+        }
+    }
+    .hero h1 {
+        margin-top: 22px;
+        font-size: clamp(3rem, 1.4rem + 5vw, 5.4rem);
+        line-height: 0.98;
+        letter-spacing: -0.045em;
+        font-weight: 300;
+        max-width: 12ch;
+        color: #fff;
+    }
+    .hero h1 em {
+        font-style: normal;
+        color: var(--gold);
+    }
+    .hero .lede {
         margin-top: 24px;
+        color: var(--ice-2);
+        max-width: 44ch;
     }
     .hero__search {
         margin-top: 36px;
-        max-width: 640px;
+        max-width: 580px;
     }
-    .hero__browse {
-        margin-top: 14px;
-        color: var(--ink-3);
+    .hero__facts {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 28px;
+        list-style: none;
+        margin: 26px 0 0;
+        padding: 0;
+        font-size: 0.86rem;
+        color: var(--ice-3);
     }
-    .hero__notice {
-        margin-top: 32px;
-        max-width: 640px;
+    .hero__facts b {
+        color: var(--ice);
+        font-weight: 500;
+        margin-right: 4px;
     }
-    .hero__fig {
+    .hero__card {
         grid-column: 8 / span 5;
+        align-self: end;
+        margin-bottom: -8px;
     }
     @media (max-width: 1080px) {
+        .hero__shade {
+            background: linear-gradient(180deg, rgb(5 10 21 / 0.8) 0%, rgb(5 10 21 / 0.55) 40%, rgb(5 10 21 / 0.75) 70%, var(--night) 100%);
+        }
         .hero__copy,
-        .hero__fig {
+        .hero__card {
             grid-column: 1 / -1;
         }
-        .hero__fig {
-            max-width: 640px;
+        .hero__card {
+            max-width: 560px;
+        }
+        .hero {
+            align-items: flex-start;
         }
     }
-    .contents th,
-    .states thead th {
-        text-align: left !important;
+    @media (max-width: 560px) {
+        .hero__grid {
+            padding-top: 104px;
+        }
+        .hero__facts {
+            font-size: 0.8rem;
+            gap: 6px 16px;
+        }
     }
-    .states thead th:nth-child(2) {
-        text-align: right !important;
+
+    /* ---------------- marquee */
+    .marquee {
+        overflow: hidden;
+        border-block: 1px solid rgb(255 255 255 / 0.07);
+        padding-block: 18px;
     }
-    .contents td:nth-child(2),
-    .contents td:nth-child(3),
-    .states td:nth-child(3) {
-        text-align: left;
-        white-space: normal;
+    .marquee__track {
+        display: flex;
+        width: max-content;
+        animation: marquee 50s linear infinite;
+        mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
     }
-    .states td:nth-child(2) {
-        text-align: right;
-        width: 9rem;
-        font-size: 1.05rem;
+    .marquee ul {
+        display: flex;
+        gap: 48px;
+        list-style: none;
+        margin: 0;
+        padding: 0 24px;
     }
-    .states td:nth-child(3) {
-        color: var(--ink-2);
-        padding-left: 32px;
-        min-width: 18rem;
-    }
-    .contents td {
-        min-width: 12rem;
-    }
-    .explore th[scope='row'] a {
+    .marquee li {
         font-family: var(--serif);
-        font-size: 1.2rem;
+        font-size: 1.15rem;
+        font-weight: 350;
+        color: var(--ice-3);
+        white-space: nowrap;
+    }
+    .marquee li::before {
+        content: '';
+        display: inline-block;
+        width: 5px;
+        height: 5px;
+        margin-right: 48px;
+        border-radius: 50%;
+        background: var(--gold);
+        vertical-align: middle;
+        opacity: 0.7;
+    }
+    @keyframes marquee {
+        to {
+            transform: translateX(-50%);
+        }
+    }
+
+    /* ---------------- bento */
+    .bento-wrap {
+        background:
+            radial-gradient(60% 50% at 80% 10%, rgb(42 91 184 / 0.18), transparent 70%),
+            var(--night);
+    }
+    .bento {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        gap: 16px;
+    }
+    .tile {
+        position: relative;
+        overflow: hidden;
+        padding: 24px;
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgb(255 255 255 / 0.06), rgb(255 255 255 / 0.02));
+        border: 1px solid rgb(255 255 255 / 0.09);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+    .tile::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(360px circle at var(--mx, -500px) var(--my, -500px), rgb(127 178 255 / 0.12), transparent 60%);
+        pointer-events: none;
+    }
+    .tile h3 {
+        font-size: 1.4rem;
+        font-weight: 400;
+        margin-top: auto;
+    }
+    .tile p {
+        color: var(--ice-3);
+        font-size: 0.95rem;
+        max-width: 48ch;
+    }
+    .tile--search {
+        grid-column: span 7;
+    }
+    .tile--bars {
+        grid-column: span 5;
+    }
+    .tile--gaps {
+        grid-column: span 5;
+    }
+    .tile--report {
+        grid-column: span 7;
+    }
+    .tile__demo {
+        position: relative;
+        height: 220px;
+        margin-bottom: 14px;
+    }
+    @media (max-width: 900px) {
+        .tile {
+            grid-column: 1 / -1 !important;
+        }
+    }
+
+    /* search demo */
+    .ds__bar {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 50px;
+        padding: 0 18px;
+        border-radius: 999px;
+        background: rgb(255 255 255 / 0.08);
+        border: 1px solid rgb(255 255 255 / 0.14);
+        font-size: 0.95rem;
+        color: var(--ice);
+    }
+    .ds__bar :global(svg) {
+        width: 18px;
+        height: 18px;
+        color: var(--ice-3);
+    }
+    .ds__typed {
+        display: inline-block;
+        overflow: hidden;
+        white-space: nowrap;
+        width: 12ch;
+        animation: type 6s steps(12) infinite;
+    }
+    .ds__caret {
+        width: 2px;
+        height: 20px;
+        background: var(--gold);
+        margin-left: -8px;
+        animation: blink 1s steps(1) infinite;
+    }
+    @keyframes type {
+        0% {
+            width: 0;
+        }
+        30%,
+        85% {
+            width: 12ch;
+        }
+        100% {
+            width: 0;
+        }
+    }
+    @keyframes blink {
+        50% {
+            opacity: 0;
+        }
+    }
+    .ds__list {
+        list-style: none;
+        margin: 10px 0 0;
+        padding: 6px;
+        border-radius: 18px;
+        background: rgb(255 255 255 / 0.95);
+        color: #0a1426;
+    }
+    .ds__list li {
+        display: grid;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 0.86rem;
+        opacity: 0;
+        animation: row 6s var(--ease-out) infinite;
+    }
+    .ds__list li:nth-child(1) {
+        background: #eef3fb;
+        animation-delay: 0.2s;
+    }
+    .ds__list li:nth-child(2) {
+        animation-delay: 0.35s;
+    }
+    .ds__list li:nth-child(3) {
+        animation-delay: 0.5s;
+    }
+    .ds__list span {
+        font-size: 0.74rem;
+        color: #5a6781;
+    }
+    @keyframes row {
+        0%,
+        25% {
+            opacity: 0;
+            translate: 0 6px;
+        }
+        35%,
+        85% {
+            opacity: 1;
+            translate: 0 0;
+        }
+        100% {
+            opacity: 0;
+        }
+    }
+
+    /* bars demo */
+    .demo-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        padding: 10px 6px 26px;
+        border-bottom: 1px solid rgb(255 255 255 / 0.12);
+    }
+    .demo-bars span {
+        position: relative;
+        flex: 1;
+        height: var(--h);
+        border-radius: 10px 10px 4px 4px;
+        background: linear-gradient(180deg, rgb(127 178 255 / 0.85), rgb(127 178 255 / 0.15));
+        transform-origin: bottom;
+        animation: bar 5s var(--ease-out) infinite;
+        animation-delay: calc(var(--i) * 120ms);
+    }
+    .demo-bars span:last-child {
+        background: linear-gradient(180deg, #ffd9a0, rgb(244 191 114 / 0.25));
+    }
+    .demo-bars i {
+        position: absolute;
+        bottom: -24px;
+        left: 50%;
+        translate: -50% 0;
+        font-style: normal;
+        font-size: 0.72rem;
+        color: var(--ice-3);
+    }
+    @keyframes bar {
+        0% {
+            transform: scaleY(0.05);
+        }
+        30%,
+        85% {
+            transform: scaleY(1);
+        }
+        100% {
+            transform: scaleY(0.05);
+        }
+    }
+
+    /* gaps demo */
+    .demo-gaps {
+        display: grid;
+        align-content: center;
+        gap: 8px;
+    }
+    .demo-gaps div {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 16px;
+        border-radius: 14px;
+        background: rgb(255 255 255 / 0.05);
+        border: 1px solid rgb(255 255 255 / 0.08);
+        font-size: 0.9rem;
+        color: var(--ice-2);
+    }
+    .demo-gaps b {
+        font-weight: 500;
+        color: var(--ice);
+    }
+    .demo-gaps b.neg {
+        color: #ff8a7f;
+    }
+    .demo-gaps b.gap {
+        font-family: var(--sans);
+        font-style: italic;
+        font-weight: 400;
+        color: var(--gold);
+        padding: 2px 10px;
+        border-radius: 999px;
+        border: 1px dashed rgb(244 191 114 / 0.5);
+        background: repeating-linear-gradient(45deg, rgb(244 191 114 / 0.1) 0 6px, transparent 6px 12px);
+        background-size: 200% 100%;
+        animation: hatch 4s linear infinite;
+    }
+    @keyframes hatch {
+        to {
+            background-position: -34px 0;
+        }
+    }
+
+    /* report demo */
+    .demo-report {
+        display: grid;
+        place-items: center;
+    }
+    .dr__page {
+        position: absolute;
+        width: 150px;
+        height: 196px;
+        border-radius: 10px;
+        background: #f6f8fc;
+        box-shadow: 0 20px 40px -20px rgb(0 0 0 / 0.8);
+    }
+    .dr__page--3 {
+        rotate: -12deg;
+        translate: -80px 10px;
+        opacity: 0.35;
+    }
+    .dr__page--2 {
+        rotate: -5deg;
+        translate: -38px 4px;
+        opacity: 0.6;
+    }
+    .dr__page--1 {
+        rotate: 5deg;
+        translate: 30px 0;
+        padding: 18px 16px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        animation: float 6s ease-in-out infinite;
+    }
+    .dr__page--1 i {
+        display: block;
+        height: 6px;
+        border-radius: 3px;
+        background: #d9e0ec;
+    }
+    .dr__page--1 i.short {
+        width: 60%;
+    }
+    .dr__page--1 i:first-child {
+        height: 10px;
+        width: 70%;
+        background: #0a1426;
+    }
+    .dr__page--1 svg {
+        width: 100%;
+        margin: 6px 0;
+    }
+    .dr__page--1 path {
+        fill: none;
+        stroke: #1f56d6;
+        stroke-width: 2.5;
+    }
+    .dr__scan {
+        position: absolute;
+        width: 190px;
+        height: 2px;
+        translate: 30px 0;
+        background: linear-gradient(90deg, transparent, var(--gold), transparent);
+        animation: scan 3.4s ease-in-out infinite;
+    }
+    @keyframes float {
+        50% {
+            translate: 30px -8px;
+        }
+    }
+    @keyframes scan {
+        0%,
+        100% {
+            top: 12px;
+            opacity: 0;
+        }
+        15%,
+        85% {
+            opacity: 1;
+        }
+        50% {
+            top: 196px;
+        }
+    }
+
+    /* ---------------- states */
+    .states__row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 12px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .states__card {
+        display: grid;
+        gap: 10px;
+        align-content: start;
+        padding: 22px;
+        border-radius: var(--radius-lg);
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        box-shadow: var(--card-shadow);
+    }
+    .states__label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--ink-3);
+    }
+    .states__v {
+        font-family: var(--mono);
+        font-size: 1.7rem;
+        letter-spacing: -0.03em;
+        min-height: 2.4rem;
+    }
+    .states__means {
+        font-size: 0.9rem;
+        color: var(--ink-2);
+    }
+    .states__foot {
+        margin-top: 24px;
+    }
+    @media (max-width: 1000px) {
+        .states__row {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 520px) {
+        .states__row {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* ---------------- sources */
+    .sources {
+        padding-top: 0;
+    }
+    .sources__grid {
+        display: grid;
+        grid-template-columns: 1.05fr 1fr;
+        gap: clamp(32px, 6vw, 96px);
+        align-items: center;
+    }
+    .sources__photo {
+        position: relative;
+        border-radius: 28px;
+        overflow: hidden;
+        aspect-ratio: 4 / 4.2;
+        box-shadow: 0 40px 80px -40px rgb(10 20 38 / 0.5);
+    }
+    .sources__photo :global(img),
+    .sources__photo :global(picture) {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+    .sources__chip {
+        position: absolute;
+        left: 20px;
+        bottom: 20px;
+        display: grid;
+        gap: 2px;
+        padding: 14px 18px;
+        border-radius: 16px;
+        font-size: 0.82rem;
+        background: rgb(5 10 21 / 0.45) !important;
+        color: var(--ice-2);
+    }
+    .sources__chip .num {
+        color: var(--ice);
+        font-weight: 500;
+    }
+    .sources__copy .lede {
+        margin-top: 18px;
+    }
+    .sources__list {
+        list-style: none;
+        margin: 32px 0 24px;
+        padding: 0;
+        display: grid;
+        gap: 10px;
+    }
+    .sources__list li {
+        display: flex;
+        gap: 18px;
+        padding: 18px 20px;
+        border-radius: 16px;
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+    }
+    .sources__list div {
+        display: grid;
+        gap: 2px;
+    }
+    .sources__list b {
         font-weight: 600;
+    }
+    .sources__list span:not(.sources__n) {
+        color: var(--ink-2);
+        font-size: 0.93rem;
+    }
+    .sources__n {
+        color: var(--ochre-ink);
+        font-size: 0.85rem;
+        padding-top: 2px;
+    }
+    @media (max-width: 900px) {
+        .sources__grid {
+            grid-template-columns: 1fr;
+        }
+        .sources__photo {
+            aspect-ratio: 4 / 3;
+        }
+    }
+
+    /* ---------------- reports */
+    .reports {
+        position: relative;
+        overflow: hidden;
+        isolation: isolate;
+        padding-block: clamp(96px, 12vw, 180px);
+    }
+    .reports :global(.reports__img),
+    .reports > :global(picture) {
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+    }
+    .reports :global(img) {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        object-position: 50% 35%;
+    }
+    .reports__shade {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        background: linear-gradient(180deg, var(--night) 0%, rgb(5 10 21 / 0.55) 30%, rgb(5 10 21 / 0.55) 70%, var(--night) 100%);
+    }
+    .reports__grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+    }
+    .rcard {
+        position: relative;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+        padding: 32px;
+        border-radius: 28px;
+    }
+    .rcard::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(420px circle at var(--mx, -500px) var(--my, -500px), rgb(244 191 114 / 0.1), transparent 60%);
+        pointer-events: none;
+    }
+    .rcard__top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+    .rcard h3 {
+        font-size: 2rem;
+        font-weight: 350;
+        letter-spacing: -0.03em;
+    }
+    .rcard__lede {
+        color: var(--ice-2);
+        font-size: 1.02rem;
+    }
+    .rcard__list {
+        list-style: none;
+        margin: 0;
+        padding: 18px 0 0;
+        border-top: 1px solid rgb(255 255 255 / 0.1);
+        display: grid;
+        gap: 12px;
+    }
+    .rcard__list li {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        color: var(--ice);
+        font-size: 0.95rem;
+    }
+    .rcard__list :global(svg) {
+        width: 18px;
+        height: 18px;
+        color: var(--gold);
+        flex-shrink: 0;
+    }
+    .rcard__foot {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-top: auto;
+        padding-top: 10px;
+    }
+    .rcard__price {
+        font-family: var(--mono);
+        font-size: 0.85rem;
+        color: var(--ice-3);
+    }
+    @media (max-width: 860px) {
+        .reports__grid {
+            grid-template-columns: 1fr;
+        }
+        .rcard {
+            padding: 24px;
+        }
+    }
+
+    /* ---------------- explore */
+    .explore__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--rule-2);
+    }
+    .explore__list li {
+        border-bottom: 1px solid var(--rule-2);
+    }
+    .explore__list a {
+        display: grid;
+        grid-template-columns: 4rem 1fr 1.2fr auto;
+        align-items: center;
+        gap: 24px;
+        padding: 28px 8px;
         color: var(--ink);
         text-decoration: none;
+        transition:
+            padding 300ms var(--ease-out),
+            background 300ms var(--ease-out);
+        border-radius: 16px;
     }
-    .explore th[scope='row'] a:hover {
-        text-decoration: underline;
-        text-decoration-color: var(--ochre);
+    .explore__list a:hover {
+        background: var(--sheet);
+        padding-inline: 20px;
     }
-    .explore thead th:nth-child(2),
-    .explore td:nth-child(2) {
-        text-align: left !important;
-        white-space: normal !important;
+    .explore__n {
+        font-size: 0.9rem;
+        color: var(--ink-3);
+    }
+    .explore__t {
+        font-family: var(--serif);
+        font-size: clamp(1.8rem, 1.2rem + 2vw, 2.8rem);
+        font-weight: 350;
+        letter-spacing: -0.03em;
+    }
+    .explore__x {
         color: var(--ink-2);
     }
-    .explore thead th:first-child {
-        text-align: left;
+    .explore__go {
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 50%;
+        border: 1px solid var(--rule-2);
+        transition:
+            background 300ms var(--ease-out),
+            color 300ms var(--ease-out),
+            rotate 300ms var(--ease-out);
+    }
+    .explore__go :global(svg) {
+        width: 18px;
+        height: 18px;
+    }
+    .explore__list a:hover .explore__go {
+        background: var(--ink);
+        color: var(--paper);
+        rotate: -45deg;
+    }
+    @media (max-width: 760px) {
+        .explore__list a {
+            grid-template-columns: 1fr auto;
+            gap: 6px 16px;
+        }
+        .explore__n {
+            display: none;
+        }
+        .explore__x {
+            grid-column: 1;
+            font-size: 0.92rem;
+        }
+        .explore__go {
+            grid-row: 1 / span 2;
+            grid-column: 2;
+        }
+    }
+
+    /* ---------------- cta */
+    .cta {
+        position: relative;
+        overflow: hidden;
+        padding-block: clamp(96px, 12vw, 160px);
+        text-align: center;
+    }
+    .cta__glow {
+        position: absolute;
+        left: 50%;
+        top: 100%;
+        width: 1400px;
+        height: 700px;
+        translate: -50% -45%;
+        border-radius: 50%;
+        background: radial-gradient(closest-side, rgb(42 91 184 / 0.55), rgb(244 191 114 / 0.08) 60%, transparent);
+        filter: blur(20px);
+        animation: breathe 9s ease-in-out infinite;
+    }
+    @keyframes breathe {
+        50% {
+            scale: 1.08;
+            opacity: 0.8;
+        }
+    }
+    .cta__inner {
+        position: relative;
+        display: grid;
+        justify-items: center;
+        gap: 28px;
+    }
+    .cta h2 {
+        font-size: var(--step-4);
+        font-weight: 300;
+        max-width: 16ch;
+    }
+    .cta__search {
+        width: min(600px, 100%);
+    }
+    .cta .small {
+        color: var(--ice-3);
     }
 </style>

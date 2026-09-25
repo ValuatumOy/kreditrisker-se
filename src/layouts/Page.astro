@@ -1,7 +1,8 @@
 ---
-// Text and hub pages: breadcrumbs, a title block on the report grid, content.
+// Inner pages: night band with breadcrumbs and title, then a light content area.
 import Base from './Base.astro'
 import Crumbs from '../components/Crumbs.astro'
+import NightBand from '../components/NightBand.astro'
 import { crumbsJsonLd, type Crumb } from '../lib/seo.ts'
 
 interface Props {
@@ -20,44 +21,48 @@ const { title, h1 = title, description, path, lede, crumbs = [{ label: title }],
 ---
 
 <Base title={title} description={description} path={path} noindex={noindex} jsonLd={[...jsonLd, crumbsJsonLd(crumbs)]}>
-    <Crumbs items={crumbs} />
-    <header class="shell ph">
-        <h1>{h1}</h1>
-        {lede && <p class="lede">{lede}</p>}
+    <NightBand>
+        <Crumbs items={crumbs} />
+        <h1 class="ph__h1 reveal">{h1}</h1>
+        {lede && <p class="lede ph__lede reveal" style="--d:1">{lede}</p>}
         {
             draft && (
-                <p class="ph__draft small">
-                    Utkast. Texten ska granskas av jurist innan tjänsten lanseras och kan ändras.
+                <p class="ph__draft reveal" style="--d:2">
+                    Utkast · texten granskas av jurist innan lansering och kan ändras.
                 </p>
             )
         }
         <slot name="head" />
-    </header>
+    </NightBand>
     <div class="shell ph__body">
         <slot />
     </div>
 </Base>
 
 <style>
-    .ph {
-        padding-block: 20px clamp(32px, 5vw, 56px);
-        border-bottom: 1px solid var(--rule);
+    .ph__h1 {
+        margin-top: 28px;
+        max-width: 18ch;
+        font-weight: 300;
+        font-size: clamp(2.6rem, 1.4rem + 4vw, 4.4rem);
+        color: #fff;
     }
-    .ph h1 {
-        max-width: 20ch;
-    }
-    .ph .lede {
-        margin-top: 18px;
+    .ph__lede {
+        margin-top: 20px;
+        color: var(--ice-2);
     }
     .ph__draft {
         display: inline-block;
-        margin-top: 18px;
-        padding: 6px 10px;
-        background: var(--ochre-wash);
-        color: var(--ochre-ink);
-        border-radius: 2px;
+        margin-top: 20px;
+        padding: 6px 12px;
+        border-radius: 999px;
+        border: 1px solid rgb(244 191 114 / 0.35);
+        background: rgb(244 191 114 / 0.1);
+        color: var(--gold);
+        font-size: 0.82rem;
     }
     .ph__body {
-        padding-top: clamp(32px, 5vw, 56px);
+        padding-top: clamp(40px, 6vw, 72px);
+        padding-bottom: clamp(64px, 8vw, 120px);
     }
 </style>

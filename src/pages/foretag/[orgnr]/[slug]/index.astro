@@ -4,12 +4,14 @@
 import Base from '../../../../layouts/Base.astro'
 import Crumbs from '../../../../components/Crumbs.astro'
 import RedirectPage from '../../../../components/RedirectPage.astro'
-import KeyFigures from '../../../../components/KeyFigures.astro'
 import BarChart from '../../../../components/BarChart.astro'
+import LineChart from '../../../../components/LineChart.astro'
 import FinancialTable from '../../../../components/FinancialTable.astro'
 import ReportPanel from '../../../../components/ReportPanel.astro'
 import ModelSection from '../../../../components/ModelSection.astro'
 import Icon from '../../../../components/Icon.astro'
+import NightBand from '../../../../components/NightBand.astro'
+import KpiStrip from '../../../../components/KpiStrip.astro'
 import { getSite } from '../../../../lib/store.ts'
 import { relatedCompanies, type Site } from '../../../../lib/publish.ts'
 import type { FiscalPeriod, PublishedCompany, Value } from '../../../../lib/contract/types.ts'
@@ -83,20 +85,23 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
             synthetic={r.synthetic}
             jsonLd={c.quality.indexable ? [companyJsonLd(c), crumbsJsonLd(crumbs)] : []}
         >
-            <Crumbs items={crumbs} />
-            <div class="shell co">
+            <NightBand>
+                <Crumbs items={crumbs} />
                 <header class="co__head">
-                    <h1>{r.name}</h1>
-                    <div class="co__ids">
+                    <div class="co__titlerow">
+                        <div class="co__mark reveal" aria-hidden="true">{r.name.replace(/^Exempel /, '').slice(0, 1)}</div>
+                        <h1 class="reveal" style="--d:1">{r.name}</h1>
+                    </div>
+                    <div class="co__ids reveal" style="--d:2">
                         <button class="co__orgnr num" type="button" data-copy={formatOrgnr(r.orgnr)} aria-label={`Kopiera organisationsnummer ${formatOrgnr(r.orgnr)}`}>
-                            <span>Org.nr {formatOrgnr(r.orgnr)}</span>
+                            <span>{formatOrgnr(r.orgnr)}</span>
                             <Icon name="copy" />
                         </button>
                         {[LEGAL_FORM_TEXT[r.legalForm], r.municipality && kommunName(r.municipality.name), sni && `SNI ${sni.code}`]
                             .filter(Boolean)
                             .map((t) => <span class="co__id">{t}</span>)}
                     </div>
-                    <div class="co__tags">
+                    <div class="co__tags reveal" style="--d:3">
                         <span class:list={['tag', statusTone]}>
                             {STATUS_TEXT[r.status.code]}
                             {r.status.since && ` sedan ${date(r.status.since)}`}
@@ -108,36 +113,33 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                         {r.formerNames[0] && <span class="tag tag--plain">Tidigare {r.formerNames[0].name}</span>}
                     </div>
                 </header>
-
+                {latest ? (
+                    <div class="co__kpis">
+                        <p class="co__kpihead">
+                            <span>Nyckeltal, räkenskapsåret {periodLabel(latest)}{latest.months !== 12 && ` (${latest.months} mån)`}</span>
+                            <span class="co__kpisrc">
+                                {SOURCE_TEXT[latest.source.source]} · {latest.filedAt ? `registrerat ${date(latest.filedAt)}` : `hämtat ${date(latest.source.retrievedAt)}`}
+                            </span>
+                        </p>
+                        <KpiStrip periods={r.periods} />
+                    </div>
+                ) : (
+                    <div class="co__empty glass">
+                        <h3>Inget bokslut ännu</h3>
+                        <p>
+                            {r.registeredAt ? `Företaget registrerades ${date(r.registeredAt)} och ` : 'Företaget '}har inte lämnat någon årsredovisning som finns i källan. Profilen
+                            visar registeruppgifter tills det första bokslutet registreras.
+                        </p>
+                    </div>
+                )}
+            </NightBand>
+            <div class="shell co">
                 <section class="co__lead" aria-labelledby="sammanfattning">
-                    <h2 id="sammanfattning" class="visually-hidden">Sammanfattning</h2>
-                    <div class="co__summary">
+                    <div class="fig co__summary reveal">
+                        <h2 id="sammanfattning" class="co__summaryh">Sammanfattning</h2>
                         <p>{summary[0]}</p>
                         {latest && summary.length > 1 && <p>{summary.slice(1).join(' ')}</p>}
                     </div>
-                    {latest ? (
-                        <figure class="fig co__kf">
-                            <div class="fig__head">
-                                <span class="fig__no">{nextFig('Tabell')}</span>
-                                <span class="fig__title">
-                                    Nyckeltal <span class="fig__sub">– räkenskapsåret {periodLabel(latest)}{latest.months !== 12 && ` (${latest.months} månader)`}</span>
-                                </span>
-                            </div>
-                            <KeyFigures periods={r.periods} />
-                            <figcaption class="fig__src">
-                                <b>Källa:</b> {SOURCE_TEXT[latest.source.source]}, bokslut {date(latest.start)}–{date(latest.end)}
-                                {latest.filedAt && `, registrerat ${date(latest.filedAt)}`}. Hämtat {date(latest.source.retrievedAt)}.
-                            </figcaption>
-                        </figure>
-                    ) : (
-                        <div class="co__empty">
-                            <h3>Inget bokslut ännu</h3>
-                            <p>
-                                {r.registeredAt ? `Företaget registrerades ${date(r.registeredAt)} och ` : 'Företaget '}har inte lämnat någon årsredovisning som finns i källan. Profilen
-                                visar registeruppgifter tills det första bokslutet registreras.
-                            </p>
-                        </div>
-                    )}
                 </section>
 
                 <div class="co__rail">
@@ -155,14 +157,14 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                                 <figure class="fig">
                                     <div class="fig__head">
                                         <span class="fig__no">{nextFig()}</span>
-                                        <span class="fig__title">Nettoomsättning <span class="fig__sub">– kronor per räkenskapsår, senaste fem åren</span></span>
+                                        <span class="fig__title">Nettoomsättning <span class="fig__sub">– senaste fem åren</span></span>
                                     </div>
-                                    <BarChart title={`Nettoomsättning, ${r.name}`} points={salesSeries} />
+                                    <LineChart title={`Nettoomsättning, ${r.name}`} points={salesSeries} height={210} />
                                 </figure>
                                 <figure class="fig">
                                     <div class="fig__head">
                                         <span class="fig__no">{nextFig()}</span>
-                                        <span class="fig__title">Rörelseresultat <span class="fig__sub">– kronor per räkenskapsår, senaste fem åren</span></span>
+                                        <span class="fig__title">Rörelseresultat <span class="fig__sub">– senaste fem åren</span></span>
                                     </div>
                                     <BarChart title={`Rörelseresultat, ${r.name}`} points={ebitSeries} />
                                 </figure>
@@ -284,22 +286,31 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
 </script>
 
 <style>
-    .co {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) 360px;
-        grid-template-areas:
-            'head head'
-            'lead rail'
-            'main rail';
-        column-gap: clamp(32px, 5vw, 72px);
-        align-items: start;
-    }
     .co__head {
-        grid-area: head;
-        padding-block: 20px 36px;
+        padding-block: 28px 32px;
+    }
+    .co__titlerow {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+    .co__mark {
+        display: grid;
+        place-items: center;
+        width: clamp(52px, 6vw, 72px);
+        height: clamp(52px, 6vw, 72px);
+        flex-shrink: 0;
+        border-radius: 20px;
+        background: linear-gradient(145deg, #2a5bb8, #0f2146);
+        border: 1px solid rgb(255 255 255 / 0.18);
+        font-family: var(--serif);
+        font-size: clamp(1.6rem, 1rem + 1.6vw, 2.2rem);
+        color: var(--ice);
     }
     .co__head h1 {
-        font-size: clamp(2.2rem, 1.3rem + 3.4vw, 3.9rem);
+        font-size: clamp(2.2rem, 1.2rem + 3.6vw, 4.2rem);
+        font-weight: 300;
+        color: #fff;
         max-width: 22ch;
     }
     .co__ids {
@@ -307,36 +318,36 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         flex-wrap: wrap;
         align-items: center;
         gap: 6px 12px;
-        margin-top: 16px;
-        color: var(--ink-2);
+        margin-top: 20px;
+        color: var(--ice-2);
     }
     .co__ids > :not(:last-child)::after {
         content: '·';
         margin-left: 12px;
-        color: var(--ink-3);
+        color: var(--ice-3);
     }
     .co__orgnr {
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 4px 8px;
-        margin-left: -8px;
-        border: 1px solid transparent;
-        border-radius: var(--radius);
-        background: none;
+        padding: 5px 12px;
+        border: 1px solid rgb(255 255 255 / 0.16);
+        border-radius: 999px;
+        background: rgb(255 255 255 / 0.06);
         font: inherit;
-        font-weight: 600;
-        color: var(--ink);
+        font-family: var(--mono);
+        font-size: 0.92rem;
+        color: var(--ice);
         cursor: pointer;
+        transition: background 160ms;
     }
     .co__orgnr:hover {
-        border-color: var(--rule-2);
-        background: var(--sheet);
+        background: rgb(255 255 255 / 0.12);
     }
     .co__orgnr :global(svg) {
-        width: 15px;
-        height: 15px;
-        color: var(--ink-3);
+        width: 14px;
+        height: 14px;
+        color: var(--ice-3);
     }
     .co__orgnr.is-copied :global(svg) {
         color: var(--green);
@@ -347,66 +358,101 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         gap: 8px;
         margin-top: 16px;
     }
+    .co__kpihead {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 4px 16px;
+        margin-bottom: 12px;
+        font-size: 0.82rem;
+        color: var(--ice-2);
+    }
+    .co__kpisrc {
+        color: var(--ice-3);
+    }
+    .co__empty {
+        max-width: 720px;
+        padding: 24px;
+        border-radius: 20px;
+    }
+    .co__empty p {
+        color: var(--ice-2);
+        margin-top: 6px;
+    }
+    .co {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        grid-template-areas:
+            'lead rail'
+            'main rail';
+        column-gap: clamp(28px, 4vw, 56px);
+        align-items: start;
+        padding-top: clamp(32px, 4vw, 48px);
+        padding-bottom: clamp(64px, 8vw, 120px);
+    }
     .co__lead {
         grid-area: lead;
-        display: grid;
-        gap: 28px;
     }
     .co__summary {
         display: grid;
-        gap: 8px;
-        font-size: var(--step-1);
-        line-height: 1.5;
+        gap: 10px;
+        font-size: 1.08rem;
+        line-height: 1.6;
         color: var(--ink-2);
-        max-width: 64ch;
     }
-    .co__summary p:first-child {
+    .co__summary p:first-of-type {
         color: var(--ink);
     }
-    .co__empty {
-        padding: 22px;
-        background: var(--sheet);
-        border: 1px dashed var(--rule-2);
-    }
-    .co__empty p {
-        color: var(--ink-2);
-        margin-top: 6px;
-        max-width: 60ch;
+    .co__summaryh {
+        font-family: var(--sans);
+        font-size: 0.8rem;
+        font-weight: 500;
+        color: var(--ink-3);
+        letter-spacing: 0;
     }
     .co__rail {
         grid-area: rail;
         position: sticky;
-        top: 88px;
+        top: 92px;
     }
     .co__fix {
         margin-top: 12px;
         color: var(--ink-3);
+        text-align: center;
     }
     .co__main {
         grid-area: main;
         min-width: 0;
     }
     .co__sec {
-        padding-top: clamp(48px, 6vw, 72px);
+        padding-top: clamp(40px, 5vw, 64px);
     }
     .co__sec > h2 {
         font-size: var(--step-2);
-        margin-bottom: 20px;
+        font-weight: 350;
+        margin-bottom: 18px;
     }
     .co__charts {
         display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 32px;
+        grid-template-columns: 1.3fr 1fr;
+        gap: 16px;
     }
     .co__facts {
         display: grid;
         grid-template-columns: 1fr 1fr;
         margin: 0;
-        border-top: 1px solid var(--ink);
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--card-shadow);
+        overflow: hidden;
     }
     .co__facts > div {
-        padding: 12px 16px 12px 0;
+        padding: 16px 20px;
         border-bottom: 1px solid var(--rule);
+    }
+    .co__facts > div:nth-child(odd):not(.co__wide) {
+        border-right: 1px solid var(--rule);
     }
     .co__facts dt {
         font-size: var(--step--1);
@@ -424,12 +470,16 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
     .co__sources {
         list-style: none;
         margin: 0 0 12px;
-        padding: 0;
-        border-top: 1px solid var(--ink);
+        padding: 6px 20px;
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-lg);
     }
     .co__sources li {
-        padding: 10px 0;
-        border-bottom: 1px solid var(--rule);
+        padding: 12px 0;
+    }
+    .co__sources li + li {
+        border-top: 1px solid var(--rule);
     }
     .co__related {
         list-style: none;
@@ -437,24 +487,35 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         padding: 0;
         display: grid;
         grid-template-columns: 1fr 1fr;
-        border-top: 1px solid var(--ink);
+        gap: 10px;
     }
     .co__related li {
         display: grid;
-        padding: 12px 16px 12px 0;
-        border-bottom: 1px solid var(--rule);
+        padding: 16px 18px;
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-radius: 16px;
+        transition:
+            translate 200ms var(--ease-out),
+            box-shadow 200ms var(--ease-out);
+    }
+    .co__related li:hover {
+        translate: 0 -2px;
+        box-shadow: var(--card-shadow);
     }
     .co__related a {
         font-weight: 600;
+        color: var(--ink);
+        text-decoration: none;
     }
     @media (max-width: 1080px) {
         .co {
             grid-template-columns: minmax(0, 1fr);
-            grid-template-areas: 'head' 'lead' 'rail' 'main';
+            grid-template-areas: 'lead' 'rail' 'main';
         }
         .co__rail {
             position: static;
-            margin-top: 36px;
+            margin-top: 24px;
         }
     }
     @media (max-width: 720px) {
@@ -463,8 +524,11 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         .co__related {
             grid-template-columns: 1fr;
         }
-        .co__summary {
-            font-size: 1.08rem;
+        .co__facts > div:nth-child(odd):not(.co__wide) {
+            border-right: 0;
+        }
+        .co__titlerow {
+            gap: 14px;
         }
     }
 </style>

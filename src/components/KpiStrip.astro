@@ -1,0 +1,130 @@
+---
+// Newest-year key figures as glass tiles with count-up and prior-year change.
+// Keeps every value state; missing/incomparable never animate from zero.
+import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
+import { compactSek, count, percent, type Display } from '../lib/format.ts'
+import { computeMetrics } from '../lib/metrics.ts'
+
+interface Props {
+    periods: FiscalPeriod[]
+}
+const { periods } = Astro.props
+const [p, prior] = periods
+const m = computeMetrics(p, prior)
+const mPrior = prior ? computeMetrics(prior, periods[2]) : undefined
+
+type Anim = { to: number; decimals: number; suffix: string } | undefined
+const sekAnim = (v: Value): Anim => {
+    if (v.status !== 'reported') return undefined
+    const a = Math.abs(v.value)
+    if (a >= 1e9) return { to: v.value / 1e9, decimals: 1, suffix: ' mdkr' }
+    if (a >= 1e6) return { to: v.value / 1e6, decimals: 1, suffix: ' Mkr' }
+    if (a >= 1e3) return { to: Math.round(v.value / 1e3), decimals: 0, suffix: ' tkr' }
+    return undefined
+}
+const pctAnim = (v: Value, d = 1): Anim => (v.status === 'derived' ? { to: v.value * 100, decimals: d, suffix: ' %' } : undefined)
+const delta = (a: Value, b: Value | undefined, kind: 'pct' | 'pp'): { text: string; up: boolean } | null => {
+    if (!b) return null
+    if (kind === 'pct') {
+        if (a.status !== 'reported' || b.status !== 'reported' || b.value <= 0 || p.months !== 12 || prior?.months !== 12) return null
+        const d = (a.value / b.value - 1) * 100
+        return { text: `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`, up: d >= 0 }
+    }
+    if (a.status !== 'derived' || b.status !== 'derived') return null
+    const d = (a.value - b.value) * 100
+    return { text: `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} p.e.`, up: d >= 0 }
+}
+const cells: { label: string; d: Display; anim: Anim; delta: ReturnType<typeof delta> }[] = [
+    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), anim: sekAnim(p.income.netSales), delta: delta(p.income.netSales, prior?.income.netSales, 'pct') },
+    { label: 'Rörelseresultat', d: compactSek(p.income.operatingProfit), anim: sekAnim(p.income.operatingProfit), delta: null },
+    { label: 'Årets resultat', d: compactSek(p.income.netProfit), anim: sekAnim(p.income.netProfit), delta: null },
+    { label: 'Soliditet', d: percent(m.equityRatio), anim: pctAnim(m.equityRatio), delta: delta(m.equityRatio, mPrior?.equityRatio, 'pp') },
+    { label: 'Kassalikviditet', d: percent(m.quickRatio, 0), anim: pctAnim(m.quickRatio, 0), delta: null },
+    { label: 'Anställda', d: count(p.employees), anim: p.employees.status === 'reported' ? { to: p.employees.value, decimals: 0, suffix: '' } : undefined, delta: null },
+]
+---
+
+<dl class="kpi">
+    {
+        cells.map((c, i) => (
+            <div class="kpi__cell reveal" style={`--d:${i}`}>
+                <dt>{c.label}</dt>
+                <dd class:list={['kpi__v', 'num', `val--${c.d.state}`]} title={c.d.note} data-count={c.anim?.to} data-decimals={c.anim?.decimals} data-suffix={c.anim?.suffix}>
+                    {c.d.text}
+                </dd>
+                {c.d.note && <dd class="visually-hidden">{c.d.note}</dd>}
+                {c.delta && <dd class:list={['kpi__d', 'num', c.delta.up ? 'is-up' : 'is-down']}>{c.delta.text}</dd>}
+            </div>
+        ))
+    }
+</dl>
+
+<style>
+    .kpi {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+        margin: 0;
+    }
+    .kpi__cell {
+        padding: 16px 16px 14px;
+        border-radius: 18px;
+        background: linear-gradient(180deg, rgb(255 255 255 / 0.09), rgb(255 255 255 / 0.03));
+        border: 1px solid rgb(255 255 255 / 0.12);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+    .kpi dt {
+        font-size: 0.76rem;
+        color: var(--ice-3);
+        white-space: nowrap;
+    }
+    .kpi dd {
+        margin: 0;
+    }
+    .kpi__v {
+        margin-top: 6px !important;
+        font-size: 1.45rem;
+        font-weight: 450;
+        color: var(--ice);
+        white-space: nowrap;
+    }
+    .kpi__v.val--negative {
+        color: var(--red);
+    }
+    .kpi__v.val--missing,
+    .kpi__v.val--incomparable {
+        font-size: 1rem;
+        color: var(--gold);
+        text-decoration-color: rgb(244 191 114 / 0.5);
+        padding-top: 6px;
+    }
+    .kpi__d {
+        margin-top: 4px !important;
+        display: inline-block;
+        font-size: 0.72rem;
+        padding: 1px 7px;
+        border-radius: 999px;
+    }
+    .kpi__d.is-up {
+        color: #5fd49c;
+        background: rgb(95 212 156 / 0.12);
+    }
+    .kpi__d.is-down {
+        color: #ff8a7f;
+        background: rgb(255 138 127 / 0.12);
+    }
+    @media (max-width: 1100px) {
+        .kpi {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 560px) {
+        .kpi {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .kpi__v {
+            font-size: 1.25rem;
+        }
+    }
+</style>

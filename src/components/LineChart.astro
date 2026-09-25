@@ -1,0 +1,206 @@
+---
+// Animated area/line chart for one series. Missing years break the line and
+// render as a gold dashed band labelled "saknas" — never a zero point.
+import type { Value } from '../lib/contract/types.ts'
+import { compactSek } from '../lib/format.ts'
+
+interface Props {
+    points: { label: string; value: Value }[] // oldest first
+    title: string
+    height?: number
+}
+const { points, title, height = 150 } = Astro.props
+const uid = 'lc' + Math.abs([...title].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)).toString(36)
+const W = 520
+const padX = 18
+const top = 30
+const bottom = 28
+const plotH = height - top - bottom
+const vals = points.map((p) => (p.value.status === 'reported' || p.value.status === 'derived' ? p.value.value : null))
+const present = vals.filter((v): v is number => v !== null)
+const max = Math.max(0, ...present) * 1.08 || 1
+const min = Math.min(0, ...present)
+const x = (i: number) => padX + (points.length === 1 ? (W - 2 * padX) / 2 : (i * (W - 2 * padX)) / (points.length - 1))
+const y = (v: number) => top + ((max - v) / (max - min || 1)) * plotH
+// Split into continuous runs so a missing year breaks the line.
+const runs: { i: number; v: number }[][] = []
+vals.forEach((v, i) => {
+    if (v === null) return
+    const last = runs.at(-1)
+    if (last && last.at(-1)!.i === i - 1) last.push({ i, v })
+    else runs.push([{ i, v }])
+})
+const smooth = (run: { i: number; v: number }[]) =>
+    run
+        .map((p, k) => {
+            const px = x(p.i)
+            const py = y(p.v)
+            if (k === 0) return `M${px},${py}`
+            const prev = run[k - 1]
+            const cx = (x(prev.i) + px) / 2
+            return `C${cx},${y(prev.v)} ${cx},${py} ${px},${py}`
+        })
+        .join(' ')
+const lastIdx = vals.map((v, i) => (v === null ? -1 : i)).filter((i) => i >= 0).at(-1)
+const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).join(', ')
+---
+
+<svg class="lc" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`${title}. ${summary}`}>
+    <defs>
+        <linearGradient id={`${uid}-fill`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--blue)" stop-opacity="0.35"></stop>
+            <stop offset="1" stop-color="var(--blue)" stop-opacity="0"></stop>
+        </linearGradient>
+        <pattern id={`${uid}-hatch`} width="7" height="7" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="7" stroke="var(--ochre)" stroke-opacity="0.45" stroke-width="1.2"></line>
+        </pattern>
+    </defs>
+    {[0.25, 0.5, 0.75].map((f) => <line class="lc__grid" x1="0" x2={W} y1={top + plotH * f} y2={top + plotH * f} />)}
+    <line class="lc__base" x1="0" x2={W} y1={y(Math.max(min, 0))} y2={y(Math.max(min, 0))}></line>
+    {
+        vals.map((v, i) =>
+            v === null ? (
+                <g class="lc__gap">
+                    <rect x={x(i) - 22} y={top} width="44" height={plotH} rx="6" fill={`url(#${uid}-hatch)`} />
+                    <rect x={x(i) - 22} y={top} width="44" height={plotH} rx="6" class="lc__gapframe" />
+                    <text x={x(i)} y={top - 10} text-anchor="middle" class="lc__gaplabel">
+                        saknas
+                    </text>
+                </g>
+            ) : null,
+        )
+    }
+    {
+        runs.map((run) =>
+            run.length > 1 ? (
+                <>
+                    <path class="lc__area" d={`${smooth(run)} L${x(run.at(-1)!.i)},${y(Math.max(min, 0))} L${x(run[0].i)},${y(Math.max(min, 0))} Z`} fill={`url(#${uid}-fill)`} />
+                    <path class="lc__line" d={smooth(run)} pathLength="1" />
+                </>
+            ) : null,
+        )
+    }
+    {
+        vals.map((v, i) =>
+            v === null ? null : (
+                <g class:list={['lc__pt', { 'is-last': i === lastIdx }]}>
+                    {i === lastIdx && <circle cx={x(i)} cy={y(v)} r="10" class="lc__pulse" />}
+                    <circle cx={x(i)} cy={y(v)} r={i === lastIdx ? 4.5 : 3} />
+                    {i === lastIdx && (
+                        <text x={Math.min(x(i), W - 40)} y={y(v) - 14} text-anchor="middle" class="lc__v">
+                            {compactSek(points[i].value).text}
+                        </text>
+                    )}
+                </g>
+            ),
+        )
+    }
+    {
+        points.map((p, i) => (
+            <text x={x(i)} y={height - 6} text-anchor="middle" class="lc__x">
+                {p.label}
+            </text>
+        ))
+    }
+</svg>
+
+<style>
+    .lc {
+        width: 100%;
+        height: auto;
+        overflow: visible;
+        font-family: var(--mono);
+    }
+    .lc__grid {
+        stroke: var(--rule);
+        stroke-dasharray: 2 5;
+    }
+    .lc__base {
+        stroke: var(--rule-2);
+    }
+    .lc__line {
+        fill: none;
+        stroke: var(--blue);
+        stroke-width: 2.4;
+        stroke-linecap: round;
+    }
+    .lc__pt circle {
+        fill: var(--paper);
+        stroke: var(--blue);
+        stroke-width: 2;
+    }
+    .lc__pt.is-last circle:not(.lc__pulse) {
+        fill: var(--ochre);
+        stroke: none;
+    }
+    .lc__pulse {
+        fill: var(--ochre) !important;
+        stroke: none !important;
+        opacity: 0.25;
+        transform-box: fill-box;
+        transform-origin: center;
+    }
+    .lc__v {
+        font-size: 13px;
+        font-weight: 500;
+        fill: var(--ink);
+    }
+    .lc__x {
+        font-size: 11.5px;
+        fill: var(--ink-3);
+    }
+    .lc__gapframe {
+        fill: none;
+        stroke: var(--ochre);
+        stroke-opacity: 0.6;
+        stroke-dasharray: 4 3;
+    }
+    .lc__gaplabel {
+        font-family: var(--sans);
+        font-size: 11.5px;
+        font-style: italic;
+        fill: var(--ochre-ink);
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .lc__line {
+            stroke-dasharray: 1;
+            stroke-dashoffset: 1;
+            animation: lc-draw 1600ms var(--ease-out) 200ms forwards;
+        }
+        .lc__area {
+            opacity: 0;
+            animation: lc-fade 1200ms var(--ease-out) 700ms forwards;
+        }
+        .lc__pulse {
+            animation: lc-pulse 2400ms ease-out infinite;
+        }
+        .lc__gap rect:first-child {
+            animation: lc-shimmer 3s ease-in-out infinite;
+        }
+    }
+    @keyframes lc-draw {
+        to {
+            stroke-dashoffset: 0;
+        }
+    }
+    @keyframes lc-fade {
+        to {
+            opacity: 1;
+        }
+    }
+    @keyframes lc-pulse {
+        0% {
+            transform: scale(0.6);
+            opacity: 0.5;
+        }
+        100% {
+            transform: scale(2.2);
+            opacity: 0;
+        }
+    }
+    @keyframes lc-shimmer {
+        50% {
+            opacity: 0.45;
+        }
+    }
+</style>

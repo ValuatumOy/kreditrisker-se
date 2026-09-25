@@ -30,6 +30,7 @@ const fullTitle = path === '/' ? `${SITE.name} – ${title}` : `${title} | ${SIT
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <script is:inline>document.documentElement.classList.add('js')</script>
         <title>{fullTitle}</title>
         <meta name="description" content={description} />
         <meta name="robots" content={robots} />
@@ -40,18 +41,18 @@ const fullTitle = path === '/' ? `${SITE.name} – ${title}` : `${title} | ${SIT
         <meta property="og:title" content={title} />
         <meta property="og:description" content={description} />
         <meta property="og:url" content={canonical} />
-        <meta name="theme-color" content="#f5f6f3" />
+        <meta name="theme-color" content="#050a15" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="sitemap" href="/sitemap-index.xml" />
         {jsonLd.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
     </head>
     <body>
         <Fragment set:html={`<!--
-THESIS: Swedish company facts presented like a central-bank stability report: every number is a numbered figure with its source, period and freshness. Refuses the navy fintech dashboard with gauges and the cream editorial magazine.
-OWN-WORLD: cool white paper #f5f6f3, ink-blue text #0f1e26, statsblå #1d4f6e for series and links, one ochre highlight #c58a1c for figure numbers and gaps; Source Serif 4 headings, Schibsted Grotesk body and tabular data; 2px ink figure rules, hairline tables, "Källa:" lines.
-STORY: the visitor searches a company, reads calm sourced facts, sees exactly what is missing, and finds the report path with honest availability.
-FIRST VIEWPORT: serif headline and a full-width search field on the left seven columns; right five columns hold Diagram 1, a labelled synthetic profile that cycles full, sparse and stale data.
-FORM: grounded direction 7 of 7 (stability report), seed 1b69662a.
+THESIS: Blå timmen. Swedish company facts shown the way a premium fintech shows money: night-navy chrome over Stockholm at blue hour, product panels in glass, every number still sourced, dated and honest about gaps. Refuses the flat grey directory table and the generic purple SaaS gradient.
+OWN-WORLD: night #050a15, ice text #eef3fa, glow blue #7fb2ff for data, city-light gold #f4bf72 for emphasis and gaps; day surfaces #f3f5f9 with white 20px cards; Source Serif 4 light display, Geist UI, Geist Mono numerals; glass panels, grain, photography.
+STORY: the visitor sees the city, types a company, watches real-looking figures assemble, understands what is missing and what is not launched yet.
+FIRST VIEWPORT: full-bleed Stockholm blue-hour photo; left, a light serif headline and a glass search with a typing placeholder; right, a floating glass profile card whose numbers count up while a gold line traces the skyline.
+FORM: user-directed redesign (luxurious fintech), replacing seed 1b69662a.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
 -->`} />
         <a class="skip" href="#main">Hoppa till innehållet</a>
@@ -62,35 +63,48 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
                 </div>
             )
         }
-        <Nav current={path} />
         {
             synthetic && (
                 <div class="env-banner env-banner--synthetic" role="note">
-                    Syntetiska testdata. Företagen på sajten finns inte; alla siffror är påhittade för utveckling.
+                    <span class="env-dot" aria-hidden="true" /> Syntetiska testdata – företagen finns inte, siffrorna är påhittade för utveckling.
                 </div>
             )
         }
+        <Nav current={path} />
         <main id="main">
             <slot />
         </main>
         <Footer />
+        <script>
+            import '../scripts/motion.ts'
+        </script>
     </body>
 </html>
 
 <style>
     .env-banner {
-        background: var(--ink);
-        color: var(--paper);
-        font-size: var(--step--1);
-        padding: 8px var(--gutter);
+        position: relative;
+        z-index: 40;
+        background: var(--night);
+        color: var(--ice-2);
+        font-size: 0.78rem;
+        padding: 7px var(--gutter);
         text-align: center;
+        border-bottom: 1px solid rgb(255 255 255 / 0.08);
     }
     .env-banner code {
-        font-size: 0.95em;
+        font-family: var(--mono);
     }
     .env-banner--synthetic {
-        background: var(--ochre-wash);
-        color: var(--ochre-ink);
-        border-bottom: 1px solid color-mix(in srgb, var(--ochre) 40%, var(--rule));
+        color: var(--gold);
+    }
+    .env-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 6px;
+        border-radius: 50%;
+        background: var(--gold);
+        vertical-align: 1px;
     }
 </style>
