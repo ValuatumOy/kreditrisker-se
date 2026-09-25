@@ -1,6 +1,5 @@
 ---
 import { FLAGS, SITE } from '../config/site.ts'
-import Logo from './Logo.astro'
 const year = SITE.asOf.slice(0, 4)
 const cols = [
     { h: 'Utforska', links: [['/sok/', 'Sök företag'], ['/branscher/', 'Branscher'], ['/kommuner/', 'Kommuner'], ['/topplistor/', 'Topplistor'], ['/guider/', 'Guider']] },
@@ -12,7 +11,7 @@ const cols = [
 <footer class="foot dark grain">
     <div class="shell foot__grid">
         <div class="foot__brand">
-            <a href="/" class="foot__logo"><Logo size={36} /> <span>{SITE.name}</span></a>
+            <a href="/" class="foot__logo"><span>{SITE.name}</span></a>
             <p>Bokslut, nyckeltal och kreditrisk för svenska företag. Byggt av {SITE.provider.name}.</p>
         </div>
         {
@@ -35,7 +34,6 @@ const cols = [
         {!FLAGS.checkout && <span>Tjänsten är under uppbyggnad. Inga rapporter om svenska företag säljs ännu.</span>}
         <span>Foton: Unsplash</span>
     </div>
-    <p class="foot__word" aria-hidden="true">{SITE.name}</p>
 </footer>
 
 <style>

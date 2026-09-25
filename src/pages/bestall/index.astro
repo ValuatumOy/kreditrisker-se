@@ -4,6 +4,7 @@
 // renders a single state for review. 'http' talks to the Swedish report backend.
 import Base from '../../layouts/Base.astro'
 import Icon from '../../components/Icon.astro'
+import NightBand from '../../components/NightBand.astro'
 import { FLAGS } from '../../config/site.ts'
 import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
 
@@ -11,7 +12,8 @@ const TERMS_VERSION = 'utkast-2026-09'
 ---
 
 <Base title="Beställ rapport" description="Beställ en rapport om ett svenskt företag." path="/bestall/" noindex>
-    <div class="shell od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)}>
+    <NightBand>
+    <div class="od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)}>
         <p class="od__back small"><a href="/sok/" data-back>← Tillbaka</a></p>
         <h1>Beställ <span data-product-name>rapport</span></h1>
         <p class="od__co" data-company>Inget företag valt.</p>
@@ -62,6 +64,7 @@ const TERMS_VERSION = 'utkast-2026-09'
             <p class="small">Kontakta oss via <a href="/om/">kontaktsidan</a> och ange ordernumret om problemet kvarstår.</p>
         </div>
     </div>
+    </NightBand>
 </Base>
 
 <script>

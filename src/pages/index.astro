@@ -86,7 +86,6 @@ const explore = [
 
         <div class="shell hero__grid">
             <div class="hero__copy">
-                <p class="hero__pill reveal"><span class="hero__pulse" aria-hidden="true"></span> Under uppbyggnad för svenska företag</p>
                 <h1 class="reveal" style="--d:1">Se siffrorna bakom varje <em>svenskt företag.</em></h1>
                 <p class="lede reveal" style="--d:2">Bokslut, nyckeltal och källor på ett ställe. Varje siffra visar räkenskapsår och hur aktuell den är, och det som saknas står som saknas.</p>
                 <div class="hero__search reveal" style="--d:3">
@@ -210,9 +209,9 @@ const explore = [
                 <h2 class="reveal">Källan först. Alltid.</h2>
                 <p class="lede reveal" style="--d:1">Under varje tabell står varifrån siffrorna kommer, vilket räkenskapsår de gäller och när vi hämtade dem.</p>
                 <ol class="sources__list">
-                    <li class="reveal" style="--d:2"><span class="sources__n num">01</span><div><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></div></li>
-                    <li class="reveal" style="--d:3"><span class="sources__n num">02</span><div><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></div></li>
-                    <li class="reveal" style="--d:4"><span class="sources__n num">03</span><div><b>Valuatum</b><span>Nyckeltal med publicerade formler. Kreditbetyg först när modellen är validerad för Sverige.</span></div></li>
+                    <li class="reveal" style="--d:2"><div><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></div></li>
+                    <li class="reveal" style="--d:3"><div><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></div></li>
+                    <li class="reveal" style="--d:4"><div><b>Valuatum</b><span>Nyckeltal med publicerade formler. Kreditbetyg först när modellen är validerad för Sverige.</span></div></li>
                 </ol>
                 <p class="small muted reveal">Källorna kräver avtal om datalicens innan publicering. <a href="/kallor/">Om datakällorna</a></p>
             </div>
@@ -292,7 +291,7 @@ const explore = [
     <section class="cta dark grain">
         <div class="cta__glow" aria-hidden="true"></div>
         <div class="shell cta__inner">
-            <h2 class="reveal">Börja med ett organisationsnummer.</h2>
+            <h2 class="reveal">Börja med ett organisations&shy;nummer.</h2>
             <div class="cta__search reveal" style="--d:1"><SearchBox id="cta-q" /></div>
             {!FLAGS.checkout && <p class="small reveal" style="--d:2">Profilerna är gratis. Rapporter säljs inte ännu.</p>}
         </div>
@@ -399,41 +398,8 @@ const explore = [
     .hero__copy {
         grid-column: 1 / span 6;
     }
-    .hero__pill {
-        display: inline-flex;
-        align-items: center;
-        gap: 10px;
-        padding: 6px 14px 6px 10px;
-        border-radius: 999px;
-        border: 1px solid rgb(255 255 255 / 0.16);
-        background: rgb(255 255 255 / 0.06);
-        backdrop-filter: blur(10px);
-        font-size: 0.82rem;
-        color: var(--ice-2);
-    }
-    .hero__pulse {
-        position: relative;
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: var(--gold);
-    }
-    .hero__pulse::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        border-radius: 50%;
-        background: var(--gold);
-        animation: ping 2s ease-out infinite;
-    }
-    @keyframes ping {
-        to {
-            transform: scale(3);
-            opacity: 0;
-        }
-    }
     .hero h1 {
-        margin-top: 22px;
+        margin-top: 0;
         font-size: clamp(3rem, 1.4rem + 5vw, 5.4rem);
         line-height: 0.98;
         letter-spacing: -0.045em;
@@ -476,7 +442,19 @@ const explore = [
     }
     @media (max-width: 1080px) {
         .hero__shade {
-            background: linear-gradient(180deg, rgb(5 10 21 / 0.8) 0%, rgb(5 10 21 / 0.55) 40%, rgb(5 10 21 / 0.75) 70%, var(--night) 100%);
+            background: linear-gradient(180deg, rgb(5 10 21 / 0.78) 0%, rgb(5 10 21 / 0.5) 35%, rgb(5 10 21 / 0.2) 60%, rgb(5 10 21 / 0.55) 85%, var(--night) 100%);
+        }
+        .hero__media {
+            bottom: auto;
+            height: min(100svh, 900px);
+        }
+        .hero__media :global(img),
+        .hero__sky {
+            object-position: 38% 50%;
+        }
+        .hero .lede,
+        .hero__facts {
+            color: var(--ice);
         }
         .hero__copy,
         .hero__card {
@@ -595,7 +573,7 @@ const explore = [
     }
     .tile__demo {
         position: relative;
-        height: 220px;
+        min-height: 220px;
         margin-bottom: 14px;
     }
     @media (max-width: 900px) {
@@ -1212,7 +1190,9 @@ const explore = [
         gap: 28px;
     }
     .cta h2 {
-        font-size: var(--step-4);
+        font-size: clamp(2.1rem, 1rem + 5vw, 4.6rem);
+        overflow-wrap: anywhere;
+        hyphens: auto;
         font-weight: 300;
         max-width: 16ch;
     }

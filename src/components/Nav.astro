@@ -1,7 +1,6 @@
 ---
 import { SITE } from '../config/site.ts'
 import Icon from './Icon.astro'
-import Logo from './Logo.astro'
 
 interface Props {
     current: string
@@ -21,7 +20,6 @@ const isCurrent = (href: string) => current.startsWith(href)
 <header class="nav dark" data-nav>
     <div class="shell nav__bar">
         <a class="nav__brand" href="/" aria-label={`${SITE.name}, till startsidan`}>
-            <Logo />
             <span class="nav__name">{SITE.name}</span>
         </a>
         <nav class="nav__links" aria-label="Huvudmeny">

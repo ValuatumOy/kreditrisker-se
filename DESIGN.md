@@ -1,248 +1,271 @@
 ---
 name: Kreditrisker (SE)
-description: Swedish company facts set like a central-bank stability report; every number is a numbered, sourced figure.
+description: Swedish company facts shown like a premium fintech at blue hour; every number sourced, dated and honest about gaps.
 colors:
-  paper: "#f5f6f3"
-  paper-2: "#eceee9"
+  night: "#050a15"
+  night-2: "#0a1426"
+  night-3: "#111f38"
+  ice: "#eef3fa"
+  ice-2: "#b7c4d9"
+  ice-3: "#8595b0"
+  glow: "#7fb2ff"
+  gold: "#f4bf72"
+  paper: "#f3f5f9"
+  paper-2: "#e9edf4"
   sheet: "#ffffff"
-  ink: "#0f1e26"
-  ink-2: "#33444d"
-  ink-3: "#56656c"
-  rule: "#d3d8d3"
-  rule-2: "#b9c0bb"
-  statsbla: "#1d4f6e"
-  statsbla-light: "#8fb0c4"
-  statsbla-wash: "#d6e3ea"
-  ochre: "#c58a1c"
-  ochre-ink: "#7d5308"
-  ochre-wash: "#f6ebd3"
-  red: "#9a2d24"
-  red-wash: "#f5e2de"
-  green: "#2c6147"
+  ink: "#0a1426"
+  ink-2: "#33415a"
+  ink-3: "#5a6781"
+  rule: "#dde3ed"
+  rule-2: "#c4ccda"
+  blue: "#1f56d6"
+  blue-3: "#dce8ff"
+  ochre: "#d9962f"
+  ochre-ink: "#8a5a0e"
+  ochre-wash: "#fbf0dc"
+  red: "#c2362b"
+  red-wash: "#fbe5e2"
+  green: "#1f8a5b"
 typography:
   display:
     fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
-    fontSize: "clamp(2.5rem, 1.4rem + 4.2vw, 4.4rem)"
-    fontWeight: 500
-    lineHeight: 1.08
-    letterSpacing: "-0.028em"
+    fontSize: "clamp(3rem, 1.4rem + 5vw, 5.4rem)"
+    fontWeight: 300
+    lineHeight: 0.98
+    letterSpacing: "-0.045em"
   headline:
     fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
-    fontSize: "clamp(1.9rem, 1.3rem + 2vw, 2.6rem)"
-    fontWeight: 500
-    lineHeight: 1.08
-    letterSpacing: "-0.022em"
+    fontSize: "clamp(2.6rem, 1.4rem + 4.4vw, 4.6rem)"
+    fontWeight: 350
+    lineHeight: 1.06
+    letterSpacing: "-0.035em"
+  section:
+    fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
+    fontSize: "clamp(2rem, 1.3rem + 2.4vw, 3rem)"
+    fontWeight: 380
+    lineHeight: 1.06
+    letterSpacing: "-0.03em"
   title:
     fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
-    fontSize: "1.25rem"
-    fontWeight: 500
+    fontSize: "1.1875rem"
+    fontWeight: 400
     lineHeight: 1.25
-    letterSpacing: "-0.005em"
-  figure-value:
-    fontFamily: "Source Serif 4 Variable, Source Serif 4, Georgia, serif"
-    fontSize: "1.85rem"
-    fontWeight: 400
-    lineHeight: 1.2
-    letterSpacing: "-0.02em"
+    letterSpacing: "-0.01em"
   body:
-    fontFamily: "Schibsted Grotesk Variable, Schibsted Grotesk, system-ui, sans-serif"
-    fontSize: "1.0625rem"
-    fontWeight: 400
-    lineHeight: 1.55
-    fontFeature: "kern"
-  figure-title:
-    fontFamily: "Schibsted Grotesk Variable, Schibsted Grotesk, system-ui, sans-serif"
+    fontFamily: "Geist Variable, Geist, system-ui, sans-serif"
     fontSize: "1rem"
-    fontWeight: 600
-    lineHeight: 1.3
-  label:
-    fontFamily: "Schibsted Grotesk Variable, Schibsted Grotesk, system-ui, sans-serif"
-    fontSize: "0.8125rem"
     fontWeight: 400
+    lineHeight: 1.6
+  label:
+    fontFamily: "Geist Variable, Geist, system-ui, sans-serif"
+    fontSize: "0.8125rem"
+    fontWeight: 500
     lineHeight: 1.5
+  numeral:
+    fontFamily: "Geist Mono Variable, Geist Mono, ui-monospace, monospace"
+    fontSize: "1.45rem"
+    fontWeight: 450
+    letterSpacing: "-0.01em"
+    fontFeature: "tnum"
 rounded:
-  hairline: "2px"
-  base: "3px"
+  control: "10px"
+  card: "20px"
+  panel: "24px"
+  feature: "28px"
   pill: "999px"
 spacing:
-  gutter: "clamp(16px, 3.2vw, 40px)"
+  gutter: "clamp(16px, 3.4vw, 48px)"
   col-gap: "24px"
-  section: "clamp(56px, 8vw, 112px)"
+  section: "clamp(72px, 10vw, 140px)"
   max: "1320px"
 components:
   button-primary:
     backgroundColor: "{colors.ink}"
     textColor: "{colors.paper}"
-    rounded: "{rounded.base}"
-    padding: "0 18px"
+    rounded: "{rounded.pill}"
+    padding: "0 20px"
     height: "44px"
-  button-primary-hover:
-    backgroundColor: "{colors.statsbla}"
+  button-primary-night:
+    backgroundColor: "{colors.ice}"
+    textColor: "{colors.night}"
+    rounded: "{rounded.pill}"
+    padding: "0 20px"
+    height: "44px"
   button-quiet:
     backgroundColor: "transparent"
     textColor: "{colors.ink}"
-    rounded: "{rounded.base}"
+    rounded: "{rounded.pill}"
+    padding: "0 20px"
     height: "44px"
-  button-disabled:
-    backgroundColor: "{colors.paper-2}"
-    textColor: "{colors.ink-3}"
-  input-search:
-    backgroundColor: "{colors.sheet}"
-    textColor: "{colors.ink}"
-    rounded: "{rounded.base}"
-    height: "60px"
   tag:
     backgroundColor: "{colors.sheet}"
     textColor: "{colors.ink-2}"
     rounded: "{rounded.pill}"
-    padding: "2px 8px"
-  tag-warn:
-    backgroundColor: "{colors.ochre-wash}"
-    textColor: "{colors.ochre-ink}"
-  tag-alert:
-    backgroundColor: "{colors.red-wash}"
-    textColor: "{colors.red}"
-  panel:
+    padding: "3px 10px"
+  card-day:
     backgroundColor: "{colors.sheet}"
-    padding: "18px 20px 20px"
+    rounded: "{rounded.card}"
+    padding: "clamp(18px, 2.4vw, 28px)"
+  input-search:
+    backgroundColor: "{colors.sheet}"
+    textColor: "{colors.ink}"
+    rounded: "{rounded.pill}"
+    height: "56px"
+  nav-link-current:
+    backgroundColor: "{colors.ice}"
+    textColor: "{colors.night}"
+    rounded: "{rounded.pill}"
+    padding: "7px 14px"
 ---
 
 # Design System: Kreditrisker (SE)
 
 ## Overview
 
-**Creative North Star: "The Stability Report"**
+**Creative North Star: "Blå timmen"** (name taken from the direction contract's thesis)
 
-Company facts are presented the way a Riksbank or Finansinspektionen stability report presents the economy: cool white paper, ink-blue text, a hairline grid, and numbered exhibits. Every number lives inside a figure that has a number ("Tabell 1", "Diagram 1"), a sans title with a grey subtitle, and a closing "Källa:" or "Anm." line naming source, period and retrieval date. Nothing floats free.
+Swedish company facts shown the way a premium fintech shows money. The chrome is night navy laid over Stockholm and Nordic blue-hour photography (Stockholm blue hour, Stockholm dusk, aurora lake, Lapland aerial), shaded down so ice-white type and glass product panels float on it. Long reading, tables and profiles below the fold switch to cool day surfaces with white 20px cards. The site alternates night bands and day sections; the `.dark` scope re-maps every day token, so one component works in both.
 
-The mood is calm, sourced and unhurried. Density is report-like: generous section padding, tight tables. Gaps in the data are shown, never hidden; ochre is the colour of "look here": figure numbers, missing years, provisional notices. The system rejects the navy fintech dashboard with gauges and the cream editorial magazine.
+The feel is luxurious and calm, not loud: light serif display, quiet Geist UI, Geist Mono for every figure. Motion makes the data feel alive (count-ups, self-drawing lines, a gold trace along the skyline) but never hides content; everything is visible without JS and all motion stops under reduced motion. Honesty is the brand: every number carries a period and source, and gaps are drawn, never zeroed. Gold is the colour of the city lights and of "look here": emphasis and missing data share it.
+
+The world refuses the flat grey directory table and the generic purple SaaS gradient.
 
 **Key Characteristics:**
-- Numbered figures with a 2px ink top rule and a hairline-separated source line.
-- Serif headlines and headline numbers; grotesk for body, labels and table data.
-- Flat paper, 1px hairlines, almost no shadow.
-- Honest value states: negative, missing and incomparable each look different from zero.
-- One ochre accent, used for signalling, never for decoration.
+- Night-navy chrome over shaded blue-hour photography, with film grain.
+- Glass panels (translucent white fill, 1px white hairline, backdrop blur) for product surfaces on night.
+- Light serif display, Geist UI, Geist Mono tabular numerals.
+- Pills for every tag, button, nav link and search field.
+- Missing is drawn in gold (night) or italic "saknas" (day), never as zero.
+- Motion that assembles the data, all gated by reduced motion.
 
 ## Colors
 
-Cool, desaturated paper-and-ink with one statistical blue and one ochre signal.
+A two-mode palette: a night set for chrome and heroes, a cool day set for reading, joined by one blue and one gold.
 
 ### Primary
-- **Statsblå** (statsbla): links, focus outline, button hover, the highlighted (latest) bar in charts. Its lighter step (statsbla-light) fills the other bars; the wash (statsbla-wash) is the 3px focus halo on inputs.
+- **Glow Blue** (night) / **Report Blue** (day): the data colour. Chart lines, links, focus rings, selection. On night it becomes the soft glow value; on day the deep blue. Also the pointer-spotlight tint on tiles.
 
 ### Secondary
-- **Report Ochre** (ochre): the dashed outline of missing-year slots in charts, the 2px top rule of notices, dots on warn tags, the active-nav underline. **Ochre Ink** (ochre-ink) is the AA-legible text form, used for figure numbers ("Tabell 1") and warn text. **Ochre Wash** is the synthetic-data banner, warn tags and chart notes.
+- **City-Light Gold** (night) / **Ochre** with **Ochre Ink** text (day): emphasis and gaps. The gold words in the hero headline, the last point of a line chart, the skyline trace, missing values, dashed gap slots, warn tags. Day text in this hue uses Ochre Ink for contrast; the Ochre Wash fills warn tags and notices.
 
 ### Tertiary
-- **Deficit Red** (red): negative values and negative bars (at 0.85 opacity), alert tags on Red Wash.
-- **Registry Green** (green): only the dot on an "ok" tag.
+- **Deficit Red** with Red Wash: negative values and alert tags. Lifts to a coral red under `.dark`.
+- **Registry Green**: active status dots and positive deltas. Lifts to a mint green under `.dark`.
 
 ### Neutral
-- **Cool Paper** (paper): page background, nav (94% with blur), sticky table first column.
-- **Paper 2**: disabled buttons, segmented-tab track.
-- **Sheet** (white): panels, inputs, tags, dropdowns: anything that sits "on" the page.
-- **Ink** (ink): text, primary buttons, 2px figure rules, table top rule, chart baseline.
-- **Ink 2 / Ink 3**: secondary text (ledes, table heads) / tertiary (captions, source lines, placeholders, missing values).
-- **Rule / Rule 2**: 1px hairlines between rows and sections / stronger hairlines for quiet buttons, tag borders, sum rows, hatch strokes.
+- **Night** (theme colour, page chrome), **Night-2** (report panel base), **Night-3** (deep fills).
+- **Ice**, **Ice-2**, **Ice-3**: text tiers on night (primary, secondary, captions and labels).
+- **Day Paper** and **Paper-2**: day page background and pill fills; **Sheet** (white) for cards.
+- **Ink**, **Ink-2**, **Ink-3**: day text tiers. **Rule** and **Rule-2**: 1px hairlines and stronger borders. On night, rules become white at 10% and 20%.
 
 ### Named Rules
-**The Ochre Means Attention Rule.** Ochre marks figure numbers, gaps, provisional states and current position. It is never a fill for decoration or a brand splash.
+**The Missing Is Never Zero Rule.** A missing, incomparable or not-applicable value is never rendered as 0, a dash or an empty cell. It is the italic word "saknas" (or "ej jämförbar") in Geist, dotted-underlined; on night surfaces it turns gold. In charts a missing year is a hatched slot with a gold dashed frame (4 3) and an italic label.
 
-**The Missing Is Not Zero Rule.** A missing or incomparable value is never rendered as 0 or a dash; it gets its own visual state (see Components: Values).
+**The Gold Means Look Here Rule.** Gold marks emphasis, the latest data point and gaps. It is never a large fill or a decorative wash beyond a faint radial light.
+
+**The One Scope Rule.** Night is a scope, not a second stylesheet: wrap a band in `.dark` and the day tokens re-map. Don't hard-code night colours into components that also live on day.
 
 ## Typography
 
-**Display Font:** Source Serif 4 (variable, optical sizing on; Georgia fallback)
-**Body Font:** Schibsted Grotesk (variable; system-ui fallback)
+**Display Font:** Source Serif 4 (with Georgia)
+**Body Font:** Geist (with system-ui)
+**Label/Mono Font:** Geist Mono (with ui-monospace)
 
-**Character:** A book-weight report serif for statements and headline figures against a sturdy Scandinavian newspaper grotesk for everything read at working size.
+**Character:** A light, optically sized serif gives the headlines a quiet luxury; Geist keeps the UI crisp; Geist Mono makes every figure read as data.
 
 ### Hierarchy
-- **Display** (500, clamp 2.5–4.4rem, 1.08, -0.028em): page h1, balanced wrap.
-- **Headline** (500, clamp 1.9–2.6rem, -0.022em): section h2. In prose and documents h2 drops to 1.6rem.
-- **Title** (500, 1.25rem, 1.25): h3; also the lede size (sans, ink-2, 1.5 line height, max 58ch).
-- **Figure value** (serif 400, 1.85rem; 1.5–1.55rem compact/mobile): key-figure cells. Missing values inside fall back to sans 1.05rem.
-- **Figure title** (sans 600, 1rem): figure heads, next to the ochre-ink figure number (600, 0.8125rem).
-- **Body** (400, 1.0625rem, 1.55): prose max 68ch, documents 76ch. Tables run at 0.95rem.
-- **Label** (400, 0.8125rem): table heads (600, ink-2), key-figure labels, source lines, crumbs (ink-3).
+- **Display** (300, clamp 3 to 5.4rem, 0.98, -0.045em): home hero h1 only, max 12ch, gold words set in the same weight (no italic).
+- **Headline** (350, clamp 2.6 to 4.6rem, 1.06): page h1s such as company names in the night band.
+- **Section** (380, clamp 2 to 3rem, 1.06): section h2s, in a 7/5 split with a lede paragraph aligned to the bottom.
+- **Title** (400, 1.1875rem, 1.25): h3; larger light serif (1.4 to 2rem, 350 to 400) for tile and report-card titles.
+- **Body** (400, 1rem, 1.6): running text, prose max 70ch, lede 1.1875rem at 58ch.
+- **Label** (500, 0.72 to 0.82rem, sentence case): KPI terms, figure heads, table heads, source lines, footer column heads.
+- **Numeral** (Geist Mono, tabular, -0.01em): every figure, org number, period and axis label.
 
 ### Named Rules
-**The Lining, Not Tabular Rule.** Numerals use `lining-nums` only. Tabular figures were removed on purpose: Schibsted's `tnum` widens the Swedish decimal comma. Right-aligned table columns carry the alignment instead.
+**The Mono Numbers Rule.** Figures, org numbers, periods and chart labels are Geist Mono with tabular numerals. Negative numbers use a true minus (U+2212).
 
-**The No Eyebrow Rule.** No uppercase kickers or tracked labels above headings. The figure number is the only label a heading gets.
+**The No Eyebrow Rule.** No uppercase or tracked kicker labels above headings. Labels stay sentence case and sit beside or inside what they name.
+
+**The No Gradient Text Rule.** Text is always a solid colour; emphasis is Gold, not a gradient fill.
 
 ## Layout
 
-A 12-column grid (24px gaps) inside a 1320px shell with a fluid gutter (16–40px). Section heads split 7/5: serif h2 left, ink-2 lede right aligned to the bottom; they stack below 860px. Sections pad 56–112px vertically and are separated by a 1px rule. Profile pages pair a main column with a sticky ~320px report panel (top 88px) that stacks below 900px; documents use a 220px sticky table of contents that stacks below 900px.
+A 1320px shell with fluid gutters (16 to 48px) and a 12-column grid at a 24px gap. Sections breathe (72 to 140px block padding). The home hero is full-bleed photography at least 760px tall: copy in columns 1 to 6, a floating glass profile card in 8 to 12. Inner pages open with a night band (dusk photo, 124px top padding to clear the 72px transparent nav) carrying crumbs, the page title and a six-cell KPI strip, then drop to day sections.
 
-Key figures sit in a 3-column hairline grid (2 columns compact and below 640px), cells divided by 1px left rules. Tables scroll horizontally inside their wrapper; below 720px the first column becomes sticky on paper with a soft edge shadow. The sticky nav is 64px; scroll padding is 88px.
+The home page uses a 12-column bento of night tiles (7/5 spans), a five-card states row, a photo-plus-list sources split and two glass report cards over photography. Documents use a 220px sticky table of contents beside a 76ch body.
+
+Responsive: section heads stack at 860px, documents at 900px, the nav collapses to a sheet at 1060px, KPI strips go 6 to 3 to 2 columns (1100px, 560px), the first table column sticks under 720px.
 
 ## Elevation & Depth
 
-Flat. Depth comes from paper vs. sheet (white) and from rules, not shadows. Shadows appear only where something floats over content.
+Hybrid: depth on night comes from glass, blur and long soft drop shadows; day cards sit on a faint two-layer shadow. Photography is always shaded with navy gradients so type holds contrast, and a grain overlay (fractal noise, 12%, overlay blend) sits on night bands.
 
 ### Shadow Vocabulary
-- **Focus halo** (`box-shadow: 0 0 0 3px var(--blue-3)`): search inputs on focus.
-- **Dropdown** (`box-shadow: 0 22px 40px -24px rgb(15 30 38 / 0.5)`): search suggestions list.
-- **Mobile sheet** (`box-shadow: 0 18px 30px -24px rgb(15 30 38 / 0.35)`): open mobile menu.
-- **Selected segment** (`box-shadow: 0 1px 2px rgb(15 30 38 / 0.18)`): active segmented tab.
-- **Sticky column edge** (`box-shadow: 6px 0 8px -8px rgb(15 30 38 / 0.35)`): mobile table first column.
+- **Day card** (`0 1px 2px rgb(10 20 38 / 0.04), 0 12px 32px -12px rgb(10 20 38 / 0.14)`): cards, states cards, the day search field.
+- **Night card** (`0 30px 80px -30px rgb(0 0 0 / 0.7)`): the same token re-mapped under `.dark`.
+- **Glass** (`inset 0 1px 0 rgb(255 255 255 / 0.12), 0 40px 100px -40px rgb(0 0 0 / 0.8)`): with a 10% to 3% white fill, a 14% white hairline and `blur(18px) saturate(1.3)`.
+- **Dropdown** (`0 30px 60px -20px rgb(0 0 0 / 0.45)`): search suggestions.
+- **Focus** (`0 0 0 4px` Blue-3): search field focus ring, alongside a 2px blue outline elsewhere.
 
 ### Named Rules
-**The Rule Before Shadow Rule.** If a surface needs separation, give it a hairline or a 2px ink top rule. Reach for shadow only when it overlaps content.
+**The Light Not Halo Rule.** Light comes from the scene (radial washes, the pointer spotlight, the photo), never from glow halos or blurred coloured shadows around text, buttons or cards.
 
 ## Shapes
 
-Near-square. Buttons, inputs, notices and segment tracks use a 3px radius; inner controls (search submit, segment buttons, dropdown items) use 2px. Figures and panels have square corners. Tags are the one rounded form: full pills with a 6px status dot. Borders are 1px hairlines; the signature stroke is the 2px ink top rule that opens every figure, panel and table of contents.
+Soft and rounded throughout. Controls and small insets at 10px, day cards 20px, night panels and hero card 24px, feature cards and photo frames 28px, inner cells 14 to 16px. Everything interactive or labelling is a full pill (999px). Borders are 1px hairlines; night borders are translucent white. Status dots are 6px circles. The logo is a 9px-radius square with a gold setting sun and three rising ice bars.
 
 ## Components
 
-### Figures (signature)
-Every table, chart and key-figure block is a figure: 2px ink top rule, 14px padding, head row with the ochre-ink number ("Tabell n" / "Diagram n") and a sans 600 title plus grey subtitle ("– räkenskapsåret 2025"). It closes with a source line above a 1px rule, 0.8125rem ink-3, lead word in bold ink-2: "Källa:" for provenance, "Anm." for method notes. A figure without a source line is incomplete.
-
-### Values
-- **Positive / zero:** ink, Swedish formatting (space thousands, decimal comma, "Mkr"/"tkr").
-- **Negative:** Deficit Red with a true minus sign (U+2212).
-- **Missing / incomparable / not applicable:** "saknas" / "ej jämförbar" in ink-3 italic at 0.92em, dotted rule-2 underline, help cursor; the reason sits in a tooltip and in visually-hidden text.
-
-### Charts
-SVG bar charts: statsblå-light bars, latest year statsblå with a bold ink value label, 1px ink baseline (3px zero line when values cross it), negative bars red. Missing years are drawn as slots with a 45° rule-2 hatch, a 4/3 dashed ochre outline and an italic ink-3 label. Bars grow in over 900ms (70ms stagger) only without reduced motion.
-
 ### Buttons
-- **Shape:** 3px radius, 44px min height, 0 18px padding, sans 500 0.95rem.
-- **Primary:** ink fill, paper text. Hover: statsblå fill and border (160ms ease-out).
-- **Quiet:** transparent, ink text, rule-2 border; hover goes to sheet with an ink border.
-- **Disabled:** paper-2 fill, rule border, ink-3 text, not-allowed cursor.
+Confident pills that lift on hover.
+- **Shape:** full pill (999px), 44px min height, 20px side padding, 500 weight at 0.95rem.
+- **Primary:** Ink fill with Paper text on day; Ice fill with Night text on night.
+- **Quiet:** transparent with a Rule-2 border; border goes to Ink on hover.
+- **Hover / Focus:** 1px lift (`translate 0 -1px`, 200ms ease-out) and the trailing arrow slides 3px; focus is a 2px blue outline at 3px offset.
 
 ### Tags
-Pills on sheet with a rule-2 border, 0.8125rem ink-2 text, and a 6px dot (ink-3 default, green ok). Warn: ochre wash, ochre-ink text. Alert: red wash, red text. Used for company status, freshness and report availability ("Inte lanserad").
+- **Style:** pill, 1px Rule border, Sheet fill, 0.78rem 500, a 6px dot before the text.
+- **Variants:** ok (green dot with a faint 3px green ring), warn (Ochre Wash, Ochre Ink text, gold dot, used for "Inte lanserad" and stale data), alert (Red Wash, red), plain (no dot).
 
-### Inputs / Search
-Hero search: sheet field, 1px ink border, 3px radius, 60px tall (72px hero), 22px icon inset, ink submit button (2px radius) inset 6px. Focus adds the 3px statsblå-wash halo. The nav search is 38px with a rule-2 border that turns ink on focus. Labels sit above in 0.8125rem 600 ink-2.
+### Cards / Containers
+- **Day card:** Sheet, 1px Rule, 20px radius, 18 to 28px padding, day-card shadow. Figure cards carry a mono pill number, a 600 sans title with a grey subtitle and a hairline-topped source line (Källa).
+- **Glass panel:** see Elevation. Used for the hero profile card, report cards and photo chips.
+- **Night tile / report panel:** faint white gradient or Night-2 base with navy and gold radial washes, 24px radius, and a pointer spotlight (a 300 to 420px radial of blue or gold at 10 to 14% that follows the cursor).
 
-### Panels & Notices
-Panels (report box, hero preview): sheet, 1px rule border, 2px ink top rule, 18–22px padding. Notices: sheet with a 2px ochre top rule, bottom corners 3px, ochre-ink icon. Synthetic-data banner: full-width ochre wash strip under the nav.
-
-### Tables
-1px ink top rule on the wrapper, 1px rule row lines, 10px 12px cells, right-aligned numbers, left first column. Sum rows bold with rule-2 lines; group rows serif 600 1.05rem with an ink underline.
+### Inputs / Fields
+- **Search:** pill field, 56px (68px hero), leading 20px icon, a `/` key hint, and an inset pill submit (Ink on day, Ice on night). On night it becomes glass with a navy fill and 20px blur.
+- **Focus:** border to blue plus a 4px Blue-3 ring.
+- **Suggestions:** white 16px-radius list with 10px-radius rows, mono meta line.
+- The hero field types its placeholder with a gold caret.
 
 ### Navigation
-Sticky 64px bar on 94% paper with a 10px backdrop blur and a bottom hairline. Brand wordmark in serif 600 1.45rem with "från Valuatum" in ink-3. Links 0.94rem ink-2; the current page gets ink text and a 2px ochre underline. Below the desktop breakpoint, a 44px menu button opens a paper sheet with its own search and ruled link list.
+Transparent 72px bar over the hero that turns to 78% Night with blur once the page scrolls. Serif wordmark with the logo; links live in a translucent pill track, each link a pill (Ice-2, hover white 6%, current page Ice fill with Night text). A solid Ice pill CTA "Sök företag" sits right. Under 1060px it becomes a menu button opening a Night sheet with a pill search and serif links.
+
+### KPI Strip
+Six glass cells (18px radius, blur 14px) in the night band: a label in Ice-3, a Geist Mono value at 1.45rem, and a small pill delta (green up, coral down). Missing values drop to 1rem gold italic "saknas".
+
+### Charts
+Line: a 2.4px blue line with round caps, dashed 2 5 grid, open points, the latest point in gold, a hatched gold dashed slot for missing years. Bars: blue bars that grow from the baseline (70ms stagger), a 3px Ink zero line, the same gap slot. All labels Geist Mono.
+
+### Motion
+One ease (`cubic-bezier(0.16, 1, 0.3, 1)`). Scroll reveal: fade, 24px rise and 6px blur over 900ms with a 90ms stagger. Count-up: 1400ms quartic ease in sv-SE format. Lines self-draw over 1600ms. The hero draws a gold skyline trace with a travelling light, the photo drifts over 30s, a serif marquee scrolls at 50s. Hero card tilts up to 5 degrees on fine pointers. All of it is off under `prefers-reduced-motion`.
 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** wrap every number block in a numbered figure with a "Källa:" or "Anm." line naming source, period and retrieval date.
-- **Do** render missing data as "saknas" / "ej jämförbar" in the missing-value style and missing years as hatched ochre-dashed slots.
-- **Do** use a true minus (U+2212) and Deficit Red for negative values.
-- **Do** keep figures and panels square with a 2px ink top rule; keep controls at 3px.
-- **Do** use ochre-ink, not ochre, for any ochre text.
+- **Do** set every figure, org number and period in Geist Mono with tabular numerals and a true minus.
+- **Do** render missing data as italic "saknas", gold on night, and missing chart years as hatched slots with a gold dashed frame.
+- **Do** give every number block its period and a source line.
+- **Do** use pills (999px) for tags, buttons, nav links and search fields.
+- **Do** shade photography with navy gradients and put product surfaces in glass on top of it.
+- **Do** wrap night sections in `.dark` so day tokens re-map, rather than hard-coding night colours.
+- **Do** gate every animation behind `prefers-reduced-motion: no-preference` and keep content visible without JS.
 
 ### Don't:
-- **Don't** use `tabular-nums`; Schibsted's tabular figures widen the decimal comma.
-- **Don't** add eyebrow or kicker labels above headings.
-- **Don't** build dashboards with gauges, dials, navy fills or glowing KPI cards.
-- **Don't** drift toward a cream editorial magazine: paper stays cool (#f5f6f3), never warm.
 - **Don't** show a missing value as 0, a dash or an empty cell.
-- **Don't** use shadows for resting surfaces.
+- **Don't** add eyebrow or kicker labels above headings.
+- **Don't** use gradient-filled text.
+- **Don't** put glow halos or blurred coloured shadows around text, buttons or cards.
+- **Don't** use gold as a large fill or decoration; it marks emphasis and gaps.
+- **Don't** drift toward the flat grey directory table or a purple SaaS gradient.

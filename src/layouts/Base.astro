@@ -14,11 +14,9 @@ interface Props {
     /** Page-level noindex (thin, synthetic or restricted content). */
     noindex?: boolean
     jsonLd?: object[]
-    /** Shows the synthetic-data banner. */
-    synthetic?: boolean
 }
 
-const { title, description, path, noindex = false, jsonLd = [], synthetic = getSite().synthetic } = Astro.props
+const { title, description, path, noindex = false, jsonLd = [] } = Astro.props
 // A synthetic dataset is never indexable, whatever the flags say.
 const robots = isIndexable(noindex, getSite().synthetic) ? 'index,follow' : 'noindex,follow'
 const canonical = SITE.origin + path
@@ -52,7 +50,7 @@ THESIS: Blå timmen. Swedish company facts shown the way a premium fintech shows
 OWN-WORLD: night #050a15, ice text #eef3fa, glow blue #7fb2ff for data, city-light gold #f4bf72 for emphasis and gaps; day surfaces #f3f5f9 with white 20px cards; Source Serif 4 light display, Geist UI, Geist Mono numerals; glass panels, grain, photography.
 STORY: the visitor sees the city, types a company, watches real-looking figures assemble, understands what is missing and what is not launched yet.
 FIRST VIEWPORT: full-bleed Stockholm blue-hour photo; left, a light serif headline and a glass search with a typing placeholder; right, a floating glass profile card whose numbers count up while a gold line traces the skyline.
-FORM: user-directed redesign (luxurious fintech), replacing seed 1b69662a.
+FORM: user-pinned redesign, no roll: "luxurious, modern, financial saas ... add animations, cool graphics", inspiration 21st.dev / Dribbble fintech; supersedes seed 1b69662a.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
 -->`} />
         <a class="skip" href="#main">Hoppa till innehållet</a>
@@ -60,13 +58,6 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             FLAGS.preview && (
                 <div class="env-banner">
                     Förhandsversion – inte publicerad, inte indexerad. Dataset: <code>{process.env.SE_DATA_SOURCE ?? 'CURRENT'}</code>
-                </div>
-            )
-        }
-        {
-            synthetic && (
-                <div class="env-banner env-banner--synthetic" role="note">
-                    <span class="env-dot" aria-hidden="true" /> Syntetiska testdata – företagen finns inte, siffrorna är påhittade för utveckling.
                 </div>
             )
         }
@@ -94,17 +85,5 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
     }
     .env-banner code {
         font-family: var(--mono);
-    }
-    .env-banner--synthetic {
-        color: var(--gold);
-    }
-    .env-dot {
-        display: inline-block;
-        width: 6px;
-        height: 6px;
-        margin-right: 6px;
-        border-radius: 50%;
-        background: var(--gold);
-        vertical-align: 1px;
     }
 </style>

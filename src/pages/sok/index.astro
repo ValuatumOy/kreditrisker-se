@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro'
 import SearchBox from '../../components/SearchBox.astro'
+import NightBand from '../../components/NightBand.astro'
 import { getSite } from '../../lib/store.ts'
 
 const site = getSite()
@@ -8,11 +9,15 @@ const popular = site.industries.filter((h) => h.substantial).slice(0, 6)
 ---
 
 <Base title="Sök företag" description="Sök bland svenska företag på namn eller organisationsnummer." path="/sok/" noindex>
-    <div class="shell sr">
-        <h1>Sök företag</h1>
-        <div class="sr__box">
-            <SearchBox id="page-q" />
+    <NightBand compact>
+        <div class="sr__head">
+            <h1>Sök företag</h1>
+            <div class="sr__box">
+                <SearchBox id="page-q" size="hero" />
+            </div>
         </div>
+    </NightBand>
+    <div class="shell sr">
 
         <div class="sr__out" data-results aria-live="polite">
             <noscript>
@@ -124,15 +129,23 @@ const popular = site.industries.filter((h) => h.substantial).slice(0, 6)
 </script>
 
 <style>
-    .sr {
-        padding-top: clamp(32px, 5vw, 64px);
-        max-width: 900px;
+    .sr__head {
+        max-width: 760px;
+        padding-top: 24px;
     }
-    .sr h1 {
-        font-size: var(--step-3);
+    .sr__head h1 {
+        font-size: clamp(2.4rem, 1.4rem + 3vw, 3.6rem);
+        font-weight: 300;
+        color: #fff;
     }
     .sr__box {
         margin-top: 24px;
+    }
+    .sr {
+        padding-bottom: clamp(64px, 8vw, 120px);
+    }
+    .sr > * {
+        max-width: 900px;
     }
     .sr__out {
         margin-top: 40px;

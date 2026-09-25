@@ -218,7 +218,7 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
             var(--card-shadow);
     }
     :global(.dark) .sbox__field {
-        background: linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0.05));
+        background: linear-gradient(180deg, rgb(12 22 42 / 0.72), rgb(6 12 26 / 0.82));
         border-color: rgb(255 255 255 / 0.18);
         backdrop-filter: blur(20px) saturate(1.4);
         -webkit-backdrop-filter: blur(20px) saturate(1.4);
@@ -248,6 +248,9 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
     }
     .sbox input::placeholder {
         color: var(--ink-3);
+    }
+    :global(.dark) .sbox input::placeholder {
+        color: var(--ice-2);
     }
     .sbox input::-webkit-search-cancel-button {
         filter: grayscale(1);

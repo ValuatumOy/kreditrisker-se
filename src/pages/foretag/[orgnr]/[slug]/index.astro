@@ -82,7 +82,6 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
             description={desc}
             path={c.path}
             noindex={!c.quality.indexable}
-            synthetic={r.synthetic}
             jsonLd={c.quality.indexable ? [companyJsonLd(c), crumbsJsonLd(crumbs)] : []}
         >
             <NightBand>
@@ -317,14 +316,21 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         display: flex;
         flex-wrap: wrap;
         align-items: center;
-        gap: 6px 12px;
+        gap: 8px 18px;
         margin-top: 20px;
         color: var(--ice-2);
     }
-    .co__ids > :not(:last-child)::after {
-        content: '·';
-        margin-left: 12px;
-        color: var(--ice-3);
+    .co__id {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .co__id::before {
+        content: '';
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: var(--ice-3);
     }
     .co__orgnr {
         display: inline-flex;
