@@ -1,0 +1,236 @@
+---
+// Order flow behind flags. With the default 'disabled' adapter every product
+// is unavailable. 'mock' (preview builds only) simulates the lifecycle; ?demo=<state>
+// renders a single state for review. 'http' talks to the Swedish report backend.
+import Base from '../../layouts/Base.astro'
+import Icon from '../../components/Icon.astro'
+import { FLAGS } from '../../config/site.ts'
+import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
+
+const TERMS_VERSION = 'utkast-2026-09'
+---
+
+<Base title="Beställ rapport" description="Beställ en rapport om ett svenskt företag." path="/bestall/" noindex>
+    <div class="shell od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)}>
+        <p class="od__back small"><a href="/sok/" data-back>← Tillbaka</a></p>
+        <h1>Beställ <span data-product-name>rapport</span></h1>
+        <p class="od__co" data-company>Inget företag valt.</p>
+
+        <div class="od__panel" data-view="unavailable" hidden>
+            <p class="od__state"><Icon name="clock" /> <span class="tag tag--warn">{STATE_LABEL.unavailable}</span></p>
+            <p data-reason>{UNAVAILABLE_TEXT.not_launched}</p>
+            <p><a href="/rapporter/">Läs om rapporterna</a> · <a href="/rapporter/exempel/">Se exempel</a></p>
+        </div>
+
+        <div class="od__panel" data-view="sample" hidden>
+            <p class="od__state"><Icon name="doc" /> <span class="tag tag--warn">{STATE_LABEL.sample}</span></p>
+            <p>Rapporten kan inte beställas ännu, men du kan se hur den är uppbyggd.</p>
+            <a class="btn btn--quiet" data-sample href="/rapporter/exempel/">Se exempelrapport</a>
+        </div>
+
+        <form class="od__panel od__form" data-view="available" hidden novalidate>
+            <p class="od__state"><span class="tag tag--ok">{STATE_LABEL.available}</span></p>
+            <label for="od-email">E-post för leverans</label>
+            <input id="od-email" name="email" type="email" autocomplete="email" required aria-describedby="od-email-err" />
+            <p class="od__err small" id="od-email-err" hidden>Skriv en giltig e-postadress, till exempel namn@foretag.se.</p>
+            <label class="od__check">
+                <input type="checkbox" name="terms" required aria-describedby="od-terms-err" />
+                <span>Jag godkänner <a href="/villkor/">villkoren</a> och har läst om <a href="/leverans/">leverans och ångerrätt</a>.</span>
+            </label>
+            <p class="od__err small" id="od-terms-err" hidden>Du behöver godkänna villkoren för att beställa.</p>
+            <p class="small muted" data-price></p>
+            <button class="btn" type="submit">Beställ och betala <Icon name="arrow" /></button>
+        </form>
+
+        <div class="od__panel" data-view="processing" hidden aria-live="polite">
+            <p class="od__state"><span class="od__spin" aria-hidden="true"></span> <span class="tag">{STATE_LABEL.processing}</span></p>
+            <p>Rapporten tas fram. Du kan lämna sidan; den skickas också till din e-post.</p>
+            <p class="small muted">Order <span class="num" data-order-id></span></p>
+        </div>
+
+        <div class="od__panel" data-view="success" hidden aria-live="polite">
+            <p class="od__state"><Icon name="check" /> <span class="tag tag--ok">{STATE_LABEL.success}</span></p>
+            <p>Rapporten är klar.</p>
+            <a class="btn" data-download href="#">Ladda ner PDF <Icon name="doc" /></a>
+            <p class="small muted">Order <span class="num" data-order-id></span></p>
+        </div>
+
+        <div class="od__panel" data-view="failure" hidden aria-live="assertive">
+            <p class="od__state"><Icon name="alert" /> <span class="tag tag--alert">{STATE_LABEL.failure}</span></p>
+            <p>Rapporten kunde inte tas fram (<span class="num" data-code></span>).</p>
+            <button class="btn btn--quiet" type="button" data-retry hidden>Försök igen</button>
+            <p class="small">Kontakta oss via <a href="/om/">kontaktsidan</a> och ange ordernumret om problemet kvarstår.</p>
+        </div>
+    </div>
+</Base>
+
+<script>
+    import { selectBackend } from '../../lib/reports/adapter.ts'
+    import type { ReportProduct, ReportState } from '../../lib/reports/types.ts'
+    import { UNAVAILABLE_TEXT, PRODUCT_NAME } from '../../lib/reports/labels.ts'
+    import { formatOrgnr, parseOrgnr } from '../../lib/orgnr.ts'
+    import type { SearchHit } from '../../lib/search.ts'
+
+    const root = document.querySelector<HTMLElement>('[data-order]')!
+    const params = new URLSearchParams(location.search)
+    const product: ReportProduct = params.get('produkt') === 'ai' ? 'ai' : 'basic'
+    const parsed = parseOrgnr(params.get('orgnr') ?? '')
+    const orgnr = parsed.ok ? parsed.orgnr : ''
+    const adapter = root.dataset.adapter
+    const flags = JSON.parse(root.dataset.flags!) as Record<ReportProduct, string>
+    const backend = selectBackend(adapter, root.dataset.api)
+    const views = [...root.querySelectorAll<HTMLElement>('[data-view]')]
+    const $ = <T extends Element>(sel: string) => root.querySelectorAll<T>(sel)
+
+    root.querySelector('[data-product-name]')!.textContent = PRODUCT_NAME[product].toLowerCase()
+
+    function show(s: ReportState) {
+        views.forEach((v) => (v.hidden = v.dataset.view !== s.kind))
+        if (s.kind === 'unavailable') root.querySelector('[data-reason]')!.textContent = UNAVAILABLE_TEXT[s.reason]
+        if (s.kind === 'sample') root.querySelector<HTMLAnchorElement>('[data-sample]')!.href = s.sampleHref
+        if (s.kind === 'processing' || s.kind === 'success' || (s.kind === 'failure' && s.orderId)) $('[data-order-id]').forEach((e) => (e.textContent = (s as { orderId: string }).orderId))
+        if (s.kind === 'success') root.querySelector<HTMLAnchorElement>('[data-download]')!.href = s.downloadHref
+        if (s.kind === 'failure') {
+            root.querySelector('[data-code]')!.textContent = s.code
+            root.querySelector<HTMLElement>('[data-retry]')!.hidden = !s.retryable
+        }
+        if (s.kind === 'available') root.querySelector('[data-price]')!.textContent = 'Priset visas innan du betalar.'
+    }
+
+    async function poll(orderId: string) {
+        const s = await backend.orderStatus(orderId, product)
+        show(s)
+        if (s.kind === 'processing') setTimeout(() => poll(orderId), 1500)
+    }
+
+    async function start() {
+        if (!orgnr) return show({ kind: 'unavailable', reason: 'insufficient_data' })
+        const hits: SearchHit[] = await fetch('/sok/index.json').then((r) => r.json()).catch(() => [])
+        const hit = hits.find((h) => h.o === orgnr)
+        const co = root.querySelector('[data-company]')!
+        co.textContent = hit ? `${hit.n}, org.nr ${formatOrgnr(orgnr)}` : `Org.nr ${formatOrgnr(orgnr)}`
+        if (hit) root.querySelector<HTMLAnchorElement>('[data-back]')!.href = hit.p
+
+        const demo = params.get('demo')
+        if (adapter === 'mock' && demo) {
+            const demos: Record<string, ReportState> = {
+                unavailable: { kind: 'unavailable', reason: 'not_launched' },
+                sample: { kind: 'sample', sampleHref: '/rapporter/exempel/' },
+                available: { kind: 'available' },
+                processing: { kind: 'processing', orderId: 'demo-1', startedAt: '' },
+                success: { kind: 'success', orderId: 'demo-1', downloadHref: '#demo' },
+                failure: { kind: 'failure', orderId: 'demo-1', code: 'generation_failed', retryable: true },
+            }
+            return show(demos[demo] ?? demos.unavailable)
+        }
+        if (flags[product] === 'unavailable') return show({ kind: 'unavailable', reason: 'not_launched' })
+        if (flags[product] === 'sample') return show({ kind: 'sample', sampleHref: `/rapporter/exempel/#${product === 'basic' ? 'basrapport' : 'ai-rapport'}` })
+        show(await backend.availability(orgnr, product))
+    }
+
+    const form = root.querySelector<HTMLFormElement>('form[data-view=available]')!
+    form.addEventListener('submit', async (e) => {
+        e.preventDefault()
+        const email = form.elements.namedItem('email') as HTMLInputElement
+        const terms = form.elements.namedItem('terms') as HTMLInputElement
+        const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())
+        root.querySelector<HTMLElement>('#od-email-err')!.hidden = emailOk
+        root.querySelector<HTMLElement>('#od-terms-err')!.hidden = terms.checked
+        email.setAttribute('aria-invalid', String(!emailOk))
+        if (!emailOk) return email.focus()
+        if (!terms.checked) return terms.focus()
+        const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms! })
+        show(s)
+        if (s.kind === 'processing') poll(s.orderId)
+    })
+    root.querySelector('[data-retry]')!.addEventListener('click', () => show({ kind: 'available' }))
+    start()
+</script>
+
+<style>
+    .od {
+        max-width: 640px;
+        padding-top: clamp(24px, 4vw, 48px);
+    }
+    .od h1 {
+        font-size: var(--step-3);
+    }
+    .od__co {
+        margin-top: 8px;
+        color: var(--ink-2);
+        font-size: var(--step-1);
+    }
+    .od__panel {
+        margin-top: 32px;
+        padding: 22px;
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-top: 2px solid var(--ink);
+        display: grid;
+        gap: 14px;
+        justify-items: start;
+    }
+    .od__panel[hidden] {
+        display: none;
+    }
+    .od__state {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    .od__state :global(svg) {
+        width: 20px;
+        height: 20px;
+        color: var(--ink-2);
+    }
+    .od__form label {
+        font-weight: 600;
+        font-size: 0.95rem;
+    }
+    .od__form input[type='email'] {
+        width: 100%;
+        height: 48px;
+        padding: 0 14px;
+        border: 1px solid var(--rule-2);
+        border-radius: var(--radius);
+        font: inherit;
+        background: var(--sheet);
+    }
+    .od__form input[type='email']:focus {
+        outline: 2px solid var(--blue);
+        outline-offset: 1px;
+        border-color: var(--blue);
+    }
+    .od__form input[aria-invalid='true'] {
+        border-color: var(--red);
+    }
+    .od__check {
+        display: flex;
+        gap: 10px;
+        align-items: flex-start;
+        font-weight: 400 !important;
+    }
+    .od__check input {
+        width: 18px;
+        height: 18px;
+        margin-top: 3px;
+        accent-color: var(--ink);
+    }
+    .od__err {
+        color: var(--red);
+        margin-top: -8px;
+    }
+    .od__spin {
+        width: 18px;
+        height: 18px;
+        border-radius: 50%;
+        border: 2px solid var(--rule);
+        border-top-color: var(--blue);
+        animation: spin 900ms linear infinite;
+    }
+    @keyframes spin {
+        to {
+            rotate: 360deg;
+        }
+    }
+</style>

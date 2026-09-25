@@ -1,0 +1,27 @@
+---
+import Page from '../layouts/Page.astro'
+import Doc from '../components/Doc.astro'
+import { SITE } from '../config/site.ts'
+---
+
+<Page title="Användarvillkor" description="Villkor för att använda sajten och dess företagsinformation." path="/villkor/" lede={`Villkor för att använda ${SITE.name}.`} draft>
+    <Doc toc={[['tjansten', 'Tjänsten'], ['uppgifter', 'Uppgifternas karaktär'], ['anvandning', 'Tillåten användning'], ['ansvar', 'Ansvar'], ['rapporter', 'Rapporter']]}>
+        <h2 id="tjansten">Tjänsten</h2>
+        <p>{SITE.name} tillhandahålls av {SITE.provider.name}. Företagsprofilerna är gratis att läsa.</p>
+
+        <h2 id="uppgifter">Uppgifternas karaktär</h2>
+        <p>
+            Profilerna återger uppgifter ur offentliga register och företagens årsredovisningar samt nyckeltal som vi räknar fram. Uppgifterna kan vara ofullständiga eller
+            inaktuella; varje profil anger källa och datum. De utgör inte en rekommendation att ingå eller avstå från en affär.
+        </p>
+
+        <h2 id="anvandning">Tillåten användning</h2>
+        <p>Du får läsa och citera enskilda uppgifter. Systematisk kopiering eller automatiserad hämtning av sajtens innehåll är inte tillåten utan skriftligt avtal.</p>
+
+        <h2 id="ansvar">Ansvar</h2>
+        <p>Vi ansvarar inte för beslut som fattas på grundval av uppgifterna, i den utsträckning lagen tillåter. Ansvarsbegränsningen ska granskas mot svensk konsumenträtt.</p>
+
+        <h2 id="rapporter">Rapporter</h2>
+        <p>Villkor för köp av rapporter, inklusive pris, leverans och ångerrätt, publiceras här innan rapporterna kan beställas. Se även <a href="/leverans/">leverans och ångerrätt</a>.</p>
+    </Doc>
+</Page>

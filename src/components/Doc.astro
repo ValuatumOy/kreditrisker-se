@@ -1,0 +1,16 @@
+---
+interface Props {
+    toc: [string, string][]
+}
+const { toc } = Astro.props
+---
+
+<div class="doc">
+    <nav class="doc__toc small" aria-label="Innehåll">
+        <p>Innehåll</p>
+        <ol>{toc.map(([id, t]) => <li><a href={`#${id}`}>{t}</a></li>)}</ol>
+    </nav>
+    <div class="prose doc__body">
+        <slot />
+    </div>
+</div>

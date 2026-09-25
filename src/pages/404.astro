@@ -1,0 +1,26 @@
+---
+import Base from '../layouts/Base.astro'
+import SearchBox from '../components/SearchBox.astro'
+---
+
+<Base title="Sidan finns inte" description="Sidan kunde inte hittas." path="/404/" noindex>
+    <div class="shell nf">
+        <h1>Sidan finns inte</h1>
+        <p class="lede">Adressen kan vara felstavad, eller så har företaget bytt namn och sidan flyttat. Sök på organisationsnumret, så hittar du rätt.</p>
+        <div class="nf__s"><SearchBox id="nf-q" /></div>
+        <p class="small muted"><a href="/">Till startsidan</a> · <a href="/branscher/">Branscher</a> · <a href="/kommuner/">Kommuner</a></p>
+    </div>
+</Base>
+
+<style>
+    .nf {
+        max-width: 760px;
+        padding-top: clamp(40px, 8vw, 112px);
+    }
+    .nf .lede {
+        margin-top: 16px;
+    }
+    .nf__s {
+        margin: 32px 0 16px;
+    }
+</style>

@@ -1,0 +1,57 @@
+---
+import Page from '../layouts/Page.astro'
+import Doc from '../components/Doc.astro'
+import { getSite } from '../lib/store.ts'
+const site = getSite()
+---
+
+<Page
+    title="Datakällor"
+    description="Varifrån uppgifterna om svenska företag kommer, hur ofta de uppdateras och vad som gäller för att få använda dem."
+    path="/kallor/"
+    lede="Här redovisar vi varje källa, vad vi hämtar därifrån och vilka villkor som gäller. Källorna är planerade; inget hämtas förrän avtal och licenser är klara."
+>
+    <Doc toc={[['nu', 'Läget just nu'], ['bolagsverket', 'Bolagsverket'], ['scb', 'SCB'], ['valuatum', 'Valuatum'], ['villkor', 'Villkor och rättelser']]}>
+        <h2 id="nu">Läget just nu</h2>
+        {
+            site.synthetic ? (
+                <p>
+                    Sajten innehåller bara <strong>syntetiska testdata</strong>: påhittade företag med organisationsnummer som börjar på 00, en serie som inte används i
+                    Bolagsverkets register. De finns för att bygga och testa sidorna och visas inte i sökmotorer.
+                </p>
+            ) : (
+                <p>Uppgifterna kommer från källorna nedan. Datum för hämtning och bokslutsperiod anges på varje profil.</p>
+            )
+        }
+
+        <h2 id="bolagsverket">Bolagsverket</h2>
+        <p>
+            Bolagsverket tillhandahåller sedan februari 2025 så kallade värdefulla datamängder avgiftsfritt via API: bland annat företagsnamn, organisationsform, adress,
+            verksamhetsbeskrivning, SNI-kod och digitalt inlämnade årsredovisningar. Årsredovisningarna finns i formatet iXBRL från 2020 och framåt.
+        </p>
+        <ul>
+            <li><strong>Vad vi planerar att hämta:</strong> registeruppgifter och resultat- och balansräkning ur digitalt inlämnade årsredovisningar.</li>
+            <li><strong>Begränsning:</strong> alla bolag lämnar inte in digitalt. Årsredovisningar som bara finns på papper visas som <em>saknas</em>.</li>
+            <li><strong>Uppdatering:</strong> vid varje dataleverans; hämtningsdatum anges på profilen.</li>
+        </ul>
+
+        <h2 id="scb">SCB</h2>
+        <p>
+            SCB:s företagsregister är en möjlig kompletterande källa för bransch (SNI) och kommun. SNI-koden anges på profilen med version, eftersom SCB inför en ny version av
+            näringsgrensindelningen (SNI 2025).
+        </p>
+
+        <h2 id="valuatum">Valuatum</h2>
+        <p>
+            Nyckeltal räknar Valuatum fram ur bokslutet med <a href="/metod/">publicerade formler</a>. Valuatums kreditriskmodell används för kreditbetyg först när den är
+            validerad för svenska företag.
+        </p>
+
+        <h2 id="villkor">Villkor och rättelser</h2>
+        <p>
+            Innan företagsuppgifter publiceras ska villkoren för återanvändning av varje källa vara granskade, inklusive hur uppgifter om enskilda personer får användas.
+            Enskilda näringsidkare publiceras inte.
+        </p>
+        <p>Hittar du ett fel kan du <a href="/om/#rattelse">begära rättelse</a>. Vi rättar mot källan; står felet i källan hänvisar vi till den.</p>
+    </Doc>
+</Page>

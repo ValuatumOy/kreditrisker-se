@@ -1,0 +1,17 @@
+---
+import Page from '../../layouts/Page.astro'
+import HubIndex from '../../components/HubIndex.astro'
+import { getSite } from '../../lib/store.ts'
+const site = getSite()
+const indexable = site.municipalities.some((h) => h.indexable)
+---
+
+<Page
+    title="Kommuner"
+    description="Svenska företag efter säteskommun, med bokslut och nyckeltal."
+    path="/kommuner/"
+    lede="Företagen grupperas efter den kommun där de har sitt registrerade säte. Kommunkoden är SCB:s fyrsiffriga kod."
+    noindex={!indexable}
+>
+    <HubIndex hubs={site.municipalities} base="/kommuner/" codeLabel="Kommunkod" detailLabel="Län" no="Tabell 1" title="Kommuner med publicerade företag" />
+</Page>

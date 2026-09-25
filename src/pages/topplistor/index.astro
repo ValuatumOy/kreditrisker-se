@@ -1,0 +1,95 @@
+---
+import Page from '../../layouts/Page.astro'
+import Icon from '../../components/Icon.astro'
+import { getSite } from '../../lib/store.ts'
+import { MIN_RANKING_ENTRIES } from '../../lib/publish.ts'
+const site = getSite()
+---
+
+<Page
+    title="Topplistor"
+    description="Svenska företag rangordnade efter omsättning, tillväxt, soliditet och rörelsemarginal, med tydliga urvalsregler."
+    path="/topplistor/"
+    lede="Listorna bygger på senaste bokslut och har fasta urvalsregler, så att vilande bolag och avvikande räkenskapsår inte hamnar i toppen av fel skäl."
+    noindex={!site.rankings.some((r) => r.entries.length >= MIN_RANKING_ENTRIES) || site.synthetic}
+>
+    <ul class="tl">
+        {
+            site.rankings.map((r) => (
+                <li>
+                    <a href={`/topplistor/${r.slug}/`}>
+                        <span class="tl__t">{r.title}</span>
+                        <span class="tl__d">{r.description}</span>
+                        <span class="tl__r small">{r.rule}</span>
+                        <span class="tl__n small num">{r.entries.length} företag</span>
+                        <Icon name="arrow" class="tl__i" />
+                    </a>
+                </li>
+            ))
+        }
+    </ul>
+</Page>
+
+<style>
+    .tl {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-top: 2px solid var(--ink);
+    }
+    .tl li {
+        border-bottom: 1px solid var(--rule);
+    }
+    .tl li:nth-child(2n) {
+        border-left: 1px solid var(--rule);
+    }
+    .tl a {
+        position: relative;
+        display: grid;
+        gap: 8px;
+        padding: 24px 56px 24px 24px;
+        color: var(--ink);
+        text-decoration: none;
+        height: 100%;
+        transition: background 180ms var(--ease-out);
+    }
+    .tl li:nth-child(2n + 1) a {
+        padding-left: 0;
+    }
+    .tl a:hover {
+        background: var(--sheet);
+    }
+    .tl__t {
+        font-family: var(--serif);
+        font-size: 1.6rem;
+        letter-spacing: -0.015em;
+    }
+    .tl__d {
+        color: var(--ink-2);
+    }
+    .tl__r,
+    .tl__n {
+        color: var(--ink-3);
+    }
+    .tl a :global(.tl__i) {
+        position: absolute;
+        right: 20px;
+        top: 30px;
+        width: 20px;
+        height: 20px;
+        color: var(--ochre-ink);
+    }
+    @media (max-width: 760px) {
+        .tl {
+            grid-template-columns: 1fr;
+        }
+        .tl li:nth-child(2n) {
+            border-left: 0;
+        }
+        .tl a {
+            padding-left: 0 !important;
+        }
+    }
+</style>

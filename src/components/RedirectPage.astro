@@ -1,0 +1,23 @@
+---
+// Static redirect (hosting without server rules). The edge also gets these
+// as 301s from dist/_redirects.json; this page is the fallback.
+import { SITE } from '../config/site.ts'
+interface Props {
+    to: string
+}
+const { to } = Astro.props
+---
+
+<!doctype html>
+<html lang="sv">
+    <head>
+        <meta charset="utf-8" />
+        <title>Flyttad sida</title>
+        <meta name="robots" content="noindex,follow" />
+        <link rel="canonical" href={SITE.origin + to} />
+        <meta http-equiv="refresh" content={`0;url=${to}`} />
+    </head>
+    <body>
+        <p>Sidan har flyttat till <a href={to}>{SITE.origin + to}</a>.</p>
+    </body>
+</html>

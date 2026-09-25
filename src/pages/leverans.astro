@@ -1,0 +1,31 @@
+---
+import Page from '../layouts/Page.astro'
+import Doc from '../components/Doc.astro'
+import { FLAGS } from '../config/site.ts'
+---
+
+<Page
+    title="Leverans och ångerrätt"
+    description="Hur rapporter levereras digitalt och vad som gäller för ångerrätt vid köp av digitalt innehåll."
+    path="/leverans/"
+    lede="Rapporterna är digitalt innehåll som levereras som PDF. Den här sidan fylls i med exakta villkor innan rapporterna kan beställas."
+    draft
+>
+    <Doc toc={[['status', 'Status'], ['leverans', 'Leverans'], ['anger', 'Ångerrätt'], ['fel', 'Om något går fel']]}>
+        <h2 id="status">Status</h2>
+        <p>{FLAGS.checkout ? 'Rapporter kan beställas.' : 'Rapporter kan inte beställas ännu. Inga betalningar tas emot.'}</p>
+
+        <h2 id="leverans">Leverans</h2>
+        <p>Rapporten levereras som PDF för nedladdning och till den e-postadress du anger. Leveranstiden anges här när den är testad och fastställd.</p>
+
+        <h2 id="anger">Ångerrätt</h2>
+        <p>
+            Enligt distansavtalslagen gäller i regel 14 dagars ångerrätt för konsumenter. För digitalt innehåll som inte levereras på ett fysiskt medium upphör ångerrätten om
+            leveransen har påbörjats med konsumentens uttryckliga samtycke och konsumenten har bekräftat att ångerrätten därmed går förlorad. Hur detta tillämpas på
+            rapporterna, och om köparen i praktiken är näringsidkare eller konsument, ska granskas av jurist innan lansering.
+        </p>
+
+        <h2 id="fel">Om något går fel</h2>
+        <p>Om en rapport inte kan tas fram visas det direkt i beställningen, med ordernummer. Vad som gäller för återbetalning anges här innan lansering.</p>
+    </Doc>
+</Page>

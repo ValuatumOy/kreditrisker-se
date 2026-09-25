@@ -1,0 +1,17 @@
+---
+import Page from '../../layouts/Page.astro'
+import HubIndex from '../../components/HubIndex.astro'
+import { getSite } from '../../lib/store.ts'
+const site = getSite()
+const indexable = site.industries.some((h) => h.indexable)
+---
+
+<Page
+    title="Branscher"
+    description="Svenska företag grupperade efter bransch enligt SNI, Svensk näringsgrensindelning."
+    path="/branscher/"
+    lede="Företagen grupperas efter huvudbransch enligt SNI (Svensk näringsgrensindelning), den kod som företaget har registrerat hos Bolagsverket och SCB."
+    noindex={!indexable}
+>
+    <HubIndex hubs={site.industries} base="/branscher/" codeLabel="SNI-kod" detailLabel="Version" no="Tabell 1" title="Branscher med publicerade företag" />
+</Page>

@@ -1,0 +1,63 @@
+---
+// Text and hub pages: breadcrumbs, a title block on the report grid, content.
+import Base from './Base.astro'
+import Crumbs from '../components/Crumbs.astro'
+import { crumbsJsonLd, type Crumb } from '../lib/seo.ts'
+
+interface Props {
+    title: string
+    h1?: string
+    description: string
+    path: string
+    lede?: string
+    crumbs?: Crumb[]
+    noindex?: boolean
+    jsonLd?: object[]
+    /** Draft legal text awaiting review. */
+    draft?: boolean
+}
+const { title, h1 = title, description, path, lede, crumbs = [{ label: title }], noindex, jsonLd = [], draft } = Astro.props
+---
+
+<Base title={title} description={description} path={path} noindex={noindex} jsonLd={[...jsonLd, crumbsJsonLd(crumbs)]}>
+    <Crumbs items={crumbs} />
+    <header class="shell ph">
+        <h1>{h1}</h1>
+        {lede && <p class="lede">{lede}</p>}
+        {
+            draft && (
+                <p class="ph__draft small">
+                    Utkast. Texten ska granskas av jurist innan tjänsten lanseras och kan ändras.
+                </p>
+            )
+        }
+        <slot name="head" />
+    </header>
+    <div class="shell ph__body">
+        <slot />
+    </div>
+</Base>
+
+<style>
+    .ph {
+        padding-block: 20px clamp(32px, 5vw, 56px);
+        border-bottom: 1px solid var(--rule);
+    }
+    .ph h1 {
+        max-width: 20ch;
+    }
+    .ph .lede {
+        margin-top: 18px;
+    }
+    .ph__draft {
+        display: inline-block;
+        margin-top: 18px;
+        padding: 6px 10px;
+        background: var(--ochre-wash);
+        color: var(--ochre-ink);
+        border-radius: 2px;
+    }
+    .ph__body {
+        padding-top: clamp(32px, 5vw, 56px);
+    }
+</style>

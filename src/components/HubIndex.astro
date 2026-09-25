@@ -1,0 +1,63 @@
+---
+import type { Hub } from '../lib/publish.ts'
+
+interface Props {
+    hubs: Hub[]
+    base: string
+    codeLabel: string
+    detailLabel: string
+    no: string
+    title: string
+}
+const { hubs, base, codeLabel, detailLabel, no, title } = Astro.props
+---
+
+<figure class="fig">
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">{title}</span></div>
+    {
+        hubs.length === 0 ? (
+            <p class="muted">Inga företag publicerade ännu.</p>
+        ) : (
+            <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, ${title}`}>
+                <table class="data hi">
+                    <thead>
+                        <tr>
+                            <th scope="col">Namn</th>
+                            <th scope="col">{codeLabel}</th>
+                            <th scope="col" class="hi__txt">{detailLabel}</th>
+                            <th scope="col">Företag</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {hubs.map((h) => (
+                            <tr>
+                                <th scope="row">
+                                    <a href={`${base}${h.slug}/`}>{h.name}</a>
+                                </th>
+                                <td class="num">{h.code}</td>
+                                <td class="hi__txt">{h.detail}</td>
+                                <td class="num">{h.companies.length}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
+        )
+    }
+</figure>
+
+<style>
+    .hi th[scope='row'] a {
+        font-weight: 600;
+        color: var(--ink);
+        text-decoration: none;
+    }
+    .hi th[scope='row'] a:hover {
+        text-decoration: underline;
+        text-decoration-color: var(--ochre);
+    }
+    .hi__txt {
+        text-align: left !important;
+        color: var(--ink-2);
+    }
+</style>

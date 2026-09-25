@@ -1,0 +1,274 @@
+---
+// Accessible combobox (WAI-ARIA 1.2 pattern). Works without JS as a plain GET
+// form to /sok/; with JS it suggests companies as you type.
+import Icon from './Icon.astro'
+
+interface Props {
+    size?: 'hero' | 'page'
+    id?: string
+    value?: string
+}
+const { size = 'page', id = 'q', value = '' } = Astro.props
+const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
+---
+
+<form class:list={['sbox', `sbox--${size}`]} action="/sok/" method="get" role="search" data-search data-endpoint={endpoint}>
+    <label class="sbox__label" for={id}>Sök på företagsnamn eller organisationsnummer</label>
+    <div class="sbox__field">
+        <Icon name="search" class="sbox__icon" />
+        <input
+            id={id}
+            name="q"
+            type="search"
+            value={value}
+            placeholder="Namn eller org.nr"
+            autocomplete="off"
+            spellcheck="false"
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded="false"
+            aria-controls={`${id}-list`}
+        />
+        <button class="sbox__go" type="submit">
+            <span>Sök</span>
+            <Icon name="arrow" />
+        </button>
+    </div>
+    <ul class="sbox__list" id={`${id}-list`} role="listbox" aria-label="Förslag" hidden></ul>
+    <p class="sbox__status visually-hidden" aria-live="polite"></p>
+</form>
+
+<script>
+    import { searchIndex, type SearchHit } from '../lib/search.ts'
+    import { formatOrgnr } from '../lib/orgnr.ts'
+
+    let indexPromise: Promise<SearchHit[]> | null = null
+    const loadIndex = () => (indexPromise ??= fetch('/sok/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => []))
+
+    const STATUS: Record<string, string> = { liquidation: 'I likvidation', bankruptcy: 'Konkurs', reconstruction: 'Rekonstruktion', deregistered: 'Avregistrerat' }
+
+    for (const form of document.querySelectorAll<HTMLFormElement>('[data-search]')) {
+        const input = form.querySelector('input')!
+        const list = form.querySelector<HTMLUListElement>('[role=listbox]')!
+        const status = form.querySelector('.sbox__status')!
+        const endpoint = form.dataset.endpoint
+        let hits: SearchHit[] = []
+        let active = -1
+        let seq = 0
+
+        const close = () => {
+            list.hidden = true
+            input.setAttribute('aria-expanded', 'false')
+            input.removeAttribute('aria-activedescendant')
+            active = -1
+        }
+        const setActive = (i: number) => {
+            active = i
+            list.querySelectorAll('[role=option]').forEach((el, j) => el.setAttribute('aria-selected', String(j === i)))
+            if (i >= 0) input.setAttribute('aria-activedescendant', `${list.id}-${i}`)
+            else input.removeAttribute('aria-activedescendant')
+        }
+        const render = () => {
+            list.replaceChildren(
+                ...hits.map((h, i) => {
+                    const li = document.createElement('li')
+                    li.id = `${list.id}-${i}`
+                    li.setAttribute('role', 'option')
+                    li.setAttribute('aria-selected', 'false')
+                    const a = document.createElement('a')
+                    a.href = h.p
+                    a.tabIndex = -1
+                    const name = document.createElement('span')
+                    name.className = 'sbox__name'
+                    name.textContent = h.n
+                    const meta = document.createElement('span')
+                    meta.className = 'sbox__meta'
+                    meta.textContent = [formatOrgnr(h.o), h.k, h.st && STATUS[h.st]].filter(Boolean).join(' · ')
+                    a.append(name, meta)
+                    li.append(a)
+                    li.addEventListener('mousedown', (e) => e.preventDefault())
+                    return li
+                }),
+            )
+            const open = hits.length > 0
+            list.hidden = !open
+            input.setAttribute('aria-expanded', String(open))
+            status.textContent = input.value.trim().length >= 2 ? (open ? `${hits.length} förslag` : 'Inga förslag') : ''
+            setActive(-1)
+        }
+        const query = async () => {
+            const q = input.value
+            const mine = ++seq
+            let res: SearchHit[]
+            if (endpoint) {
+                res = q.trim().length < 2 ? [] : await fetch(`${endpoint}?q=${encodeURIComponent(q)}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])
+            } else {
+                res = searchIndex(await loadIndex(), q)
+            }
+            if (mine !== seq) return
+            hits = res
+            render()
+        }
+        let t: number | undefined
+        input.addEventListener('input', () => {
+            clearTimeout(t)
+            t = window.setTimeout(query, endpoint ? 160 : 40)
+        })
+        input.addEventListener('focus', () => {
+            if (!endpoint) loadIndex()
+            if (hits.length) render()
+        })
+        input.addEventListener('blur', () => setTimeout(close, 120))
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowDown' && hits.length) {
+                e.preventDefault()
+                if (list.hidden) render()
+                setActive((active + 1) % hits.length)
+            } else if (e.key === 'ArrowUp' && hits.length) {
+                e.preventDefault()
+                setActive(active <= 0 ? hits.length - 1 : active - 1)
+            } else if (e.key === 'Escape') {
+                if (!list.hidden) {
+                    e.preventDefault()
+                    close()
+                }
+            } else if (e.key === 'Enter' && active >= 0) {
+                e.preventDefault()
+                location.href = hits[active].p
+            }
+        })
+    }
+</script>
+
+<style>
+    .sbox {
+        position: relative;
+    }
+    .sbox__label {
+        display: block;
+        font-size: var(--step--1);
+        font-weight: 600;
+        color: var(--ink-2);
+        margin-bottom: 8px;
+    }
+    .sbox__field {
+        position: relative;
+        display: flex;
+        align-items: stretch;
+        background: var(--sheet);
+        border: 1px solid var(--ink);
+        border-radius: var(--radius);
+        transition: box-shadow 200ms var(--ease-out);
+    }
+    .sbox__field:focus-within {
+        box-shadow: 0 0 0 3px var(--blue-3);
+    }
+    .sbox__field :global(.sbox__icon) {
+        position: absolute;
+        left: 18px;
+        top: 50%;
+        translate: 0 -50%;
+        width: 22px;
+        height: 22px;
+        color: var(--ink-2);
+        pointer-events: none;
+    }
+    .sbox input {
+        flex: 1;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        font: inherit;
+        color: var(--ink);
+        padding: 0 16px 0 52px;
+        height: 60px;
+        font-size: 1.12rem;
+        outline: none;
+    }
+    .sbox input::placeholder {
+        color: var(--ink-3);
+    }
+    .sbox input::-webkit-search-cancel-button {
+        filter: grayscale(1);
+    }
+    .sbox__go {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        margin: 6px;
+        padding: 0 20px;
+        border: 0;
+        border-radius: 2px;
+        background: var(--ink);
+        color: var(--paper);
+        font: 500 1rem var(--sans);
+        cursor: pointer;
+        transition: background 160ms;
+    }
+    .sbox__go:hover {
+        background: var(--blue);
+    }
+    .sbox__go :global(svg) {
+        width: 18px;
+        height: 18px;
+    }
+    .sbox--hero input {
+        height: 72px;
+        font-size: 1.3rem;
+        padding-left: 58px;
+    }
+    .sbox--hero .sbox__field :global(.sbox__icon) {
+        left: 20px;
+        width: 24px;
+        height: 24px;
+    }
+    .sbox__list {
+        position: absolute;
+        z-index: 30;
+        left: 0;
+        right: 0;
+        top: calc(100% + 6px);
+        margin: 0;
+        padding: 6px;
+        list-style: none;
+        background: var(--sheet);
+        border: 1px solid var(--rule-2);
+        border-radius: var(--radius);
+        box-shadow: 0 22px 40px -24px rgb(15 30 38 / 0.5);
+        max-height: min(420px, 60vh);
+        overflow-y: auto;
+    }
+    .sbox__list :global(a) {
+        display: grid;
+        gap: 2px;
+        padding: 10px 12px;
+        border-radius: 2px;
+        color: var(--ink);
+        text-decoration: none;
+    }
+    .sbox__list :global([aria-selected='true'] a),
+    .sbox__list :global(a:hover) {
+        background: var(--paper-2);
+    }
+    .sbox__list :global(.sbox__name) {
+        font-weight: 600;
+    }
+    .sbox__list :global(.sbox__meta) {
+        font-size: var(--step--1);
+        color: var(--ink-3);
+        font-variant-numeric: lining-nums;
+    }
+    @media (max-width: 560px) {
+        .sbox__go span {
+            display: none;
+        }
+        .sbox--hero input {
+            height: 60px;
+            font-size: 1.08rem;
+            padding-left: 50px;
+        }
+        .sbox--hero .sbox__field :global(.sbox__icon) {
+            left: 16px;
+        }
+    }
+</style>

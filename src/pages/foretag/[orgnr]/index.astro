@@ -1,0 +1,12 @@
+---
+// /foretag/{orgnr}/ -> canonical profile. Lets people and other sites link by orgnr alone.
+import RedirectPage from '../../../components/RedirectPage.astro'
+import { getSite } from '../../../lib/store.ts'
+
+export function getStaticPaths() {
+    return getSite().companies.map((c) => ({ params: { orgnr: c.record.orgnr }, props: { to: c.path } }))
+}
+const { to } = Astro.props
+---
+
+<RedirectPage to={to} />

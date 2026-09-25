@@ -1,0 +1,54 @@
+---
+import Page from '../layouts/Page.astro'
+import Doc from '../components/Doc.astro'
+import { SITE } from '../config/site.ts'
+const p = SITE.provider
+---
+
+<Page
+    title="Om tjänsten och kontakt"
+    description={`${SITE.name} tillhandahålls av ${p.name}. Kontaktuppgifter, rättelser och leverantörsuppgifter.`}
+    path="/om/"
+    lede={`${SITE.name} är en tjänst för att granska svenska företag innan man gör affärer med dem. Den byggs och drivs av ${p.name}.`}
+>
+    <Doc toc={[['leverantor', 'Leverantör'], ['kontakt', 'Kontakt'], ['rattelse', 'Rättelser'], ['status', 'Status']]}>
+        <h2 id="leverantor">Leverantör</h2>
+        <dl>
+            <dt>Företag</dt>
+            <dd>{p.name}</dd>
+            <dt>FO-nummer (Finland)</dt>
+            <dd class="num">{p.businessId}</dd>
+            <dt>Land</dt>
+            <dd>{p.country}</dd>
+            <dt>Webbplats</dt>
+            <dd><a href={p.url}>{p.url.replace(/^https:\/\/|\/$/g, '')}</a></dd>
+        </dl>
+        <p>
+            Valuatum driver sedan tidigare <a href="https://luottoriskit.fi/fi/">luottoriskit.fi</a> med bokslut och kreditrapporter för finska företag. Den svenska tjänsten
+            har egna data, egen metod och egna villkor.
+        </p>
+
+        <h2 id="kontakt">Kontakt</h2>
+        {
+            p.email ? (
+                <p>
+                    E-post: <a href={`mailto:${p.email}`}>{p.email}</a>
+                </p>
+            ) : (
+                <p>En svensk kontaktadress publiceras när tjänsten lanseras. Till dess når du Valuatum via <a href={p.url}>valuatum.com</a>.</p>
+            )
+        }
+
+        <h2 id="rattelse">Rättelser</h2>
+        <p>
+            Om uppgifter om ditt företag är fel, skicka organisationsnummer, vilken uppgift som gäller och vad som är rätt. Vi jämför med källan. Är felet vårt rättar vi det
+            vid nästa publicering; står felet i källan, till exempel i en inlämnad årsredovisning, behöver det rättas där.
+        </p>
+
+        <h2 id="status">Status</h2>
+        <p>
+            Tjänsten är under uppbyggnad. Innan svenska företagsuppgifter publiceras och rapporter säljs ska datalicenser, integritetsfrågor, eventuellt tillstånd enligt
+            kreditupplysningslagen, betalning och villkor vara granskade.
+        </p>
+    </Doc>
+</Page>

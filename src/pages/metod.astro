@@ -1,0 +1,140 @@
+---
+import Page from '../layouts/Page.astro'
+import { FORMULAS, UNTAXED_RESERVE_EQUITY_SHARE } from '../lib/metrics.ts'
+import { CORE_ITEMS, MIN_CORE_ITEMS } from '../lib/quality.ts'
+import { CURRENT_MONTHS, STALE_MONTHS } from '../lib/freshness.ts'
+import { MIN_HUB_COMPANIES, MIN_RANKING_ENTRIES } from '../lib/publish.ts'
+import { INCOMPARABLE_TEXT, MISSING_TEXT } from '../lib/format.ts'
+
+const CORE_LABEL: Record<string, string> = {
+    netSales: 'Nettoomsättning',
+    operatingProfit: 'Rörelseresultat',
+    netProfit: 'Årets resultat',
+    totalAssets: 'Summa tillgångar',
+    equity: 'Eget kapital',
+    currentLiabilities: 'Kortfristiga skulder',
+    '': 'Medelantal anställda',
+}
+const toc = [
+    ['nyckeltal', 'Nyckeltal och formler'],
+    ['varden', 'Saknade och avvikande värden'],
+    ['aktualitet', 'Hur aktuella uppgifterna är'],
+    ['index', 'Vilka profiler som visas i sökmotorer'],
+    ['risk', 'Kreditbetyg'],
+    ['topplistor', 'Topplistor och branschsiffror'],
+]
+---
+
+<Page
+    title="Metod"
+    h1="Så räknar och visar vi"
+    description="Formler för nyckeltal, hur saknade värden hanteras, hur aktualitet bedöms och vilka profiler som indexeras."
+    path="/metod/"
+    lede="Allt vi räknar fram ur bokslut följer formlerna nedan. Reglerna gäller alla företag lika och ändras bara med ny versionsbeteckning."
+>
+    <div class="doc">
+        <nav class="doc__toc small" aria-label="Innehåll">
+            <p>Innehåll</p>
+            <ol>{toc.map(([id, t]) => <li><a href={`#${id}`}>{t}</a></li>)}</ol>
+        </nav>
+        <div class="prose doc__body">
+            <h2 id="nyckeltal">Nyckeltal och formler</h2>
+            <p>Beloppen hämtas ur företagets årsredovisning. Nyckeltalen räknar vi själva. Varje värde på sajten bär formelns beteckning, så att en ändrad formel syns.</p>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Formler">
+                <table class="data f">
+                    <thead><tr><th scope="col">Nyckeltal</th><th scope="col">Formel</th><th scope="col">Beteckning</th></tr></thead>
+                    <tbody>
+                        {
+                            Object.values(FORMULAS).map((f) => (
+                                <tr>
+                                    <th scope="row">
+                                        {f.label}
+                                        <span class="f__x">{f.explanation}</span>
+                                    </th>
+                                    <td>{f.formula}</td>
+                                    <td class="num">{f.id}</td>
+                                </tr>
+                            ))
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p>
+                I soliditeten räknas {Math.round(UNTAXED_RESERVE_EQUITY_SHARE * 1000) / 10} % av de obeskattade reserverna som eget kapital. Resten motsvarar den latenta skatten
+                med dagens bolagsskatt på 20,6 %.
+            </p>
+
+            <h2 id="varden">Saknade och avvikande värden</h2>
+            <p>Ett värde på sajten är alltid något av följande. Vi skriver aldrig noll när en uppgift saknas.</p>
+            <dl>
+                <dt>Rapporterat</dt>
+                <dd>Beloppet står i årsredovisningen. Noll och negativa belopp visas som de är; negativa med minustecken.</dd>
+                <dt>Beräknat</dt>
+                <dd>Ett nyckeltal räknat med formlerna ovan ur rapporterade belopp.</dd>
+                <dt>Saknas</dt>
+                <dd>{Object.values(MISSING_TEXT).join(' Eller: ')}</dd>
+                <dt>Ej jämförbar</dt>
+                <dd>{Object.values(INCOMPARABLE_TEXT).join(' Eller: ')}</dd>
+            </dl>
+            <p>Saknas en uppgift som ett nyckeltal behöver, saknas också nyckeltalet.</p>
+
+            <h2 id="aktualitet">Hur aktuella uppgifterna är</h2>
+            <p>
+                Aktiebolag ska lämna in årsredovisningen inom sju månader efter räkenskapsårets slut. Därför kallar vi ett bokslut <em>aktuellt</em> om räkenskapsåret slutade högst{' '}
+                {CURRENT_MONTHS} månader tillbaka, <em>äldre</em> upp till {STALE_MONTHS} månader och <em>inaktuellt</em> därefter. Inaktuella profiler får en tydlig varning.
+            </p>
+
+            <h2 id="index">Vilka profiler som visas i sökmotorer</h2>
+            <p>Alla företag med registrerade uppgifter får en profil, men bara profiler med tillräckligt underlag indexeras. En profil indexeras om</p>
+            <ol>
+                <li>uppgifterna är verkliga, inte testdata,</li>
+                <li>registreringsstatusen är känd,</li>
+                <li>kommun och huvudbransch (SNI) finns,</li>
+                <li>det finns minst ett bokslut och det senaste är inte inaktuellt,</li>
+                <li>
+                    det senaste bokslutet redovisar minst {MIN_CORE_ITEMS} av dessa {CORE_ITEMS.length} poster: {CORE_ITEMS.map(([, k]) => CORE_LABEL[k]).join(', ')}.
+                </li>
+            </ol>
+            <p>
+                Enskilda näringsidkare får ingen profil, eftersom deras organisationsnummer är ett personnummer. Profiler som inte klarar tröskeln visas för besökare men märks
+                <code>noindex</code> och tas inte med i webbplatskartan.
+            </p>
+
+            <h2 id="risk">Kreditbetyg</h2>
+            <p>
+                Valuatum tar fram kreditbetyg för finska företag. Modellen är inte validerad på svenska data, och därför visas inga kreditbetyg, riskklasser eller
+                sannolikheter för svenska företag. När en svensk modell är validerad beskriver vi här skalan, prognoshorisonten, underlaget och modellens begränsningar.
+            </p>
+
+            <h2 id="topplistor">Topplistor och branschsiffror</h2>
+            <p>
+                Topplistor tar bara med profiler som klarar indexeringströskeln och har ett aktuellt bokslut på tolv månader. Listor med färre än {MIN_RANKING_ENTRIES} företag
+                indexeras inte. Bransch- och kommunsidor indexeras när minst {MIN_HUB_COMPANIES} profiler klarar tröskeln. Medianer räknas bara på företag som redovisar posten, och
+                antalet anges.
+            </p>
+        </div>
+    </div>
+</Page>
+
+<style>
+    .f th {
+        min-width: 16rem;
+    }
+    .f td {
+        text-align: left !important;
+        white-space: normal !important;
+        min-width: 14rem;
+    }
+    .f td.num {
+        min-width: 11rem;
+        color: var(--ink-3);
+        font-size: var(--step--1);
+    }
+    .f__x {
+        display: block;
+        margin-top: 4px;
+        font-size: var(--step--1);
+        color: var(--ink-3);
+        font-weight: 400;
+    }
+</style>

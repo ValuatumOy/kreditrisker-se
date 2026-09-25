@@ -1,0 +1,11 @@
+---
+import HubDetail from '../../components/HubDetail.astro'
+import { getSite } from '../../lib/store.ts'
+export function getStaticPaths() {
+    return getSite().industries.map((hub) => ({ params: { slug: hub.slug }, props: { slug: hub.slug } }))
+}
+const site = getSite()
+const hub = site.industries.find((h) => h.slug === Astro.props.slug)!
+---
+
+<HubDetail hub={hub} site={site} />

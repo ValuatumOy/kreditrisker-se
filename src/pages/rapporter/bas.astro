@@ -1,0 +1,26 @@
+---
+import ReportProduct from '../../components/ReportProduct.astro'
+---
+
+<ReportProduct
+    product="basic"
+    lede="En rapport som samlar ett svenskt företags bokslut, nyckeltal och branschjämförelse, för den som ska bestämma om en kund eller leverantör får kredit. Under utveckling."
+    forWhom={[
+        'Du ska skicka faktura till en ny kund och vill se att bolaget har omsättning och eget kapital.',
+        'Du väljer leverantör och vill jämföra lönsamhet och soliditet med branschen.',
+        'Du behöver ett dokument att spara som underlag för ett kreditbeslut.',
+    ]}
+    includes={[
+        { h: 'Registeruppgifter', t: 'Namn, organisationsnummer, företagsform, status, säte och bransch enligt Bolagsverket.' },
+        { h: 'Bokslut i flera år', t: 'Resultat- och balansräkning för upp till fem räkenskapsår, med period och källa för varje år.' },
+        { h: 'Nyckeltal', t: 'Tillväxt, marginaler, soliditet, kassalikviditet och avkastning, med formel och förklaring.' },
+        { h: 'Branschjämförelse', t: 'Företagets nyckeltal mot medianen för företag med samma SNI-kod.' },
+        { h: 'Kreditbetyg', t: 'Ingår först när Valuatums modell är validerad för svenska företag. Skala och prognoshorisont anges då.' },
+        { h: 'Automatisk kommentar', t: 'En kort text som beskriver utvecklingen i siffrorna.' },
+    ]}
+    excludes={[
+        'Betalningsanmärkningar och skulder hos Kronofogden.',
+        'Uppgifter om enskilda personer, till exempel styrelseledamöters privatekonomi.',
+        'Rådgivning. Rapporten är ett underlag, beslutet är ditt.',
+    ]}
+/>

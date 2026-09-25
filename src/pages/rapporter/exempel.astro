@@ -1,0 +1,218 @@
+---
+// Sample reports on a synthetic company. They show layout and content types;
+// they are not the final Swedish report and contain no real data.
+import Page from '../../layouts/Page.astro'
+import KeyFigures from '../../components/KeyFigures.astro'
+import FinancialTable from '../../components/FinancialTable.astro'
+import Val from '../../components/Val.astro'
+import { getDemoSite } from '../../lib/store.ts'
+import { formatOrgnr } from '../../lib/orgnr.ts'
+import { compactSek, kommunName, percent, periodLabel } from '../../lib/format.ts'
+import { computeMetrics, FORMULAS, numeric, type MetricKey } from '../../lib/metrics.ts'
+
+const demo = getDemoSite()
+const c = demo.companies.find((x) => x.record.name.startsWith('Exempel Mjukvara'))!
+const r = c.record
+const [p, prior] = r.periods
+const m = computeMetrics(p, prior)
+const peers = demo.companies.filter((x) => x !== c && x.record.sni[0]?.code === r.sni[0]?.code && x.record.periods[0])
+const median = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b)
+    const h = Math.floor(s.length / 2)
+    return s.length ? (s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2) : undefined
+}
+const bench = (['operatingMargin', 'equityRatio', 'quickRatio'] as MetricKey[]).map((k) => {
+    const vals = peers.map((x) => numeric(computeMetrics(x.record.periods[0], x.record.periods[1])[k])).filter((v): v is number => v !== undefined)
+    const med = median(vals)
+    return { k, own: percent(m[k]), peer: med === undefined ? null : percent({ status: 'derived', value: med, formula: 'median', inputs: [] }), n: vals.length }
+})
+const first = r.periods.at(-1)!
+const salesFrom = compactSek(first.income.netSales).text
+const salesTo = compactSek(p.income.netSales).text
+---
+
+<Page
+    title="Exempelrapporter"
+    description="Så är basrapporten och AI-rapporten uppbyggda, visat på ett syntetiskt exempelföretag."
+    path="/rapporter/exempel/"
+    lede="Så är rapporterna tänkta att se ut. Exemplen bygger på ett påhittat företag och visar upplägget, inte den slutliga rapporten."
+    crumbs={[{ href: '/rapporter/', label: 'Rapporter' }, { label: 'Exempel' }]}
+>
+    <nav class="ex__toc small" aria-label="Exempel">
+        <a href="#basrapport">Basrapport</a>
+        <a href="#ai-rapport">AI-rapport</a>
+    </nav>
+
+    <article class="sheet" id="basrapport" aria-labelledby="bas-h">
+        <header class="sheet__head">
+            <div>
+                <p class="sheet__kind">Basrapport · exempel</p>
+                <h2 id="bas-h">{r.name}</h2>
+                <p class="small muted num">Org.nr {formatOrgnr(r.orgnr)} · {r.municipality && kommunName(r.municipality.name)} · {r.sni[0]?.label}</p>
+            </div>
+            <p class="sheet__stamp">Syntetiska data<br />Inte ett verkligt företag</p>
+        </header>
+
+        <section class="sheet__sec">
+            <h3>1 Sammanfattning</h3>
+            <KeyFigures periods={r.periods} />
+        </section>
+
+        <section class="sheet__sec">
+            <h3>2 Kreditbetyg</h3>
+            <div class="sheet__gap">
+                Här visas kreditbetyg, riskklass och prognoshorisont när Valuatums modell är validerad för svenska företag. Exemplet innehåller därför inget betyg.
+            </div>
+        </section>
+
+        <section class="sheet__sec">
+            <h3>3 Jämförelse med branschen</h3>
+            <div class="table-wrap">
+                <table class="data">
+                    <thead><tr><th scope="col">Nyckeltal {periodLabel(p)}</th><th scope="col">Företaget</th><th scope="col">Branschens median</th><th scope="col">Underlag</th></tr></thead>
+                    <tbody>
+                        {
+                            bench.map((b) => (
+                                <tr>
+                                    <th scope="row">{FORMULAS[b.k].label}</th>
+                                    <td><Val d={b.own} /></td>
+                                    <td>{b.peer ? <Val d={b.peer} /> : <span class="val--missing">för litet underlag</span>}</td>
+                                    <td class="num">{b.n} företag</td>
+                                </tr>
+                            ))
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <p class="small muted sheet__note">Branschen är SNI {r.sni[0]?.code}. I exemplet består den av andra syntetiska företag.</p>
+        </section>
+
+        <section class="sheet__sec">
+            <h3>4 Bokslut</h3>
+            <FinancialTable periods={r.periods} no="Tabell 4.1" />
+        </section>
+    </article>
+
+    <article class="sheet" id="ai-rapport" aria-labelledby="ai-h">
+        <header class="sheet__head">
+            <div>
+                <p class="sheet__kind">AI-rapport · exempel</p>
+                <h2 id="ai-h">{r.name}</h2>
+                <p class="small muted num">Org.nr {formatOrgnr(r.orgnr)}</p>
+            </div>
+            <p class="sheet__stamp">Syntetiska data<br />Exempeltext</p>
+        </header>
+        <p class="small muted">Innehåller allt i basrapporten. Nedan visas de delar som tillkommer.</p>
+
+        <section class="sheet__sec">
+            <h3>5 Analys</h3>
+            <div class="sheet__prose">
+                <h4>Lönsamhet</h4>
+                <p>
+                    Nettoomsättningen har ökat från {salesFrom} räkenskapsåret {periodLabel(first)} till {salesTo} räkenskapsåret {periodLabel(p)}. Rörelsemarginalen var{' '}
+                    <Val d={percent(m.operatingMargin)} /> det senaste året, jämfört med <Val d={percent(computeMetrics(prior, r.periods[2]).operatingMargin)} /> året innan.
+                </p>
+                <h4>Soliditet och likviditet</h4>
+                <p>
+                    Soliditeten var <Val d={percent(m.equityRatio)} /> och kassalikviditeten <Val d={percent(m.quickRatio, 0)} />. {(numeric(m.quickRatio) ?? 0) > 1 && ' De likvida tillgångarna var alltså större än de kortfristiga skulderna.'}
+                </p>
+                <h4>Begränsningar</h4>
+                <p>Analysen bygger på det senaste inlämnade bokslutet. Händelser efter bokslutsdagen syns inte i siffrorna.</p>
+            </div>
+        </section>
+
+        <section class="sheet__sec">
+            <h3>6 Offentliga källor</h3>
+            <div class="sheet__gap">
+                I den riktiga rapporten sammanfattas här vad som publicerats om företaget, med länk till varje källa. Exempelföretaget finns inte, så det finns inga källor att visa.
+            </div>
+        </section>
+    </article>
+</Page>
+
+<style>
+    .ex__toc {
+        display: flex;
+        gap: 18px;
+        margin-bottom: 28px;
+    }
+    .sheet {
+        max-width: 920px;
+        margin-inline: auto;
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        padding: clamp(20px, 5vw, 64px);
+        box-shadow: 0 40px 70px -50px rgb(15 30 38 / 0.45);
+        scroll-margin-top: 90px;
+    }
+    .sheet + .sheet {
+        margin-top: 56px;
+    }
+    .sheet__head {
+        display: flex;
+        justify-content: space-between;
+        gap: 24px;
+        align-items: flex-start;
+        padding-bottom: 24px;
+        border-bottom: 2px solid var(--ink);
+        margin-bottom: 8px;
+    }
+    .sheet__kind {
+        font-size: var(--step--1);
+        font-weight: 600;
+        color: var(--ochre-ink);
+    }
+    .sheet__head h2 {
+        font-size: var(--step-3);
+        margin: 6px 0 8px;
+    }
+    .sheet__stamp {
+        flex-shrink: 0;
+        padding: 8px 12px;
+        border: 1.5px solid var(--ochre);
+        color: var(--ochre-ink);
+        font-size: var(--step--1);
+        font-weight: 600;
+        text-align: center;
+        rotate: 2deg;
+    }
+    .sheet__sec {
+        padding-top: 36px;
+    }
+    .sheet__sec > h3 {
+        font-size: 1.35rem;
+        margin-bottom: 16px;
+    }
+    .sheet__gap {
+        padding: 16px 18px;
+        background: var(--paper-2);
+        color: var(--ink-2);
+        border-radius: 2px;
+        font-size: 0.95rem;
+    }
+    .sheet__note {
+        margin-top: 10px;
+    }
+    .sheet__prose {
+        max-width: 66ch;
+        display: grid;
+        gap: 10px;
+    }
+    .sheet__prose h4 {
+        font-family: var(--sans);
+        font-size: 1rem;
+        font-weight: 600;
+        margin-top: 10px;
+    }
+    .sheet__prose p {
+        color: var(--ink-2);
+    }
+    @media (max-width: 600px) {
+        .sheet__head {
+            flex-direction: column;
+        }
+        .sheet__stamp {
+            rotate: 0deg;
+        }
+    }
+</style>

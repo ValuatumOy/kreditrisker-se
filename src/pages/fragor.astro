@@ -1,0 +1,86 @@
+---
+import Page from '../layouts/Page.astro'
+
+const faq: { q: string; a: string }[] = [
+    {
+        q: 'Vad kostar det att se ett företag?',
+        a: 'Inget. Profilerna med registeruppgifter, bokslut och nyckeltal är gratis. Det är bara rapporterna som ska kosta, och de säljs inte ännu.',
+    },
+    {
+        q: 'Är detta en kreditupplysning?',
+        a: 'Profilerna visar offentliga registeruppgifter och bokslut. Rapporterna för svenska företag är under utveckling, och vilka regler som gäller för dem granskas innan de lanseras.',
+    },
+    {
+        q: 'Varför står det «saknas» i stället för en siffra?',
+        a: 'Posten finns inte i det bokslut vi har, till exempel för att företaget lämnat en förkortad årsredovisning. Vi skriver aldrig noll när vi inte vet.',
+    },
+    {
+        q: 'Varför visas inget kreditbetyg?',
+        a: 'Valuatums kreditriskmodell är inte validerad på svenska företag än. Tills den är det visar vi inga betyg eller riskklasser.',
+    },
+    {
+        q: 'Hur aktuella är siffrorna?',
+        a: 'Bokslutet är så aktuellt som företagets senaste inlämnade årsredovisning. Varje profil anger räkenskapsår, när bokslutet registrerades och när vi hämtade det.',
+    },
+    {
+        q: 'Varför hittar jag inte en enskild firma?',
+        a: 'En enskild näringsidkares organisationsnummer är ägarens personnummer. Av integritetsskäl publicerar vi inte sådana profiler.',
+    },
+    {
+        q: 'Uppgifterna om mitt företag är fel. Vad gör jag?',
+        a: 'Skriv till oss via kontaktsidan med organisationsnummer och vad som är fel. Vi jämför med källan och rättar om felet är vårt.',
+    },
+    {
+        q: 'Vem står bakom tjänsten?',
+        a: 'Valuatum Oy, ett finskt företag som bland annat driver luottoriskit.fi med bokslut och kreditrapporter för finska företag.',
+    },
+]
+const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })),
+}
+---
+
+<Page title="Vanliga frågor" description="Svar på vanliga frågor om företagsprofiler, rapporter, källor och integritet." path="/fragor/" jsonLd={[ld]}>
+    <dl class="faq">
+        {
+            faq.map((f) => (
+                <div>
+                    <dt>{f.q}</dt>
+                    <dd>{f.a}</dd>
+                </div>
+            ))
+        }
+    </dl>
+</Page>
+
+<style>
+    .faq {
+        margin: 0;
+        max-width: 880px;
+        border-top: 2px solid var(--ink);
+    }
+    .faq > div {
+        display: grid;
+        grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+        gap: 8px 40px;
+        padding: 22px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .faq dt {
+        font-family: var(--serif);
+        font-size: 1.25rem;
+        line-height: 1.3;
+        font-weight: 500;
+    }
+    .faq dd {
+        margin: 0;
+        color: var(--ink-2);
+    }
+    @media (max-width: 720px) {
+        .faq > div {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

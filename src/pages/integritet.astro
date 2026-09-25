@@ -1,0 +1,42 @@
+---
+import Page from '../layouts/Page.astro'
+import Doc from '../components/Doc.astro'
+import { SITE } from '../config/site.ts'
+---
+
+<Page
+    title="Integritetspolicy"
+    description="Hur personuppgifter behandlas på sajten och i företagsprofilerna."
+    path="/integritet/"
+    lede="Den här sidan beskriver vilka personuppgifter som behandlas, varför och vilka rättigheter du har."
+    draft
+>
+    <Doc toc={[['ansvarig', 'Personuppgiftsansvarig'], ['besokare', 'Besökare'], ['profiler', 'Uppgifter i företagsprofiler'], ['bestallningar', 'Beställningar'], ['rattigheter', 'Dina rättigheter']]}>
+        <h2 id="ansvarig">Personuppgiftsansvarig</h2>
+        <p>{SITE.provider.name} ({SITE.provider.businessId}), {SITE.provider.country}, är personuppgiftsansvarig för behandlingen som beskrivs här.</p>
+
+        <h2 id="besokare">Besökare</h2>
+        <p>
+            Sajten använder inga spårningscookies och ingen annonsering i nuvarande version. Webbservern loggar tekniska uppgifter som IP-adress och tidpunkt för drift och
+            säkerhet. Om statistikverktyg läggs till uppdateras den här sidan och samtycke inhämtas där det krävs.
+        </p>
+
+        <h2 id="profiler">Uppgifter i företagsprofiler</h2>
+        <p>
+            Profilerna gäller juridiska personer. Enskilda näringsidkare, vars organisationsnummer är ett personnummer, publiceras inte. Namn på styrelseledamöter och andra
+            företrädare visas inte i nuvarande version. Den rättsliga grunden för publicering av företagsuppgifter ska fastställas innan lansering.
+        </p>
+
+        <h2 id="bestallningar">Beställningar</h2>
+        <p>
+            När rapporter kan beställas behandlas e-postadress och betalningsuppgifter för att leverera rapporten och uppfylla bokföringskrav. Betalningen hanteras av en
+            betalleverantör som anges här före lansering.
+        </p>
+
+        <h2 id="rattigheter">Dina rättigheter</h2>
+        <p>
+            Du har rätt att få veta vilka uppgifter om dig som behandlas, att få fel rättade och i vissa fall att få uppgifter raderade eller att invända mot behandlingen. Du kan
+            klaga hos Integritetsskyddsmyndigheten (IMY) i Sverige eller dataombudsmannen i Finland.
+        </p>
+    </Doc>
+</Page>

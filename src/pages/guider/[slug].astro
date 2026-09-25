@@ -1,0 +1,45 @@
+---
+import Page from '../../layouts/Page.astro'
+import { GUIDES, type Guide } from '../../content/guides.ts'
+import { date } from '../../lib/format.ts'
+import { SITE } from '../../config/site.ts'
+
+export function getStaticPaths() {
+    return GUIDES.map((g) => ({ params: { slug: g.slug }, props: { g } }))
+}
+const { g } = Astro.props as { g: Guide }
+const ld = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: g.title,
+    description: g.description,
+    inLanguage: 'sv-SE',
+    dateModified: g.updated,
+    publisher: { '@type': 'Organization', name: SITE.provider.name, url: SITE.provider.url },
+}
+---
+
+<Page title={g.title} description={g.description} path={`/guider/${g.slug}/`} lede={g.description} crumbs={[{ href: '/guider/', label: 'Guider' }, { label: g.title }]} jsonLd={[ld]}>
+    <article class="prose guide">
+        {
+            g.blocks.map((b) =>
+                'h' in b ? <h2>{b.h}</h2> : 'p' in b ? <p>{b.p}</p> : 'ul' in b ? <ul>{b.ul.map((x) => <li>{x}</li>)}</ul> : <p class="small muted">{b.src}</p>,
+            )
+        }
+        <p class="small muted">Uppdaterad {date(g.updated)}. Formler för nyckeltalen finns på <a href="/metod/">metodsidan</a>.</p>
+    </article>
+</Page>
+
+<style>
+    .guide {
+        font-size: 1.1rem;
+    }
+    .guide > p:first-child {
+        font-size: var(--step-1);
+        color: var(--ink);
+    }
+    .guide p,
+    .guide li {
+        color: var(--ink-2);
+    }
+</style>

@@ -1,0 +1,103 @@
+---
+// The six report states as a reading-order diagram, with the current state of
+// each product marked from the feature flags.
+import { staticReportState } from '../lib/reports/availability.ts'
+import { STATE_LABEL } from '../lib/reports/labels.ts'
+import { STATE_KINDS } from '../lib/reports/types.ts'
+
+interface Props {
+    no: string
+}
+const { no } = Astro.props
+const now = { basic: staticReportState('basic', null).kind, ai: staticReportState('ai', null).kind }
+const TEXT: Record<(typeof STATE_KINDS)[number], string> = {
+    unavailable: 'Rapporten finns inte för svenska företag ännu, eller inte för just det här företaget.',
+    sample: 'En exempelrapport på syntetiska data visar upplägget. Inget kan beställas.',
+    available: 'Rapporten kan beställas. Pris och leveranssätt visas innan du betalar.',
+    processing: 'Betalningen är klar och rapporten tas fram. Sidan uppdateras själv.',
+    success: 'Rapporten är klar att ladda ner och skickas till din e-post.',
+    failure: 'Något gick fel när rapporten togs fram. Du får veta om du kan försöka igen och vad som gäller för betalningen.',
+}
+---
+
+<figure class="fig sf">
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">Rapportens tillstånd <span class="fig__sub">– läget i dag är markerat</span></span></div>
+    <ol class="sf__list">
+        {
+            STATE_KINDS.map((k, i) => (
+                <li class:list={['sf__step', { 'is-now': now.basic === k || now.ai === k }]}>
+                    <span class="sf__i num">{i + 1}</span>
+                    <div>
+                        <p class="sf__name">
+                            {STATE_LABEL[k]}
+                            {now.basic === k && <span class="tag tag--warn">Basrapport nu</span>}
+                            {now.ai === k && <span class="tag tag--warn">AI-rapport nu</span>}
+                        </p>
+                        <p class="sf__t">{TEXT[k]}</p>
+                    </div>
+                </li>
+            ))
+        }
+    </ol>
+    <figcaption class="fig__src">
+        <b>Anm.</b> Basrapport och AI-rapport har var sitt tillstånd. Den ena kan lanseras före den andra.
+    </figcaption>
+</figure>
+
+<style>
+    .sf__list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        border-top: 1px solid var(--rule);
+    }
+    .sf__step {
+        display: grid;
+        grid-template-columns: auto 1fr;
+        gap: 12px;
+        padding: 16px 16px 18px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .sf__step:not(:nth-child(3n + 1)) {
+        padding-left: 16px;
+        border-left: 1px solid var(--rule);
+    }
+    .sf__i {
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1px solid var(--rule-2);
+        font-size: var(--step--1);
+        color: var(--ink-3);
+    }
+    .is-now .sf__i {
+        background: var(--ochre);
+        border-color: var(--ochre);
+        color: #fff;
+    }
+    .sf__name {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        font-weight: 600;
+    }
+    .sf__t {
+        margin-top: 4px;
+        color: var(--ink-2);
+        font-size: 0.93rem;
+    }
+    @media (max-width: 860px) {
+        .sf__list {
+            grid-template-columns: 1fr;
+        }
+        .sf__step:not(:nth-child(3n + 1)) {
+            padding-left: 0;
+            border-left: 0;
+        }
+    }
+</style>

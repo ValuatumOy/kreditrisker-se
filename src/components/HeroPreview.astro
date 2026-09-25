@@ -1,0 +1,190 @@
+---
+// Diagram 1 on the home page: the real profile components rendered for three
+// synthetic fixtures, so the preview shows exactly how full, sparse and stale
+// data look on a profile. Clearly labelled as synthetic.
+import type { PublishedCompany } from '../lib/contract/types.ts'
+import { FRESHNESS_TEXT, kommunName, periodLabel } from '../lib/format.ts'
+import { formatOrgnr } from '../lib/orgnr.ts'
+import BarChart from './BarChart.astro'
+import KeyFigures from './KeyFigures.astro'
+
+interface Props {
+    samples: { key: string; tab: string; note: string; company: PublishedCompany }[]
+}
+const { samples } = Astro.props
+---
+
+<figure class="fig hp" data-hero-preview>
+    <div class="fig__head">
+        <span class="fig__no">Diagram 1</span>
+        <span class="fig__title">Så visas ett företag <span class="fig__sub">– syntetiskt exempel</span></span>
+    </div>
+    <div class="hp__tabs" role="tablist" aria-label="Exempeldata">
+        {
+            samples.map((s, i) => (
+                <button role="tab" id={`hp-tab-${s.key}`} aria-controls={`hp-panel-${s.key}`} aria-selected={i === 0 ? 'true' : 'false'} tabindex={i === 0 ? 0 : -1}>
+                    {s.tab}
+                </button>
+            ))
+        }
+    </div>
+    <div class="hp__stage">
+        {
+            samples.map((s, i) => {
+                const r = s.company.record
+                const years = [...r.periods].reverse().slice(-5)
+                const f = FRESHNESS_TEXT[s.company.freshness]
+                return (
+                    <section class="hp__panel" role="tabpanel" id={`hp-panel-${s.key}`} aria-labelledby={`hp-tab-${s.key}`} hidden={i !== 0}>
+                        <div class="hp__id">
+                            <div>
+                                <p class="hp__name">{r.name}</p>
+                                <p class="hp__meta num">
+                                    {formatOrgnr(r.orgnr)} · {r.municipality && kommunName(r.municipality.name)} · SNI {r.sni[0]?.code}
+                                </p>
+                            </div>
+                            <span class:list={['tag', s.company.freshness === 'current' ? 'tag--ok' : 'tag--warn']}>{f.label}</span>
+                        </div>
+                        <KeyFigures periods={r.periods} compact />
+                        <div class="hp__chart">
+                            <p class="small muted">Nettoomsättning per räkenskapsår</p>
+                            <BarChart title={`Nettoomsättning, ${r.name}`} points={years.map((p) => ({ label: periodLabel(p), value: p.income.netSales }))} height={150} />
+                        </div>
+                        <p class="hp__note">{s.note}</p>
+                    </section>
+                )
+            })
+        }
+    </div>
+    <figcaption class="fig__src">
+        <b>Källa:</b> syntetiska testdata. Företagen finns inte; siffrorna är påhittade för att visa hur fullständiga, glesa och inaktuella uppgifter presenteras.
+    </figcaption>
+</figure>
+
+<script>
+    for (const root of document.querySelectorAll<HTMLElement>('[data-hero-preview]')) {
+        const tabs = [...root.querySelectorAll<HTMLButtonElement>('[role=tab]')]
+        const panels = [...root.querySelectorAll<HTMLElement>('[role=tabpanel]')]
+        let current = 0
+        let auto: number | undefined
+        const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+
+        const show = (i: number, focus = false) => {
+            current = i
+            tabs.forEach((t, j) => {
+                t.setAttribute('aria-selected', String(j === i))
+                t.tabIndex = j === i ? 0 : -1
+            })
+            panels.forEach((p, j) => {
+                p.hidden = j !== i
+                if (j === i) {
+                    p.classList.remove('is-in')
+                    void p.offsetWidth
+                    p.classList.add('is-in')
+                }
+            })
+            if (focus) tabs[i].focus()
+        }
+        const stop = () => clearInterval(auto)
+        tabs.forEach((t, i) =>
+            t.addEventListener('click', () => {
+                stop()
+                show(i)
+            }),
+        )
+        root.querySelector('[role=tablist]')!.addEventListener('keydown', (e) => {
+            const k = (e as KeyboardEvent).key
+            if (k !== 'ArrowRight' && k !== 'ArrowLeft') return
+            stop()
+            show((current + (k === 'ArrowRight' ? 1 : tabs.length - 1)) % tabs.length, true)
+        })
+        if (!reduce) {
+            auto = window.setInterval(() => show((current + 1) % tabs.length), 7000)
+            root.addEventListener('pointerenter', stop, { once: true })
+            root.addEventListener('focusin', stop, { once: true })
+        }
+    }
+</script>
+
+<style>
+    .hp {
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-top: 2px solid var(--ink);
+        padding: 18px 22px 16px;
+    }
+    .hp__tabs {
+        display: flex;
+        gap: 4px;
+        padding: 3px;
+        background: var(--paper-2);
+        border-radius: var(--radius);
+        margin-bottom: 18px;
+    }
+    .hp__tabs button {
+        flex: 1;
+        min-height: 36px;
+        border: 0;
+        border-radius: 2px;
+        background: transparent;
+        color: var(--ink-2);
+        font: 500 0.88rem var(--sans);
+        cursor: pointer;
+    }
+    .hp__tabs button[aria-selected='true'] {
+        background: var(--sheet);
+        color: var(--ink);
+        box-shadow: 0 1px 2px rgb(15 30 38 / 0.18);
+    }
+    .hp__id {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+    .hp__name {
+        font-family: var(--serif);
+        font-size: 1.35rem;
+        font-weight: 600;
+        line-height: 1.2;
+        letter-spacing: -0.015em;
+    }
+    .hp__meta {
+        font-size: var(--step--1);
+        color: var(--ink-3);
+        margin-top: 2px;
+    }
+    .hp__chart {
+        margin-top: 16px;
+    }
+    .hp__chart .small {
+        margin-bottom: 6px;
+    }
+    .hp__note {
+        margin-top: 12px;
+        padding: 10px 12px;
+        background: var(--ochre-wash);
+        color: var(--ochre-ink);
+        font-size: var(--step--1);
+        border-radius: 2px;
+    }
+    .hp__panel.is-in {
+        animation: settle 520ms var(--ease-out);
+    }
+    @keyframes settle {
+        from {
+            opacity: 0;
+            filter: blur(3px);
+            translate: 0 6px;
+        }
+    }
+    @media (max-width: 560px) {
+        .hp {
+            padding: 14px 14px 12px;
+        }
+        .hp__tabs button {
+            font-size: 0.8rem;
+        }
+    }
+</style>

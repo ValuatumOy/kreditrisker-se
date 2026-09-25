@@ -1,0 +1,138 @@
+---
+// Multi-year income statement, balance sheet and ratios in tkr, newest year
+// first as in Swedish annual reports. Every cell keeps its value state.
+import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
+import { date, percent, periodLabel, SOURCE_TEXT, tkr, count, type Display } from '../lib/format.ts'
+import { computeMetrics, FORMULAS, type MetricKey } from '../lib/metrics.ts'
+import Val from './Val.astro'
+
+interface Props {
+    periods: FiscalPeriod[]
+    no: string
+}
+const { periods, no } = Astro.props
+const cols = periods.slice(0, 5)
+const metrics = cols.map((p, i) => computeMetrics(p, periods[i + 1]))
+
+// Collapse identical sources into one sentence; list per year only when they differ.
+const uniform = cols.every((p) => p.source.source === cols[0].source.source && p.framework === cols[0].framework && p.consolidated === cols[0].consolidated)
+const filed = cols.map((p) => p.filedAt).filter((d): d is string => !!d).sort()
+const sourceLine = uniform
+    ? `${SOURCE_TEXT[cols[0].source.source]}, ${cols[0].consolidated ? 'koncernens ' : ''}årsredovisningar för ${cols.length === 1 ? periodLabel(cols[0]) : `${periodLabel(cols.at(-1)!)}–${periodLabel(cols[0])}`}${cols[0].framework !== 'unknown' ? ` (${cols[0].framework})` : ''}${filed.length ? `, registrerade ${filed.length > 1 ? `${date(filed[0])}–${date(filed.at(-1)!)}` : date(filed[0])}` : ''}${cols.some((p) => p.months !== 12) ? '. Räkenskapsår som inte är 12 månader är markerade i tabellhuvudet' : ''}`
+    : cols.map((p) => `${periodLabel(p)}: ${SOURCE_TEXT[p.source.source]}, period ${date(p.start)}–${date(p.end)}${p.framework !== 'unknown' ? `, ${p.framework}` : ''}${p.filedAt ? `, registrerad ${date(p.filedAt)}` : ''}`).join('; ')
+
+type Row = { label: string; cells: Display[]; sum?: boolean }
+const amount = (label: string, get: (p: FiscalPeriod) => Value, sum = false): Row => ({ label, cells: cols.map((p) => tkr(get(p))), sum })
+const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label, cells: metrics.map((m) => percent(m[key], digits)) })
+
+const groups: { title: string; rows: Row[] }[] = [
+    {
+        title: 'Resultaträkning, tkr',
+        rows: [
+            amount('Nettoomsättning', (p) => p.income.netSales),
+            amount('Personalkostnader', (p) => p.income.personnelCosts),
+            amount('Rörelseresultat', (p) => p.income.operatingProfit, true),
+            amount('Finansnetto', (p) => p.income.financialNet),
+            amount('Resultat efter finansiella poster', (p) => p.income.profitAfterFinancialItems, true),
+            amount('Årets resultat', (p) => p.income.netProfit, true),
+        ],
+    },
+    {
+        title: 'Balansräkning, tkr',
+        rows: [
+            amount('Varulager', (p) => p.balance.inventories),
+            amount('Kassa och bank', (p) => p.balance.cash),
+            amount('Summa omsättningstillgångar', (p) => p.balance.currentAssets),
+            amount('Summa tillgångar', (p) => p.balance.totalAssets, true),
+            amount('Eget kapital', (p) => p.balance.equity),
+            amount('Obeskattade reserver', (p) => p.balance.untaxedReserves),
+            amount('Långfristiga skulder', (p) => p.balance.longTermLiabilities),
+            amount('Kortfristiga skulder', (p) => p.balance.currentLiabilities),
+        ],
+    },
+    {
+        title: 'Nyckeltal',
+        rows: [
+            ratio('revenueGrowth'),
+            ratio('operatingMargin'),
+            ratio('profitMargin'),
+            ratio('equityRatio'),
+            ratio('quickRatio', 0),
+            ratio('returnOnEquity'),
+            { label: 'Medelantal anställda', cells: cols.map((p) => count(p.employees)) },
+        ],
+    },
+]
+---
+
+<figure class="fig ft">
+    <div class="fig__head">
+        <span class="fig__no">{no}</span>
+        <span class="fig__title">Bokslut <span class="fig__sub">– {cols.length === 1 ? 'ett räkenskapsår' : `${cols.length} räkenskapsår`}</span></span>
+    </div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, bokslut`}>
+        <table class="data">
+            <thead>
+                <tr>
+                    <th scope="col"><span class="visually-hidden">Post</span></th>
+                    {
+                        cols.map((p) => (
+                            <th scope="col">
+                                <span class="ft__y">{periodLabel(p)}</span>
+                                <span class="ft__p">
+                                    {p.months !== 12 ? `${p.months} mån` : '12 mån'}
+                                    {p.consolidated ? ' · koncern' : ''}
+                                </span>
+                            </th>
+                        ))
+                    }
+                </tr>
+            </thead>
+            {
+                groups.map((g) => (
+                    <tbody>
+                        <tr class="group">
+                            <th scope="rowgroup" colspan={cols.length + 1}>
+                                {g.title}
+                            </th>
+                        </tr>
+                        {g.rows.map((r) => (
+                            <tr class:list={{ sum: r.sum }}>
+                                <th scope="row">{r.label}</th>
+                                {r.cells.map((d) => (
+                                    <td>
+                                        <Val d={d} />
+                                    </td>
+                                ))}
+                            </tr>
+                        ))}
+                    </tbody>
+                ))
+            }
+        </table>
+    </div>
+    <figcaption class="fig__src">
+        <b>Källa:</b> {sourceLine}.
+        Nyckeltalen är beräknade av oss, se <a href="/metod/#nyckeltal">formler</a>. «saknas» betyder att posten inte finns i källan.
+    </figcaption>
+</figure>
+
+<style>
+    .ft thead th {
+        vertical-align: bottom;
+    }
+    .ft__y {
+        display: block;
+        font-family: var(--serif);
+        font-size: 1.1rem;
+        color: var(--ink);
+    }
+    .ft__p {
+        display: block;
+        font-weight: 400;
+        color: var(--ink-3);
+    }
+    .ft td {
+        min-width: 6.5rem;
+    }
+</style>

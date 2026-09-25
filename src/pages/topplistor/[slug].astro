@@ -1,0 +1,50 @@
+---
+import Page from '../../layouts/Page.astro'
+import CompanyTable from '../../components/CompanyTable.astro'
+import { getSite } from '../../lib/store.ts'
+import { MIN_RANKING_ENTRIES } from '../../lib/publish.ts'
+
+export function getStaticPaths() {
+    return getSite().rankings.map((r) => ({ params: { slug: r.slug }, props: { slug: r.slug } }))
+}
+const site = getSite()
+const r = site.rankings.find((x) => x.slug === Astro.props.slug)!
+const fmt = (v: number) =>
+    r.metric === 'netSales'
+        ? `${(v / 1e6).toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} Mkr`
+        : `${(v * 100).toLocaleString('sv-SE', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`
+---
+
+<Page
+    title={`${r.title} – topplista`}
+    h1={r.title}
+    description={r.description}
+    path={`/topplistor/${r.slug}/`}
+    lede={r.description}
+    noindex={r.entries.length < MIN_RANKING_ENTRIES || site.synthetic}
+    crumbs={[{ href: '/topplistor/', label: 'Topplistor' }, { label: r.title }]}
+>
+    <p class="rule small"><b>Urval:</b> {r.rule} Bara profiler som klarar <a href="/metod/#index">kvalitetströskeln</a> tas med.</p>
+    {
+        r.entries.length === 0 ? (
+            <p class="muted">Inga företag uppfyller urvalet ännu.</p>
+        ) : (
+            <CompanyTable
+                companies={r.entries.map((e) => e.company)}
+                rank={r.entries.map((e) => ({ value: fmt(e.value) }))}
+                no="Tabell 1"
+                title={r.title}
+                source={`${site.synthetic ? 'Syntetiska testdata' : 'Bolagsverket, digitala årsredovisningar'}; nyckeltal beräknade enligt metodsidan.`}
+                show="bransch"
+            />
+        )
+    }
+</Page>
+
+<style>
+    .rule {
+        max-width: 70ch;
+        color: var(--ink-2);
+        margin-bottom: 32px;
+    }
+</style>

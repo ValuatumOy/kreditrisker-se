@@ -1,0 +1,156 @@
+---
+import Page from '../layouts/Page.astro'
+import Icon from './Icon.astro'
+import { staticReportState } from '../lib/reports/availability.ts'
+import { PRODUCT_NAME, STATE_LABEL, UNAVAILABLE_TEXT } from '../lib/reports/labels.ts'
+import type { ReportProduct as P } from '../lib/reports/types.ts'
+import { VERIFIED_PRICES } from '../config/site.ts'
+
+interface Props {
+    product: P
+    lede: string
+    forWhom: string[]
+    includes: { h: string; t: string }[]
+    excludes: string[]
+}
+const { product, lede, forWhom, includes, excludes } = Astro.props
+const name = PRODUCT_NAME[product]
+const state = staticReportState(product, null)
+const price = VERIFIED_PRICES[product]
+const path = product === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'
+---
+
+<Page title={name} description={lede} path={path} lede={lede} crumbs={[{ href: '/rapporter/', label: 'Rapporter' }, { label: name }]}>
+    <div class="rpp">
+        <div class="rpp__main">
+            <section>
+                <h2>För vem</h2>
+                <ul class="rpp__list">{forWhom.map((x) => <li>{x}</li>)}</ul>
+            </section>
+            <section>
+                <h2>Planerat innehåll</h2>
+                <dl class="rpp__inc">
+                    {
+                        includes.map((x, i) => (
+                            <div>
+                                <dt>
+                                    <span class="num">{String(i + 1)}</span> {x.h}
+                                </dt>
+                                <dd>{x.t}</dd>
+                            </div>
+                        ))
+                    }
+                </dl>
+            </section>
+            <section>
+                <h2>Ingår inte</h2>
+                <ul class="rpp__list">{excludes.map((x) => <li>{x}</li>)}</ul>
+            </section>
+        </div>
+        <aside class="rpp__side">
+            <div class="rpp__box">
+                <p class="small muted">Status</p>
+                <p class="rpp__state"><span class="tag tag--warn">{STATE_LABEL[state.kind]}</span></p>
+                {state.kind === 'unavailable' && <p class="small">{UNAVAILABLE_TEXT[state.reason]}</p>}
+                <dl class="rpp__facts small">
+                    <div><dt>Pris</dt><dd>{price ? `${price.amountSek.toLocaleString('sv-SE')} kr` : 'Inte fastställt'}</dd></div>
+                    <div><dt>Leverans</dt><dd>PDF. Leveranstid anges vid lansering.</dd></div>
+                    <div><dt>Betalning</dt><dd>Inte öppen</dd></div>
+                </dl>
+                <a class="btn btn--quiet" href={`/rapporter/exempel/#${product === 'basic' ? 'basrapport' : 'ai-rapport'}`}>
+                    <Icon name="doc" /> Se exempel
+                </a>
+            </div>
+        </aside>
+    </div>
+</Page>
+
+<style>
+    .rpp {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 320px;
+        gap: 48px clamp(32px, 6vw, 96px);
+        align-items: start;
+    }
+    .rpp__main {
+        display: grid;
+        gap: 48px;
+    }
+    .rpp h2 {
+        font-size: var(--step-2);
+        margin-bottom: 16px;
+    }
+    .rpp__list {
+        margin: 0;
+        padding-left: 1.1em;
+        display: grid;
+        gap: 8px;
+        max-width: 66ch;
+        color: var(--ink-2);
+    }
+    .rpp__inc {
+        margin: 0;
+        border-top: 1px solid var(--ink);
+    }
+    .rpp__inc > div {
+        display: grid;
+        grid-template-columns: 16rem 1fr;
+        gap: 4px 24px;
+        padding: 14px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .rpp__inc dt {
+        font-weight: 600;
+    }
+    .rpp__inc dt .num {
+        color: var(--ochre-ink);
+        margin-right: 6px;
+    }
+    .rpp__inc dd {
+        margin: 0;
+        color: var(--ink-2);
+    }
+    .rpp__side {
+        position: sticky;
+        top: 88px;
+    }
+    .rpp__box {
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-top: 2px solid var(--ink);
+        padding: 18px 20px 20px;
+        display: grid;
+        gap: 10px;
+        justify-items: start;
+    }
+    .rpp__facts {
+        margin: 6px 0 8px;
+        width: 100%;
+    }
+    .rpp__facts > div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-top: 1px solid var(--rule);
+    }
+    .rpp__facts dt {
+        color: var(--ink-3);
+    }
+    .rpp__facts dd {
+        margin: 0;
+        text-align: right;
+    }
+    @media (max-width: 900px) {
+        .rpp {
+            grid-template-columns: 1fr;
+        }
+        .rpp__side {
+            position: static;
+            order: -1;
+        }
+        .rpp__inc > div {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

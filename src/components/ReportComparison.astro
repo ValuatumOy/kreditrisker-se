@@ -1,0 +1,105 @@
+---
+// Basic vs AI report comparison. Content is the planned Swedish scope; the
+// status row comes from the feature flags, so it can never claim availability
+// that is not switched on.
+import { staticReportState } from '../lib/reports/availability.ts'
+import { STATE_LABEL } from '../lib/reports/labels.ts'
+import { VERIFIED_PRICES } from '../config/site.ts'
+import Icon from './Icon.astro'
+
+interface Props {
+    no?: string
+}
+const { no = 'Tabell 3' } = Astro.props
+
+const basic = staticReportState('basic', null)
+const ai = staticReportState('ai', null)
+const price = (p: 'basic' | 'ai') => {
+    const v = VERIFIED_PRICES[p]
+    return v ? `${v.amountSek.toLocaleString('sv-SE')} kr ${v.vatIncluded ? 'inkl.' : 'exkl.'} moms` : 'Inte fastställt'
+}
+type Cell = boolean | string
+const rows: [string, Cell, Cell][] = [
+    ['Registeruppgifter och bokslut i flera år', true, true],
+    ['Nyckeltal med förklaringar', true, true],
+    ['Jämförelse med branschen', true, true],
+    ['Kreditbetyg och riskklass', 'När modellen validerats', 'När modellen validerats'],
+    ['Skriven analys av lönsamhet, soliditet och likviditet', 'Automatisk text', 'Fördjupad analys'],
+    ['Genomgång av offentliga källor på webben', false, true],
+    ['Leverans', 'PDF', 'PDF'],
+]
+---
+
+<figure class="fig rc">
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">Basrapport och AI-rapport <span class="fig__sub">– planerat innehåll</span></span></div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, jämförelse av rapporterna`}>
+        <table class="data">
+            <thead>
+                <tr>
+                    <th scope="col"><span class="visually-hidden">Innehåll</span></th>
+                    <th scope="col"><a href="/rapporter/bas/">Basrapport</a></th>
+                    <th scope="col"><a href="/rapporter/ai/">AI-rapport</a></th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    rows.map(([label, b, a]) => (
+                        <tr>
+                            <th scope="row">{label}</th>
+                            {[b, a].map((c) => (
+                                <td>
+                                    {c === true ? (
+                                        <span class="rc__yes"><Icon name="check" /><span class="visually-hidden">Ingår</span></span>
+                                    ) : c === false ? (
+                                        <span class="rc__no">Ingår inte</span>
+                                    ) : (
+                                        c
+                                    )}
+                                </td>
+                            ))}
+                        </tr>
+                    ))
+                }
+                <tr class="sum">
+                    <th scope="row">Pris</th>
+                    <td>{price('basic')}</td>
+                    <td>{price('ai')}</td>
+                </tr>
+                <tr class="sum">
+                    <th scope="row">Status</th>
+                    <td><span class="tag tag--warn">{STATE_LABEL[basic.kind]}</span></td>
+                    <td><span class="tag tag--warn">{STATE_LABEL[ai.kind]}</span></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <figcaption class="fig__src">
+        <b>Anm.</b> Innehållet är preliminärt och fastställs när rapporterna för svenska företag är färdigutvecklade och granskade. Inga betyg, prognoshorisonter eller priser från den finska tjänsten gäller för Sverige. <a href="/rapporter/">Mer om rapporterna</a>.
+    </figcaption>
+</figure>
+
+<style>
+    .rc td {
+        text-align: left !important;
+        white-space: normal !important;
+        min-width: 9rem;
+        width: 24%;
+    }
+    .rc thead th a {
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 1.15rem;
+        font-weight: 600;
+    }
+    .rc thead th {
+        text-align: left !important;
+    }
+    .rc__yes :global(svg) {
+        width: 20px;
+        height: 20px;
+        color: var(--blue);
+    }
+    .rc__no {
+        color: var(--ink-3);
+    }
+</style>

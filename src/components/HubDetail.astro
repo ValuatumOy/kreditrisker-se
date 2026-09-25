@@ -1,0 +1,99 @@
+---
+import Page from '../layouts/Page.astro'
+import HubStats from './HubStats.astro'
+import CompanyTable from './CompanyTable.astro'
+import Icon from './Icon.astro'
+import { MIN_HUB_COMPANIES, type Hub, type Site } from '../lib/publish.ts'
+import { kommunName } from '../lib/format.ts'
+
+interface Props {
+    hub: Hub
+    site: Site
+}
+const { hub, site } = Astro.props
+const isIndustry = hub.kind === 'bransch'
+const base = isIndustry ? '/branscher/' : '/kommuner/'
+const title = isIndustry ? `${hub.name} – företag och nyckeltal` : `Företag i ${kommunName(hub.name)}`
+const h1 = isIndustry ? hub.name : `Företag i ${kommunName(hub.name)}`
+const lede = isIndustry
+    ? `Företag med huvudbransch SNI ${hub.code}, ${hub.name.toLowerCase()}, med bokslut och nyckeltal från senaste räkenskapsåret.`
+    : `Företag med säte i ${kommunName(hub.name)}${hub.detail ? `, ${hub.detail}` : ''}, med bokslut och nyckeltal från senaste räkenskapsåret.`
+// Cross links: where companies in this industry sit, or which industries this municipality has.
+const cross = new Map<string, { href: string; label: string; n: number }>()
+for (const c of hub.companies) {
+    const other = isIndustry
+        ? c.record.municipality && site.municipalities.find((h) => h.code === c.record.municipality!.code)
+        : c.record.sni[0] && site.industries.find((h) => h.code === c.record.sni[0].code)
+    if (!other) continue
+    const href = `${isIndustry ? '/kommuner/' : '/branscher/'}${other.slug}/`
+    const e = cross.get(href) ?? { href, label: other.name, n: 0 }
+    e.n++
+    cross.set(href, e)
+}
+const crossList = [...cross.values()].sort((a, b) => b.n - a.n)
+---
+
+<Page
+    title={title}
+    h1={h1}
+    description={lede}
+    path={`${base}${hub.slug}/`}
+    lede={lede}
+    noindex={!hub.indexable}
+    crumbs={[{ href: base, label: isIndustry ? 'Branscher' : 'Kommuner' }, { label: hub.name }]}
+>
+    <div class="hd">
+        <HubStats companies={hub.companies} no="Tabell 1" title={isIndustry ? 'Branschen i siffror' : 'Kommunens företag i siffror'} />
+        {
+            !hub.substantial && (
+                <div class="notice" role="note">
+                    <Icon name="info" />
+                    <p>
+                        Färre än {MIN_HUB_COMPANIES} företag med tillräckliga uppgifter. Sidan visas för besökare men indexeras inte förrän underlaget är större.
+                    </p>
+                </div>
+            )
+        }
+        <CompanyTable
+            companies={hub.companies}
+            no="Tabell 2"
+            title={`Företag, sorterade efter nettoomsättning`}
+            source={`${site.synthetic ? 'Syntetiska testdata' : 'Bolagsverket'}, senaste inlämnade årsredovisning per företag. Äldre bokslut markeras i sista kolumnen.`}
+            show={isIndustry ? 'kommun' : 'bransch'}
+        />
+        {
+            crossList.length > 0 && (
+                <section>
+                    <h2>{isIndustry ? 'Kommuner i branschen' : 'Branscher i kommunen'}</h2>
+                    <ul class="hd__cross">
+                        {crossList.map((x) => (
+                            <li>
+                                <a href={x.href}>{x.label}</a> <span class="muted num">{x.n}</span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )
+        }
+    </div>
+</Page>
+
+<style>
+    .hd {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: clamp(40px, 5vw, 64px);
+    }
+    .hd h2 {
+        font-size: var(--step-2);
+        margin-bottom: 16px;
+    }
+    .hd__cross {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 24px;
+    }
+</style>

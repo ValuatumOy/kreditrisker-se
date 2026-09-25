@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-25T00:00:00Z",
+  "title": "Design System: Kreditrisker (SE)",
+  "extensions": {
+    "colorMeta": {
+      "paper": { "role": "neutral", "displayName": "Cool Paper", "canonical": "#f5f6f3", "tonalRamp": ["#1f2220", "#373b38", "#515652", "#6d726e", "#8b908c", "#b0b5b1", "#d6dad6", "#f5f6f3"] },
+      "sheet": { "role": "neutral", "displayName": "Sheet", "canonical": "#ffffff", "tonalRamp": ["#222222", "#3b3b3b", "#565656", "#737373", "#919191", "#b4b4b4", "#dadada", "#ffffff"] },
+      "ink": { "role": "neutral", "displayName": "Report Ink", "canonical": "#0f1e26", "tonalRamp": ["#0f1e26", "#1f323c", "#33444d", "#56656c", "#7b8990", "#a3aeb3", "#cbd3d6", "#eef2f3"] },
+      "rule": { "role": "neutral", "displayName": "Hairline", "canonical": "#d3d8d3", "tonalRamp": ["#262a26", "#3e433e", "#595e59", "#767c76", "#959b95", "#b9c0bb", "#d3d8d3", "#eef1ee"] },
+      "statsbla": { "role": "primary", "displayName": "Statsblå", "canonical": "#1d4f6e", "tonalRamp": ["#0b2231", "#133649", "#1d4f6e", "#35698a", "#5a88a6", "#8fb0c4", "#d6e3ea", "#eef4f7"] },
+      "ochre": { "role": "secondary", "displayName": "Report Ochre", "canonical": "#c58a1c", "tonalRamp": ["#3a2703", "#5b3d05", "#7d5308", "#a06d10", "#c58a1c", "#dcb160", "#f6ebd3", "#fbf6ea"] },
+      "red": { "role": "tertiary", "displayName": "Deficit Red", "canonical": "#9a2d24", "tonalRamp": ["#3a0f0b", "#5c1913", "#7c231b", "#9a2d24", "#b8564d", "#d3887f", "#f5e2de", "#fbf2f0"] },
+      "green": { "role": "tertiary", "displayName": "Registry Green", "canonical": "#2c6147", "tonalRamp": ["#0e2419", "#183a2a", "#224e38", "#2c6147", "#4d8066", "#7ea58f", "#c3d9cc", "#ecf4ef"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page h1 in Source Serif 4." },
+      "headline": { "displayName": "Headline", "purpose": "Section h2." },
+      "title": { "displayName": "Title", "purpose": "h3 and lede size." },
+      "figure-value": { "displayName": "Figure value", "purpose": "Serif headline numbers in key-figure cells." },
+      "body": { "displayName": "Body", "purpose": "Schibsted Grotesk running text and tables (lining numerals, never tabular)." },
+      "figure-title": { "displayName": "Figure title", "purpose": "Sans 600 figure heads beside the ochre-ink figure number." },
+      "label": { "displayName": "Label", "purpose": "Table heads, captions, Källa/Anm. source lines, crumbs." }
+    },
+    "shadows": [
+      { "name": "focus-halo", "value": "0 0 0 3px var(--blue-3)", "purpose": "Search inputs on focus." },
+      { "name": "dropdown", "value": "0 22px 40px -24px rgb(15 30 38 / 0.5)", "purpose": "Search suggestion list." },
+      { "name": "mobile-sheet", "value": "0 18px 30px -24px rgb(15 30 38 / 0.35)", "purpose": "Open mobile menu sheet." },
+      { "name": "segment-selected", "value": "0 1px 2px rgb(15 30 38 / 0.18)", "purpose": "Active segmented tab." },
+      { "name": "sticky-column", "value": "6px 0 8px -8px rgb(15 30 38 / 0.35)", "purpose": "Sticky first table column on mobile." }
+    ],
+    "motion": [
+      { "name": "ease-out", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "All state transitions (160ms) and bar growth (900ms, 70ms stagger); disabled under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "mobile-chart", "value": "560px" },
+      { "name": "key-figures-2col", "value": "640px" },
+      { "name": "sticky-table-col", "value": "720px" },
+      { "name": "section-head-stack", "value": "860px" },
+      { "name": "sidebar-stack", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Ink block, statsblå on hover. The default action.",
+      "html": "<button class=\"ds-btn\">Beställ rapport</button>",
+      "css": ".ds-btn { display:inline-flex; align-items:center; gap:10px; min-height:44px; padding:0 18px; border-radius:3px; border:1px solid #0f1e26; background:#0f1e26; color:#f5f6f3; font:500 0.95rem/1 'Schibsted Grotesk', system-ui, sans-serif; cursor:pointer; transition: background 160ms cubic-bezier(0.16,1,0.3,1), border-color 160ms cubic-bezier(0.16,1,0.3,1); } .ds-btn:hover { background:#1d4f6e; border-color:#1d4f6e; } .ds-btn:focus-visible { outline:2px solid #1d4f6e; outline-offset:2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Secondary action on paper.",
+      "html": "<button class=\"ds-btn-quiet\">Jämför rapporterna</button>",
+      "css": ".ds-btn-quiet { display:inline-flex; align-items:center; min-height:44px; padding:0 18px; border-radius:3px; border:1px solid #b9c0bb; background:transparent; color:#0f1e26; font:500 0.95rem/1 'Schibsted Grotesk', system-ui, sans-serif; cursor:pointer; transition: background 160ms, border-color 160ms; } .ds-btn-quiet:hover { background:#ffffff; border-color:#0f1e26; } .ds-btn-quiet:focus-visible { outline:2px solid #1d4f6e; outline-offset:2px; }"
+    },
+    {
+      "name": "Company Search",
+      "kind": "input",
+      "refersTo": "input-search",
+      "description": "Sheet field with ink border and inset ink submit.",
+      "html": "<div class=\"ds-sbox\"><input class=\"ds-sbox-in\" placeholder=\"Namn eller org.nr\"><button class=\"ds-sbox-go\">Sök →</button></div>",
+      "css": ".ds-sbox { display:flex; background:#fff; border:1px solid #0f1e26; border-radius:3px; transition: box-shadow 200ms cubic-bezier(0.16,1,0.3,1); } .ds-sbox:focus-within { box-shadow:0 0 0 3px #d6e3ea; } .ds-sbox-in { flex:1; min-width:0; border:0; background:transparent; height:60px; padding:0 16px; font:1.12rem 'Schibsted Grotesk', system-ui, sans-serif; color:#0f1e26; outline:none; } .ds-sbox-in::placeholder { color:#56656c; } .ds-sbox-go { margin:6px; padding:0 20px; border:0; border-radius:2px; background:#0f1e26; color:#f5f6f3; font:500 1rem 'Schibsted Grotesk', system-ui, sans-serif; cursor:pointer; } .ds-sbox-go:hover { background:#1d4f6e; }"
+    },
+    {
+      "name": "Status Tag",
+      "kind": "chip",
+      "refersTo": "tag",
+      "description": "Pill with status dot; warn variant for availability.",
+      "html": "<span class=\"ds-tag\">Aktivt</span> <span class=\"ds-tag ds-tag--warn\">Inte lanserad</span>",
+      "css": ".ds-tag { display:inline-flex; align-items:center; gap:6px; padding:2px 8px; border:1px solid #b9c0bb; border-radius:999px; font:0.8125rem/1.5 'Schibsted Grotesk', system-ui, sans-serif; color:#33444d; background:#fff; } .ds-tag::before { content:''; width:6px; height:6px; border-radius:50%; background:#2c6147; } .ds-tag--warn { background:#f6ebd3; color:#7d5308; border-color:#dcb160; } .ds-tag--warn::before { background:#c58a1c; }"
+    },
+    {
+      "name": "Numbered Figure",
+      "kind": "custom",
+      "refersTo": "panel",
+      "description": "Signature: 2px ink rule, ochre-ink number, sans title, Källa line.",
+      "html": "<figure class=\"ds-fig\"><div class=\"ds-fig-head\"><span class=\"ds-fig-no\">Tabell 1</span><span class=\"ds-fig-title\">Nyckeltal <span class=\"ds-fig-sub\">– räkenskapsåret 2025</span></span></div><div class=\"ds-fig-val\">2,3 Mkr</div><div class=\"ds-missing\">saknas</div><figcaption class=\"ds-fig-src\"><b>Källa:</b> Bolagsverket, bokslut 2025. Hämtat 1 sep 2026.</figcaption></figure>",
+      "css": ".ds-fig { margin:0; border-top:2px solid #0f1e26; padding-top:14px; font-family:'Schibsted Grotesk', system-ui, sans-serif; color:#0f1e26; } .ds-fig-head { display:flex; align-items:baseline; gap:14px; margin-bottom:18px; } .ds-fig-no { font-size:0.8125rem; font-weight:600; color:#7d5308; } .ds-fig-title { font-size:1rem; font-weight:600; } .ds-fig-sub { color:#56656c; font-weight:400; } .ds-fig-val { font-family:'Source Serif 4', Georgia, serif; font-size:1.85rem; letter-spacing:-0.02em; } .ds-missing { color:#56656c; font-style:italic; text-decoration:underline dotted #b9c0bb; text-underline-offset:0.25em; } .ds-fig-src { margin-top:14px; padding-top:10px; border-top:1px solid #d3d8d3; font-size:0.8125rem; color:#56656c; } .ds-fig-src b { color:#33444d; }"
+    },
+    {
+      "name": "Notice",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Sheet note with a 2px ochre top rule.",
+      "html": "<div class=\"ds-notice\"><strong>Under utveckling.</strong> Rapporten kan inte beställas ännu.</div>",
+      "css": ".ds-notice { padding:16px 18px; background:#fff; border:1px solid #d3d8d3; border-top:2px solid #c58a1c; border-radius:0 0 3px 3px; font:0.95rem/1.55 'Schibsted Grotesk', system-ui, sans-serif; color:#0f1e26; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": "nav",
+      "description": "Serif wordmark, ink-2 links, 2px ochre underline on current page.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav-name\">Kreditrisker</span><a href=\"#\">Branscher</a><a href=\"#\" aria-current=\"page\">Rapporter</a></nav>",
+      "css": ".ds-nav { display:flex; align-items:center; gap:22px; min-height:64px; padding:0 16px; background:#f5f6f3; border-bottom:1px solid #d3d8d3; font-family:'Schibsted Grotesk', system-ui, sans-serif; } .ds-nav-name { font-family:'Source Serif 4', Georgia, serif; font-size:1.45rem; font-weight:600; letter-spacing:-0.02em; color:#0f1e26; margin-right:auto; } .ds-nav a { color:#33444d; text-decoration:none; font-size:0.94rem; padding-block:21px; border-bottom:2px solid transparent; } .ds-nav a:hover { color:#0f1e26; } .ds-nav a[aria-current='page'] { color:#0f1e26; border-bottom-color:#c58a1c; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Stability Report",
+    "overview": "Company facts are presented the way a Riksbank or Finansinspektionen stability report presents the economy: cool white paper, ink-blue text, a hairline grid, and numbered exhibits. Every number lives inside a figure that has a number (\"Tabell 1\", \"Diagram 1\"), a sans title with a grey subtitle, and a closing \"Källa:\" or \"Anm.\" line naming source, period and retrieval date. Nothing floats free.\n\nThe mood is calm, sourced and unhurried. Density is report-like: generous section padding, tight tables. Gaps in the data are shown, never hidden; ochre is the colour of \"look here\": figure numbers, missing years, provisional notices. The system rejects the navy fintech dashboard with gauges and the cream editorial magazine.",
+    "keyCharacteristics": [
+      "Numbered figures with a 2px ink top rule and a hairline-separated source line.",
+      "Serif headlines and headline numbers; grotesk for body, labels and table data.",
+      "Flat paper, 1px hairlines, almost no shadow.",
+      "Honest value states: negative, missing and incomparable each look different from zero.",
+      "One ochre accent, used for signalling, never for decoration."
+    ],
+    "rules": [
+      { "name": "The Ochre Means Attention Rule", "body": "Ochre marks figure numbers, gaps, provisional states and current position. It is never a fill for decoration or a brand splash.", "section": "colors" },
+      { "name": "The Missing Is Not Zero Rule", "body": "A missing or incomparable value is never rendered as 0 or a dash; it gets its own visual state (see Components: Values).", "section": "colors" },
+      { "name": "The Lining, Not Tabular Rule", "body": "Numerals use `lining-nums` only. Tabular figures were removed on purpose: Schibsted's `tnum` widens the Swedish decimal comma. Right-aligned table columns carry the alignment instead.", "section": "typography" },
+      { "name": "The No Eyebrow Rule", "body": "No uppercase kickers or tracked labels above headings. The figure number is the only label a heading gets.", "section": "typography" },
+      { "name": "The Rule Before Shadow Rule", "body": "If a surface needs separation, give it a hairline or a 2px ink top rule. Reach for shadow only when it overlaps content.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** wrap every number block in a numbered figure with a \"Källa:\" or \"Anm.\" line naming source, period and retrieval date.",
+      "**Do** render missing data as \"saknas\" / \"ej jämförbar\" in the missing-value style and missing years as hatched ochre-dashed slots.",
+      "**Do** use a true minus (U+2212) and Deficit Red for negative values.",
+      "**Do** keep figures and panels square with a 2px ink top rule; keep controls at 3px.",
+      "**Do** use ochre-ink, not ochre, for any ochre text."
+    ],
+    "donts": [
+      "**Don't** use `tabular-nums`; Schibsted's tabular figures widen the decimal comma.",
+      "**Don't** add eyebrow or kicker labels above headings.",
+      "**Don't** build dashboards with gauges, dials, navy fills or glowing KPI cards.",
+      "**Don't** drift toward a cream editorial magazine: paper stays cool (#f5f6f3), never warm.",
+      "**Don't** show a missing value as 0, a dash or an empty cell.",
+      "**Don't** use shadows for resting surfaces."
+    ]
+  }
+}

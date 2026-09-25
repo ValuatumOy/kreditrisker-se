@@ -1,0 +1,470 @@
+---
+// Company profile. The orgnr is authoritative; the slug follows the current
+// name. Former slugs (name changes) render redirect pages to the canonical URL.
+import Base from '../../../../layouts/Base.astro'
+import Crumbs from '../../../../components/Crumbs.astro'
+import RedirectPage from '../../../../components/RedirectPage.astro'
+import KeyFigures from '../../../../components/KeyFigures.astro'
+import BarChart from '../../../../components/BarChart.astro'
+import FinancialTable from '../../../../components/FinancialTable.astro'
+import ReportPanel from '../../../../components/ReportPanel.astro'
+import ModelSection from '../../../../components/ModelSection.astro'
+import Icon from '../../../../components/Icon.astro'
+import { getSite } from '../../../../lib/store.ts'
+import { relatedCompanies, type Site } from '../../../../lib/publish.ts'
+import type { FiscalPeriod, PublishedCompany, Value } from '../../../../lib/contract/types.ts'
+import { SITE } from '../../../../config/site.ts'
+import { formatOrgnr } from '../../../../lib/orgnr.ts'
+import { date, FRESHNESS_TEXT, kommunName, LEGAL_FORM_TEXT, periodLabel, SOURCE_TEXT, STATUS_TEXT } from '../../../../lib/format.ts'
+import { summarize } from '../../../../lib/summary.ts'
+import { companyJsonLd, crumbsJsonLd } from '../../../../lib/seo.ts'
+
+export function getStaticPaths() {
+    const site = getSite()
+    const only = process.env.SE_BUILD_ONLY ? new Set(process.env.SE_BUILD_ONLY.split(',')) : null
+    const pages = site.companies.filter((c) => !only || only.has(c.record.orgnr))
+    return pages.flatMap((c) => [
+        { params: { orgnr: c.record.orgnr, slug: c.slug }, props: { orgnr: c.record.orgnr, redirectTo: null } },
+        ...c.redirectsFrom.map((from) => ({ params: { orgnr: c.record.orgnr, slug: from.split('/')[3] }, props: { orgnr: c.record.orgnr, redirectTo: c.path } })),
+    ])
+}
+
+const { orgnr, redirectTo } = Astro.props as { orgnr: string; redirectTo: string | null }
+const site: Site = getSite()
+const c = site.byOrgnr.get(orgnr) as PublishedCompany
+const r = c.record
+const [latest] = r.periods
+// Chart series: newest five periods, plus explicit "saknas" slots for calendar
+// years that should have been filed by now but are not in the source.
+const expectedLastYear = Number(SITE.asOf.slice(0, 4)) - (Number(SITE.asOf.slice(5, 7)) >= 8 ? 1 : 2)
+const calendarYears = r.periods.every((p) => p.months === 12 && p.end.endsWith('-12-31'))
+const missingYears: { label: string; value: Value }[] = []
+if (calendarYears && latest) for (let y = Number(latest.end.slice(0, 4)) + 1; y <= expectedLastYear; y++) missingYears.push({ label: String(y), value: { status: 'missing', reason: 'not_filed' } })
+const series = (get: (p: FiscalPeriod) => Value) => [...[...r.periods].reverse().map((p) => ({ label: periodLabel(p), value: get(p) })), ...missingYears].slice(-5)
+const years = [...r.periods].slice(0, 5).reverse()
+const hasGap = (pts: { value: Value }[]) => pts.some((x) => x.value.status !== 'reported')
+const salesSeries = series((p) => p.income.netSales)
+const ebitSeries = series((p) => p.income.operatingProfit)
+const sni = r.sni[0]
+const industryHub = sni && site.industries.find((h) => h.code === sni.code)
+const kommunHub = r.municipality && site.municipalities.find((h) => h.code === r.municipality!.code)
+const related = relatedCompanies(site, c)
+const summary = summarize(c)
+const fresh = FRESHNESS_TEXT[c.freshness]
+const statusTone = r.status.code === 'active' ? 'tag--ok' : r.status.code === 'unknown' ? '' : 'tag--alert'
+const crumbs = [
+    ...(industryHub ? [{ href: '/branscher/', label: 'Branscher' }, { href: `/branscher/${industryHub.slug}/`, label: industryHub.name }] : []),
+    { label: r.name },
+]
+// One line per source, listing its documents and the latest retrieval date.
+const sources = [...[r.status.source, ...r.periods.map((p) => p.source), ...(r.provenance.sources ?? [])]
+    .reduce((m, s) => {
+        const e = m.get(s.source) ?? { source: s.source, docs: [] as string[], retrievedAt: s.retrievedAt }
+        if (s.documentId && !e.docs.includes(s.documentId)) e.docs.push(s.documentId)
+        if (s.retrievedAt > e.retrievedAt) e.retrievedAt = s.retrievedAt
+        return m.set(s.source, e)
+    }, new Map<string, { source: string; docs: string[]; retrievedAt: string }>())
+    .values()]
+const figCount: Record<string, number> = {}
+const nextFig = (kind = 'Diagram') => `${kind} ${(figCount[kind] = (figCount[kind] ?? 0) + 1)}`
+const title = `${r.name} (${formatOrgnr(r.orgnr)})`
+const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
+---
+
+{
+    redirectTo ? (
+        <RedirectPage to={redirectTo} />
+    ) : (
+        <Base
+            title={`${title} – bokslut och nyckeltal`}
+            description={desc}
+            path={c.path}
+            noindex={!c.quality.indexable}
+            synthetic={r.synthetic}
+            jsonLd={c.quality.indexable ? [companyJsonLd(c), crumbsJsonLd(crumbs)] : []}
+        >
+            <Crumbs items={crumbs} />
+            <div class="shell co">
+                <header class="co__head">
+                    <h1>{r.name}</h1>
+                    <div class="co__ids">
+                        <button class="co__orgnr num" type="button" data-copy={formatOrgnr(r.orgnr)} aria-label={`Kopiera organisationsnummer ${formatOrgnr(r.orgnr)}`}>
+                            <span>Org.nr {formatOrgnr(r.orgnr)}</span>
+                            <Icon name="copy" />
+                        </button>
+                        {[LEGAL_FORM_TEXT[r.legalForm], r.municipality && kommunName(r.municipality.name), sni && `SNI ${sni.code}`]
+                            .filter(Boolean)
+                            .map((t) => <span class="co__id">{t}</span>)}
+                    </div>
+                    <div class="co__tags">
+                        <span class:list={['tag', statusTone]}>
+                            {STATUS_TEXT[r.status.code]}
+                            {r.status.since && ` sedan ${date(r.status.since)}`}
+                        </span>
+                        <span class:list={['tag', c.freshness === 'current' ? 'tag--ok' : 'tag--warn']} title={fresh.note}>
+                            {fresh.label}
+                            {latest && `: ${c.freshness === 'current' ? '' : 'senaste '}bokslut ${periodLabel(latest)}`}
+                        </span>
+                        {r.formerNames[0] && <span class="tag tag--plain">Tidigare {r.formerNames[0].name}</span>}
+                    </div>
+                </header>
+
+                <section class="co__lead" aria-labelledby="sammanfattning">
+                    <h2 id="sammanfattning" class="visually-hidden">Sammanfattning</h2>
+                    <div class="co__summary">
+                        <p>{summary[0]}</p>
+                        {latest && summary.length > 1 && <p>{summary.slice(1).join(' ')}</p>}
+                    </div>
+                    {latest ? (
+                        <figure class="fig co__kf">
+                            <div class="fig__head">
+                                <span class="fig__no">{nextFig('Tabell')}</span>
+                                <span class="fig__title">
+                                    Nyckeltal <span class="fig__sub">– räkenskapsåret {periodLabel(latest)}{latest.months !== 12 && ` (${latest.months} månader)`}</span>
+                                </span>
+                            </div>
+                            <KeyFigures periods={r.periods} />
+                            <figcaption class="fig__src">
+                                <b>Källa:</b> {SOURCE_TEXT[latest.source.source]}, bokslut {date(latest.start)}–{date(latest.end)}
+                                {latest.filedAt && `, registrerat ${date(latest.filedAt)}`}. Hämtat {date(latest.source.retrievedAt)}.
+                            </figcaption>
+                        </figure>
+                    ) : (
+                        <div class="co__empty">
+                            <h3>Inget bokslut ännu</h3>
+                            <p>
+                                {r.registeredAt ? `Företaget registrerades ${date(r.registeredAt)} och ` : 'Företaget '}har inte lämnat någon årsredovisning som finns i källan. Profilen
+                                visar registeruppgifter tills det första bokslutet registreras.
+                            </p>
+                        </div>
+                    )}
+                </section>
+
+                <div class="co__rail">
+                    <ReportPanel company={c} />
+                    <p class="co__fix small">
+                        Ser något fel ut? <a href="/om/#rattelse">Begär rättelse</a>
+                    </p>
+                </div>
+
+                <div class="co__main">
+                    {salesSeries.length > 1 && (
+                        <section class="co__sec" aria-labelledby="utveckling">
+                            <h2 id="utveckling">Utveckling</h2>
+                            <div class="co__charts">
+                                <figure class="fig">
+                                    <div class="fig__head">
+                                        <span class="fig__no">{nextFig()}</span>
+                                        <span class="fig__title">Nettoomsättning <span class="fig__sub">– kronor per räkenskapsår, senaste fem åren</span></span>
+                                    </div>
+                                    <BarChart title={`Nettoomsättning, ${r.name}`} points={salesSeries} />
+                                </figure>
+                                <figure class="fig">
+                                    <div class="fig__head">
+                                        <span class="fig__no">{nextFig()}</span>
+                                        <span class="fig__title">Rörelseresultat <span class="fig__sub">– kronor per räkenskapsår, senaste fem åren</span></span>
+                                    </div>
+                                    <BarChart title={`Rörelseresultat, ${r.name}`} points={ebitSeries} />
+                                </figure>
+                            </div>
+                            <p class="fig__src">
+                                <b>Källa:</b> {SOURCE_TEXT[latest.source.source]}. Belopp avrundade till tkr eller Mkr; räkenskapsår {calendarYears ? 'jan–dec' : 'enligt tabellhuvudet i Tabell 2'}.
+                                {(hasGap(salesSeries) || hasGap(ebitSeries)) && ' Streckade fält: uppgiften saknas för året' + (missingYears.length ? ', inget bokslut har lämnats in' : '') + '.'}
+                            </p>
+                        </section>
+                    )}
+
+                    {latest && (
+                        <section class="co__sec" aria-labelledby="bokslut">
+                            <h2 id="bokslut">Bokslut</h2>
+                            <FinancialTable periods={r.periods} no={nextFig('Tabell')} />
+                        </section>
+                    )}
+
+                    <section class="co__sec" aria-labelledby="risk">
+                        <h2 id="risk">Kreditrisk</h2>
+                        <ModelSection company={c} no={nextFig()} />
+                    </section>
+
+                    <section class="co__sec" aria-labelledby="om">
+                        <h2 id="om">Om företaget</h2>
+                        <dl class="co__facts">
+                            <div><dt>Organisationsnummer</dt><dd class="num">{formatOrgnr(r.orgnr)}</dd></div>
+                            <div><dt>Företagsform</dt><dd>{LEGAL_FORM_TEXT[r.legalForm]}</dd></div>
+                            <div><dt>Status</dt><dd>{STATUS_TEXT[r.status.code]}{r.status.since && `, sedan ${date(r.status.since)}`}</dd></div>
+                            {r.registeredAt && <div><dt>Registrerat</dt><dd>{date(r.registeredAt)}</dd></div>}
+                            {r.municipality && (
+                                <div>
+                                    <dt>Säte</dt>
+                                    <dd>
+                                        {kommunHub ? <a href={`/kommuner/${kommunHub.slug}/`}>{kommunName(r.municipality.name)}</a> : kommunName(r.municipality.name)}
+                                        {r.municipality.county && `, ${r.municipality.county}`}
+                                    </dd>
+                                </div>
+                            )}
+                            {r.sni.length > 0 && (
+                                <div>
+                                    <dt>Bransch</dt>
+                                    <dd>
+                                        {r.sni.map((s, i) => {
+                                            const h = site.industries.find((x) => x.code === s.code)
+                                            return (
+                                                <span class="co__sni">
+                                                    {h ? <a href={`/branscher/${h.slug}/`}>{s.label}</a> : s.label} <span class="muted num">({s.version.replace('SNI', 'SNI ')} {s.code}{i === 0 && r.sni.length > 1 ? ', huvudbransch' : ''})</span>
+                                                </span>
+                                            )
+                                        })}
+                                    </dd>
+                                </div>
+                            )}
+                            {r.businessDescription && <div class="co__wide"><dt>Verksamhet enligt registrering</dt><dd>{r.businessDescription.value}</dd></div>}
+                            {r.formerNames.length > 0 && (
+                                <div class="co__wide">
+                                    <dt>Tidigare namn</dt>
+                                    <dd>{r.formerNames.map((f) => `${f.name}${f.until ? ` (till ${date(f.until)})` : ''}`).join(', ')}</dd>
+                                </div>
+                            )}
+                        </dl>
+                    </section>
+
+                    <section class="co__sec" aria-labelledby="kallor">
+                        <h2 id="kallor">Källor</h2>
+                        <ul class="co__sources small">
+                            {sources.map((s) => (
+                                <li>
+                                    {SOURCE_TEXT[s.source]}
+                                    {s.docs.length > 0 && <span class="muted num"> · dokument {s.docs.join(', ')}</span>}
+                                    <span class="muted"> · hämtat {date(s.retrievedAt)}</span>
+                                </li>
+                            ))}
+                        </ul>
+                        <p class="small muted">
+                            Profilen publicerades från dataleverans {r.provenance.batchId}. {c.quality.indexable ? '' : 'Profilen visas inte i sökmotorer: ' + c.quality.reasons.join(', ') + '.'}
+                        </p>
+                    </section>
+
+                    {related.length > 0 && (
+                        <section class="co__sec" aria-labelledby="liknande">
+                            <h2 id="liknande">Liknande företag</h2>
+                            <ul class="co__related">
+                                {related.map((x) => (
+                                    <li>
+                                        <a href={x.path}>{x.record.name}</a>
+                                        <span class="small muted">
+                                            {x.record.municipality?.name}
+                                            {x.record.sni[0] && ` · ${x.record.sni[0].label}`}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <p class="small">
+                                {industryHub && <a href={`/branscher/${industryHub.slug}/`}>Fler inom {industryHub.name.toLowerCase()}</a>}
+                                {industryHub && kommunHub && ' · '}
+                                {kommunHub && <a href={`/kommuner/${kommunHub.slug}/`}>Fler i {kommunHub.name}</a>}
+                            </p>
+                        </section>
+                    )}
+                </div>
+            </div>
+        </Base>
+    )
+}
+
+<script>
+    for (const b of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+        b.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(b.dataset.copy!)
+                b.classList.add('is-copied')
+                b.setAttribute('aria-label', 'Kopierat')
+                setTimeout(() => b.classList.remove('is-copied'), 1600)
+            } catch {}
+        })
+    }
+</script>
+
+<style>
+    .co {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 360px;
+        grid-template-areas:
+            'head head'
+            'lead rail'
+            'main rail';
+        column-gap: clamp(32px, 5vw, 72px);
+        align-items: start;
+    }
+    .co__head {
+        grid-area: head;
+        padding-block: 20px 36px;
+    }
+    .co__head h1 {
+        font-size: clamp(2.2rem, 1.3rem + 3.4vw, 3.9rem);
+        max-width: 22ch;
+    }
+    .co__ids {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 6px 12px;
+        margin-top: 16px;
+        color: var(--ink-2);
+    }
+    .co__ids > :not(:last-child)::after {
+        content: '·';
+        margin-left: 12px;
+        color: var(--ink-3);
+    }
+    .co__orgnr {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px;
+        margin-left: -8px;
+        border: 1px solid transparent;
+        border-radius: var(--radius);
+        background: none;
+        font: inherit;
+        font-weight: 600;
+        color: var(--ink);
+        cursor: pointer;
+    }
+    .co__orgnr:hover {
+        border-color: var(--rule-2);
+        background: var(--sheet);
+    }
+    .co__orgnr :global(svg) {
+        width: 15px;
+        height: 15px;
+        color: var(--ink-3);
+    }
+    .co__orgnr.is-copied :global(svg) {
+        color: var(--green);
+    }
+    .co__tags {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 16px;
+    }
+    .co__lead {
+        grid-area: lead;
+        display: grid;
+        gap: 28px;
+    }
+    .co__summary {
+        display: grid;
+        gap: 8px;
+        font-size: var(--step-1);
+        line-height: 1.5;
+        color: var(--ink-2);
+        max-width: 64ch;
+    }
+    .co__summary p:first-child {
+        color: var(--ink);
+    }
+    .co__empty {
+        padding: 22px;
+        background: var(--sheet);
+        border: 1px dashed var(--rule-2);
+    }
+    .co__empty p {
+        color: var(--ink-2);
+        margin-top: 6px;
+        max-width: 60ch;
+    }
+    .co__rail {
+        grid-area: rail;
+        position: sticky;
+        top: 88px;
+    }
+    .co__fix {
+        margin-top: 12px;
+        color: var(--ink-3);
+    }
+    .co__main {
+        grid-area: main;
+        min-width: 0;
+    }
+    .co__sec {
+        padding-top: clamp(48px, 6vw, 72px);
+    }
+    .co__sec > h2 {
+        font-size: var(--step-2);
+        margin-bottom: 20px;
+    }
+    .co__charts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+    .co__facts {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        margin: 0;
+        border-top: 1px solid var(--ink);
+    }
+    .co__facts > div {
+        padding: 12px 16px 12px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .co__facts dt {
+        font-size: var(--step--1);
+        color: var(--ink-3);
+    }
+    .co__facts dd {
+        margin: 2px 0 0;
+    }
+    .co__wide {
+        grid-column: 1 / -1;
+    }
+    .co__sni {
+        display: block;
+    }
+    .co__sources {
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 0;
+        border-top: 1px solid var(--ink);
+    }
+    .co__sources li {
+        padding: 10px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .co__related {
+        list-style: none;
+        margin: 0 0 14px;
+        padding: 0;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        border-top: 1px solid var(--ink);
+    }
+    .co__related li {
+        display: grid;
+        padding: 12px 16px 12px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .co__related a {
+        font-weight: 600;
+    }
+    @media (max-width: 1080px) {
+        .co {
+            grid-template-columns: minmax(0, 1fr);
+            grid-template-areas: 'head' 'lead' 'rail' 'main';
+        }
+        .co__rail {
+            position: static;
+            margin-top: 36px;
+        }
+    }
+    @media (max-width: 720px) {
+        .co__charts,
+        .co__facts,
+        .co__related {
+            grid-template-columns: 1fr;
+        }
+        .co__summary {
+            font-size: 1.08rem;
+        }
+    }
+</style>

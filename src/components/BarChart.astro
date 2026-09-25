@@ -1,0 +1,149 @@
+---
+// Server-rendered SVG bar chart for one series across fiscal years.
+// Missing and incomparable years are drawn as hatched gaps with a label,
+// never as zero-height bars. Zero is a hairline with "0".
+import type { Value } from '../lib/contract/types.ts'
+import { compactSek } from '../lib/format.ts'
+
+interface Props {
+    points: { label: string; value: Value }[] // oldest first
+    title: string
+    height?: number
+    highlightLast?: boolean
+}
+const { points, title, height = 190, highlightLast = true } = Astro.props
+const uid = `h${Math.abs([...title].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7))}`
+const W = 560
+const top = 26
+const hasNeg = points.some((p) => (p.value.status === 'reported' || p.value.status === 'derived') && p.value.value < 0)
+const bottom = hasNeg ? 50 : 30
+const plotH = height - top - bottom
+const nums = points.map((p) => (p.value.status === 'reported' || p.value.status === 'derived' ? p.value.value : null))
+const present = nums.filter((n): n is number => n !== null)
+const max = Math.max(0, ...present)
+const min = Math.min(0, ...present)
+const span = max - min || 1
+const y = (v: number) => top + ((max - v) / span) * plotH
+const zeroY = y(0)
+const band = W / Math.max(points.length, 1)
+const barW = Math.min(64, band * 0.56)
+const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).join(', ')
+---
+
+<svg class="bars" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`${title}. ${summary}`}>
+    <defs>
+        <pattern id={uid} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="6" stroke="var(--rule-2)" stroke-width="1.2"></line>
+        </pattern>
+    </defs>
+    <line x1="0" x2={W} y1={zeroY} y2={zeroY} class="bars__base"></line>
+    {
+        points.map((p, i) => {
+            const cx = band * i + band / 2
+            const n = nums[i]
+            const d = compactSek(p.value)
+            const last = highlightLast && i === points.length - 1
+            if (n === null)
+                return (
+                    <g class="bars__gap">
+                        <rect x={cx - barW / 2} y={top} width={barW} height={plotH} fill={`url(#${uid})`} />
+                        <text x={cx} y={top + plotH / 2} text-anchor="middle" dominant-baseline="middle" class="bars__gaplabel">
+                            {d.text}
+                        </text>
+                        <text x={cx} y={height - 8} text-anchor="middle" class="bars__x">
+                            {p.label}
+                        </text>
+                    </g>
+                )
+            const yv = y(n)
+            const h = Math.abs(zeroY - yv)
+            return (
+                <g class:list={['bars__bar', { 'is-neg': n < 0, 'is-last': last }]} style={`--i:${i}`}>
+                    {n === 0 ? (
+                        <line x1={cx - barW / 2} x2={cx + barW / 2} y1={zeroY} y2={zeroY} class="bars__zero" />
+                    ) : (
+                        <rect x={cx - barW / 2} y={Math.min(yv, zeroY)} width={barW} height={Math.max(h, 1)} />
+                    )}
+                    <text x={cx} y={n < 0 ? zeroY + h + 15 : yv - 8} text-anchor="middle" class="bars__v">
+                        {d.text}
+                    </text>
+                    <text x={cx} y={height - 8} text-anchor="middle" class="bars__x">
+                        {p.label}
+                    </text>
+                </g>
+            )
+        })
+    }
+</svg>
+
+<style>
+    .bars {
+        width: 100%;
+        height: auto;
+        overflow: visible;
+        font-family: var(--sans);
+        font-variant-numeric: lining-nums;
+    }
+    .bars__base {
+        stroke: var(--ink);
+        stroke-width: 1;
+    }
+    .bars__bar rect {
+        fill: var(--blue-2);
+        transform-box: fill-box;
+        transform-origin: bottom;
+    }
+    .bars__bar.is-last rect {
+        fill: var(--blue);
+    }
+    .bars__bar.is-neg rect {
+        fill: var(--red);
+        opacity: 0.85;
+        transform-origin: top;
+    }
+    .bars__zero {
+        stroke: var(--ink);
+        stroke-width: 3;
+    }
+    .bars__v {
+        font-size: 14px;
+        fill: var(--ink-2);
+    }
+    .is-last .bars__v {
+        fill: var(--ink);
+        font-weight: 600;
+    }
+    .bars__x {
+        font-size: 14px;
+        fill: var(--ink-3);
+    }
+    .bars__gaplabel {
+        font-size: 12.5px;
+        font-style: italic;
+        fill: var(--ink-3);
+    }
+    .bars__gap rect {
+        stroke: var(--ochre);
+        stroke-dasharray: 4 3;
+    }
+    @media (max-width: 560px) {
+        .bars__v,
+        .bars__x {
+            font-size: 19px;
+        }
+        .bars__gaplabel {
+            font-size: 17px;
+        }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+        .bars__bar rect {
+            animation: grow 900ms var(--ease-out) both;
+            animation-delay: calc(var(--i) * 70ms);
+        }
+    }
+    @keyframes grow {
+        from {
+            transform: scaleY(0);
+        }
+    }
+</style>

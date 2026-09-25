@@ -1,0 +1,117 @@
+---
+import { FLAGS, SITE } from '../config/site.ts'
+const year = SITE.asOf.slice(0, 4)
+---
+
+<footer class="foot">
+    <div class="shell foot__grid">
+        <div class="foot__brand">
+            <p class="foot__name">{SITE.name}</p>
+            <p class="small muted">
+                Företagsinformation och kreditriskrapporter för svenska företag. Tjänsten tillhandahålls av {SITE.provider.name}, {SITE.provider.country}.
+            </p>
+        </div>
+        <nav aria-label="Utforska" class="foot__col">
+            <h2>Utforska</h2>
+            <ul>
+                <li><a href="/sok/">Sök företag</a></li>
+                <li><a href="/branscher/">Branscher</a></li>
+                <li><a href="/kommuner/">Kommuner</a></li>
+                <li><a href="/topplistor/">Topplistor</a></li>
+                <li><a href="/guider/">Guider</a></li>
+            </ul>
+        </nav>
+        <nav aria-label="Rapporter" class="foot__col">
+            <h2>Rapporter</h2>
+            <ul>
+                <li><a href="/rapporter/">Bas och AI jämförda</a></li>
+                <li><a href="/rapporter/exempel/">Exempelrapporter</a></li>
+                <li><a href="/metod/">Metod</a></li>
+                <li><a href="/kallor/">Datakällor</a></li>
+                <li><a href="/fragor/">Vanliga frågor</a></li>
+            </ul>
+        </nav>
+        <nav aria-label="Om tjänsten" class="foot__col">
+            <h2>Om tjänsten</h2>
+            <ul>
+                <li><a href="/om/">Leverantör och kontakt</a></li>
+                <li><a href="/integritet/">Integritetspolicy</a></li>
+                <li><a href="/villkor/">Användarvillkor</a></li>
+                <li><a href="/leverans/">Leverans och ångerrätt</a></li>
+            </ul>
+        </nav>
+    </div>
+    <div class="shell foot__base small">
+        <span>© {year} {SITE.provider.name} (FO-nummer {SITE.provider.businessId})</span>
+        {!FLAGS.checkout && <span>Tjänsten är under uppbyggnad. Inga rapporter om svenska företag säljs ännu.</span>}
+    </div>
+</footer>
+
+<style>
+    .foot {
+        margin-top: clamp(48px, 6vw, 80px);
+        background: var(--ink);
+        color: #d7dfe2;
+        padding-top: 56px;
+    }
+    .foot__grid {
+        display: grid;
+        grid-template-columns: 2fr repeat(3, 1fr);
+        gap: 40px 24px;
+        padding-bottom: 48px;
+    }
+    .foot__name {
+        font-family: var(--serif);
+        font-size: 1.6rem;
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 10px;
+    }
+    .foot__brand .muted {
+        color: #a9b6bc;
+        max-width: 38ch;
+    }
+    .foot h2 {
+        font-family: var(--sans);
+        font-size: var(--step--1);
+        font-weight: 600;
+        color: #fff;
+        margin-bottom: 12px;
+    }
+    .foot ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+    }
+    .foot a {
+        color: #d7dfe2;
+        text-decoration: none;
+        font-size: 0.95rem;
+    }
+    .foot a:hover {
+        color: #fff;
+        text-decoration: underline;
+    }
+    .foot__base {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 8px 24px;
+        border-top: 1px solid #2b3c45;
+        padding-block: 20px 28px;
+        color: #a9b6bc;
+    }
+    .foot :focus-visible {
+        outline-color: #fff;
+    }
+    @media (max-width: 860px) {
+        .foot__grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .foot__brand {
+            grid-column: 1 / -1;
+        }
+    }
+</style>

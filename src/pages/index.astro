@@ -1,0 +1,254 @@
+---
+import Base from '../layouts/Base.astro'
+import SearchBox from '../components/SearchBox.astro'
+import HeroPreview from '../components/HeroPreview.astro'
+import Val from '../components/Val.astro'
+import Icon from '../components/Icon.astro'
+import ReportComparison from '../components/ReportComparison.astro'
+import { getDemoSite, getSite } from '../lib/store.ts'
+import { SITE } from '../config/site.ts'
+import { compactSek, percent } from '../lib/format.ts'
+import type { Value } from '../lib/contract/types.ts'
+import { GUIDES } from '../content/guides.ts'
+
+const site = getSite()
+const demo = getDemoSite()
+const pick = (prefix: string) => demo.companies.find((c) => c.record.name.startsWith(prefix))!
+const samples = [
+    { key: 'full', tab: 'Fullständiga', note: 'Fem bokslut, alla poster finns. Nyckeltalen räknas med formlerna på metodsidan.', company: pick('Exempel Mjukvara') },
+    { key: 'sparse', tab: 'Glesa', note: 'Förkortat bokslut: bara omsättning finns. Övriga poster visas som saknas, inte som noll.', company: pick('Exempel Fastigheter') },
+    { key: 'stale', tab: 'Inaktuella', note: 'Senaste bokslutet avser 2022. Profilen säger det rakt ut och indexeras inte.', company: pick('Exempel Metall') },
+]
+
+const src = { source: 'synthetic', retrievedAt: '2026-09-01' } as const
+const states: { label: string; value: Value; fmt: 'sek' | 'pct'; means: string }[] = [
+    { label: 'Rapporterat belopp', value: { status: 'reported', value: 30_200_000, source: src }, fmt: 'sek', means: 'Står i årsredovisningen. Källa och räkenskapsår anges vid varje tabell.' },
+    { label: 'Noll', value: { status: 'reported', value: 0, source: src }, fmt: 'sek', means: 'Bolaget har redovisat exakt noll, till exempel ingen omsättning i ett holdingbolag.' },
+    { label: 'Negativt', value: { status: 'reported', value: -412_000, source: src }, fmt: 'sek', means: 'Förlust eller negativt eget kapital. Visas med minustecken och i rött.' },
+    { label: 'Saknas', value: { status: 'missing', reason: 'not_in_source' }, fmt: 'sek', means: 'Posten finns inte i källan. Vi skriver aldrig 0 i stället.' },
+    { label: 'Ej jämförbar', value: { status: 'incomparable', reason: 'period_length' }, fmt: 'pct', means: 'Till exempel tillväxt när räkenskapsåret var 18 månader.' },
+]
+const explore = [
+    { href: '/branscher/', title: 'Branscher', text: 'Företag grupperade efter huvudbransch (SNI-kod).', n: site.industries.length, unit: 'branscher' },
+    { href: '/kommuner/', title: 'Kommuner', text: 'Företag efter säteskommun.', n: site.municipalities.length, unit: 'kommuner' },
+    { href: '/topplistor/', title: 'Topplistor', text: 'Störst omsättning, snabbast växande, högst soliditet och marginal.', n: site.rankings.length, unit: 'listor' },
+    { href: '/guider/', title: 'Guider', text: 'Läs en årsredovisning, förstå nyckeltalen, kontrollera en ny kund.', n: GUIDES.length, unit: 'guider' },
+]
+---
+
+<Base
+    title="Bokslut, nyckeltal och kreditrisk för svenska företag"
+    description="Sök svenska företag på namn eller organisationsnummer. Bokslut i flera år, nyckeltal med formler och tydliga källor för varje siffra."
+    path="/"
+    jsonLd={[{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: SITE.origin + '/', inLanguage: 'sv-SE', potentialAction: { '@type': 'SearchAction', target: `${SITE.origin}/sok/?q={q}`, 'query-input': 'required name=q' } }]}
+>
+    <section class="hero">
+        <div class="shell hero__grid">
+            <div class="hero__copy">
+                <h1>Bokslut, nyckeltal och källor för svenska företag.</h1>
+                <p class="lede">Sök på namn eller organisationsnummer. Varje siffra visar källa, räkenskapsår och hur aktuell den är. Det som saknas står som saknas.</p>
+                <div class="hero__search">
+                    <SearchBox size="hero" id="hero-q" />
+                </div>
+                <p class="hero__browse small">
+                    Eller bläddra bland <a href="/branscher/">branscher</a>, <a href="/kommuner/">kommuner</a> och <a href="/topplistor/">topplistor</a>.
+                </p>
+                {
+                    site.synthetic && (
+                        <div class="notice hero__notice" role="note">
+                            <Icon name="info" />
+                            <p>
+                                <strong>Under uppbyggnad.</strong> Svenska företagsuppgifter publiceras när datalicenser och juridisk granskning är klara. Just nu innehåller sajten bara syntetiska testföretag.
+                            </p>
+                        </div>
+                    )
+                }
+            </div>
+            <div class="hero__fig">
+                <HeroPreview samples={samples} />
+            </div>
+        </div>
+    </section>
+
+    <section class="section shell">
+        <div class="section__head">
+            <h2>Allt på profilen har en källa</h2>
+            <p>En företagsprofil består av registeruppgifter, bokslut och nyckeltal som vi räknar själva. Här är vad som visas och var det kommer ifrån.</p>
+        </div>
+        <figure class="fig">
+            <div class="fig__head"><span class="fig__no">Tabell 1</span><span class="fig__title">Innehåll i en företagsprofil</span></div>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Tabell 1, innehåll i en företagsprofil">
+                <table class="data contents">
+                    <thead><tr><th scope="col">Uppgift</th><th scope="col">Källa</th><th scope="col">Hur ofta</th></tr></thead>
+                    <tbody>
+                        <tr><th scope="row">Namn, företagsform, status, säte</th><td>Bolagsverket</td><td>Vid varje dataleverans</td></tr>
+                        <tr><th scope="row">Bransch (SNI-kod)</th><td>Bolagsverket och SCB</td><td>Vid varje dataleverans</td></tr>
+                        <tr><th scope="row">Resultat- och balansräkning, flera år</th><td>Digitalt inlämnade årsredovisningar, Bolagsverket</td><td>När ett nytt bokslut registreras</td></tr>
+                        <tr><th scope="row">Nyckeltal</th><td>Beräknas av oss med <a href="/metod/">publicerade formler</a></td><td>Samtidigt som bokslutet</td></tr>
+                        <tr><th scope="row">Riskbedömning</th><td>Valuatums kreditriskmodell</td><td>Visas först när modellen är validerad för Sverige</td></tr>
+                    </tbody>
+                </table>
+            </div>
+            <figcaption class="fig__src"><b>Anm.</b> Källorna är planerade och kräver avtal om datalicens innan publicering. Se <a href="/kallor/">datakällor</a>.</figcaption>
+        </figure>
+    </section>
+
+    <section class="section shell">
+        <div class="section__head">
+            <h2>Luckor visas som luckor</h2>
+            <p>Små bolag lämnar ofta förkortade bokslut, och alla räkenskapsår är inte tolv månader. Därför har varje värde ett tillstånd, inte bara en siffra.</p>
+        </div>
+        <figure class="fig">
+            <div class="fig__head"><span class="fig__no">Tabell 2</span><span class="fig__title">Så skiljer vi på värden</span></div>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Tabell 2, så skiljer vi på värden">
+                <table class="data states">
+                    <thead><tr><th scope="col">Tillstånd</th><th scope="col">Så ser det ut</th><th scope="col">Betyder</th></tr></thead>
+                    <tbody>
+                        {
+                            states.map((s) => (
+                                <tr>
+                                    <th scope="row">{s.label}</th>
+                                    <td><Val d={s.fmt === 'sek' ? compactSek(s.value) : percent(s.value)} /></td>
+                                    <td>{s.means}</td>
+                                </tr>
+                            ))
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <figcaption class="fig__src"><b>Anm.</b> Profiler med för få uppgifter eller bokslut äldre än 31 månader visas men indexeras inte i sökmotorer. Tröskeln beskrivs på <a href="/metod/#index">metodsidan</a>.</figcaption>
+        </figure>
+    </section>
+
+    <section class="section shell">
+        <div class="section__head">
+            <h2>Två rapporter när du behöver mer</h2>
+            <p>Från varje profil går det att beställa en rapport om företaget. Rapporterna för svenska företag är under utveckling och säljs inte ännu.</p>
+        </div>
+        <ReportComparison />
+    </section>
+
+    <section class="section shell">
+        <div class="section__head">
+            <h2>Utforska</h2>
+            <p>Hitta företag via bransch och ort, eller läs hur man tolkar ett bokslut.</p>
+        </div>
+        <figure class="fig">
+            <div class="fig__head"><span class="fig__no">Tabell 4</span><span class="fig__title">Ingångar till företagen</span></div>
+            <div class="table-wrap" tabindex="0" role="region" aria-label="Tabell 4, ingångar till företagen">
+                <table class="data explore">
+                    <thead><tr><th scope="col">Ingång</th><th scope="col">Innehåll</th><th scope="col">Antal</th></tr></thead>
+                    <tbody>
+                        {
+                            explore.map((e) => (
+                                <tr>
+                                    <th scope="row"><a href={e.href}>{e.title}</a></th>
+                                    <td>{e.text}</td>
+                                    <td class="num">{e.n} {e.unit}</td>
+                                </tr>
+                            ))
+                        }
+                    </tbody>
+                </table>
+            </div>
+            <figcaption class="fig__src"><b>Anm.</b> Bransch- och kommunsidor visas i sökmotorer först när minst tre profiler i gruppen klarar kvalitetströskeln.</figcaption>
+        </figure>
+    </section>
+</Base>
+
+<style>
+    .hero {
+        padding-block: clamp(40px, 7vw, 96px) clamp(48px, 7vw, 88px);
+        border-bottom: 1px solid var(--rule);
+    }
+    .hero__grid {
+        display: grid;
+        grid-template-columns: repeat(12, minmax(0, 1fr));
+        column-gap: var(--col-gap);
+        row-gap: 48px;
+        align-items: start;
+    }
+    .hero__copy {
+        grid-column: 1 / span 7;
+        padding-top: clamp(0px, 2vw, 28px);
+    }
+    .hero__copy h1 {
+        font-size: var(--step-5);
+        max-width: 13ch;
+        letter-spacing: -0.032em;
+        line-height: 1.02;
+    }
+    .hero__copy .lede {
+        margin-top: 24px;
+    }
+    .hero__search {
+        margin-top: 36px;
+        max-width: 640px;
+    }
+    .hero__browse {
+        margin-top: 14px;
+        color: var(--ink-3);
+    }
+    .hero__notice {
+        margin-top: 32px;
+        max-width: 640px;
+    }
+    .hero__fig {
+        grid-column: 8 / span 5;
+    }
+    @media (max-width: 1080px) {
+        .hero__copy,
+        .hero__fig {
+            grid-column: 1 / -1;
+        }
+        .hero__fig {
+            max-width: 640px;
+        }
+    }
+    .contents th,
+    .states thead th {
+        text-align: left !important;
+    }
+    .states thead th:nth-child(2) {
+        text-align: right !important;
+    }
+    .contents td:nth-child(2),
+    .contents td:nth-child(3),
+    .states td:nth-child(3) {
+        text-align: left;
+        white-space: normal;
+    }
+    .states td:nth-child(2) {
+        text-align: right;
+        width: 9rem;
+        font-size: 1.05rem;
+    }
+    .states td:nth-child(3) {
+        color: var(--ink-2);
+        padding-left: 32px;
+        min-width: 18rem;
+    }
+    .contents td {
+        min-width: 12rem;
+    }
+    .explore th[scope='row'] a {
+        font-family: var(--serif);
+        font-size: 1.2rem;
+        font-weight: 600;
+        color: var(--ink);
+        text-decoration: none;
+    }
+    .explore th[scope='row'] a:hover {
+        text-decoration: underline;
+        text-decoration-color: var(--ochre);
+    }
+    .explore thead th:nth-child(2),
+    .explore td:nth-child(2) {
+        text-align: left !important;
+        white-space: normal !important;
+        color: var(--ink-2);
+    }
+    .explore thead th:first-child {
+        text-align: left;
+    }
+</style>

@@ -1,0 +1,96 @@
+---
+import '../styles/global.css'
+import { FLAGS, SITE } from '../config/site.ts'
+import { isIndexable } from '../lib/seo.ts'
+import Nav from '../components/Nav.astro'
+import Footer from '../components/Footer.astro'
+import { getSite } from '../lib/store.ts'
+
+interface Props {
+    title: string
+    description: string
+    /** Canonical path, e.g. "/foretag/0020001012/exempel-ab/". */
+    path: string
+    /** Page-level noindex (thin, synthetic or restricted content). */
+    noindex?: boolean
+    jsonLd?: object[]
+    /** Shows the synthetic-data banner. */
+    synthetic?: boolean
+}
+
+const { title, description, path, noindex = false, jsonLd = [], synthetic = getSite().synthetic } = Astro.props
+// A synthetic dataset is never indexable, whatever the flags say.
+const robots = isIndexable(noindex, getSite().synthetic) ? 'index,follow' : 'noindex,follow'
+const canonical = SITE.origin + path
+const fullTitle = path === '/' ? `${SITE.name} – ${title}` : `${title} | ${SITE.name}`
+---
+
+<!doctype html>
+<html lang="sv">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>{fullTitle}</title>
+        <meta name="description" content={description} />
+        <meta name="robots" content={robots} />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="website" />
+        <meta property="og:locale" content="sv_SE" />
+        <meta property="og:site_name" content={SITE.name} />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={description} />
+        <meta property="og:url" content={canonical} />
+        <meta name="theme-color" content="#f5f6f3" />
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="sitemap" href="/sitemap-index.xml" />
+        {jsonLd.map((d) => <script type="application/ld+json" set:html={JSON.stringify(d)} />)}
+    </head>
+    <body>
+        <Fragment set:html={`<!--
+THESIS: Swedish company facts presented like a central-bank stability report: every number is a numbered figure with its source, period and freshness. Refuses the navy fintech dashboard with gauges and the cream editorial magazine.
+OWN-WORLD: cool white paper #f5f6f3, ink-blue text #0f1e26, statsblå #1d4f6e for series and links, one ochre highlight #c58a1c for figure numbers and gaps; Source Serif 4 headings, Schibsted Grotesk body and tabular data; 2px ink figure rules, hairline tables, "Källa:" lines.
+STORY: the visitor searches a company, reads calm sourced facts, sees exactly what is missing, and finds the report path with honest availability.
+FIRST VIEWPORT: serif headline and a full-width search field on the left seven columns; right five columns hold Diagram 1, a labelled synthetic profile that cycles full, sparse and stale data.
+FORM: grounded direction 7 of 7 (stability report), seed 1b69662a.
+FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+-->`} />
+        <a class="skip" href="#main">Hoppa till innehållet</a>
+        {
+            FLAGS.preview && (
+                <div class="env-banner">
+                    Förhandsversion – inte publicerad, inte indexerad. Dataset: <code>{process.env.SE_DATA_SOURCE ?? 'CURRENT'}</code>
+                </div>
+            )
+        }
+        <Nav current={path} />
+        {
+            synthetic && (
+                <div class="env-banner env-banner--synthetic" role="note">
+                    Syntetiska testdata. Företagen på sajten finns inte; alla siffror är påhittade för utveckling.
+                </div>
+            )
+        }
+        <main id="main">
+            <slot />
+        </main>
+        <Footer />
+    </body>
+</html>
+
+<style>
+    .env-banner {
+        background: var(--ink);
+        color: var(--paper);
+        font-size: var(--step--1);
+        padding: 8px var(--gutter);
+        text-align: center;
+    }
+    .env-banner code {
+        font-size: 0.95em;
+    }
+    .env-banner--synthetic {
+        background: var(--ochre-wash);
+        color: var(--ochre-ink);
+        border-bottom: 1px solid color-mix(in srgb, var(--ochre) 40%, var(--rule));
+    }
+</style>

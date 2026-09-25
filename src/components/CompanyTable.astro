@@ -1,0 +1,96 @@
+---
+// Company list for hubs and rankings: newest-year figures with state.
+import type { PublishedCompany } from '../lib/contract/types.ts'
+import { compactSek, percent, periodLabel, STATUS_TEXT } from '../lib/format.ts'
+import { computeMetrics } from '../lib/metrics.ts'
+import Val from './Val.astro'
+
+interface Props {
+    companies: PublishedCompany[]
+    no: string
+    title: string
+    source: string
+    show?: 'kommun' | 'bransch'
+    rank?: { value: string }[]
+}
+const { companies, no, title, source, show = 'kommun', rank } = Astro.props
+---
+
+<figure class="fig">
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">{title}</span></div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, ${title}`}>
+        <table class="data ct">
+            <thead>
+                <tr>
+                    {rank && <th scope="col" class="ct__rank">#</th>}
+                    <th scope="col">Företag</th>
+                    <th scope="col" class="ct__txt">{show === 'kommun' ? 'Kommun' : 'Bransch'}</th>
+                    {rank && <th scope="col">Värde</th>}
+                    <th scope="col">Nettoomsättning</th>
+                    <th scope="col">Rörelsemarginal</th>
+                    <th scope="col">Bokslut</th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    companies.map((c, i) => {
+                        const [p, prior] = c.record.periods
+                        const m = p && computeMetrics(p, prior)
+                        return (
+                            <tr>
+                                {rank && <td class="ct__rank num">{i + 1}</td>}
+                                <th scope="row">
+                                    <a href={c.path}>{c.record.name}</a>
+                                    {c.record.status.code !== 'active' && <span class="tag tag--alert ct__tag">{STATUS_TEXT[c.record.status.code]}</span>}
+                                </th>
+                                <td class="ct__txt">{show === 'kommun' ? c.record.municipality?.name : c.record.sni[0]?.label}</td>
+                                {rank && <td class="num ct__val">{rank[i].value}</td>}
+                                <td>{p ? <Val d={compactSek(p.income.netSales)} /> : <span class="val--missing">inget bokslut</span>}</td>
+                                <td>{m ? <Val d={percent(m.operatingMargin)} /> : ''}</td>
+                                <td class:list={['num', { 'ct__stale': c.freshness === 'stale' || c.freshness === 'aging' }]}>{p ? periodLabel(p) : '–'}</td>
+                            </tr>
+                        )
+                    })
+                }
+            </tbody>
+        </table>
+    </div>
+    <figcaption class="fig__src"><b>Källa:</b> {source}</figcaption>
+</figure>
+
+<style>
+    .ct th[scope='row'] a {
+        font-weight: 600;
+        color: var(--ink);
+        text-decoration: none;
+    }
+    .ct th[scope='row'] a:hover {
+        text-decoration: underline;
+        text-decoration-color: var(--ochre);
+    }
+    .ct__tag {
+        margin-left: 8px;
+    }
+    .ct__txt {
+        text-align: left !important;
+        white-space: normal !important;
+        color: var(--ink-2);
+        max-width: 16rem;
+    }
+    .ct__rank {
+        width: 2.5rem;
+        text-align: left !important;
+        color: var(--ink-3);
+        padding-left: 0 !important;
+        min-width: 2.5rem !important;
+    }
+    .ct__val {
+        font-weight: 600;
+    }
+    .ct__stale {
+        color: var(--ochre-ink);
+    }
+    .ct tbody th {
+        min-width: 14rem;
+    }
+</style>

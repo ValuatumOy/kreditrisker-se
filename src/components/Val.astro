@@ -1,0 +1,9 @@
+---
+import type { Display } from '../lib/format.ts'
+interface Props {
+    d: Display
+}
+const { d } = Astro.props
+---
+
+<span class:list={['num', `val--${d.state}`]} title={d.note}>{d.text}</span>{d.note && <span class="visually-hidden"> ({d.note})</span>}

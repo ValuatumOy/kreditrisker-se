@@ -1,0 +1,125 @@
+---
+// Report CTAs on a company profile. Basic and AI each render their own state.
+import type { PublishedCompany } from '../lib/contract/types.ts'
+import { staticReportState } from '../lib/reports/availability.ts'
+import { PRODUCT_NAME, STATE_LABEL, UNAVAILABLE_TEXT } from '../lib/reports/labels.ts'
+import type { ReportProduct } from '../lib/reports/types.ts'
+import Icon from './Icon.astro'
+
+interface Props {
+    company: PublishedCompany
+}
+const { company } = Astro.props
+const DESC: Record<ReportProduct, string> = {
+    basic: 'Bokslut, nyckeltal och branschjämförelse samlade i en rapport.',
+    ai: 'Som basrapporten, med en skriven analys och genomgång av offentliga källor.',
+}
+const products = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, company) }))
+const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}&produkt=${p === 'basic' ? 'bas' : 'ai'}`
+---
+
+<aside class="rp" aria-labelledby="rp-title">
+    <h2 id="rp-title" class="rp__title">Rapport om {company.record.name}</h2>
+    <ul class="rp__list">
+        {
+            products.map(({ p, s }) => (
+                <li class="rp__item">
+                    <div class="rp__row">
+                        <h3>{PRODUCT_NAME[p]}</h3>
+                        <span class:list={['tag', s.kind === 'available' ? 'tag--ok' : 'tag--warn']}>{STATE_LABEL[s.kind]}</span>
+                    </div>
+                    <p class="rp__desc">{DESC[p]}</p>
+                    {s.kind === 'available' && (
+                        <>
+                            {s.price && (
+                                <p class="rp__price num">
+                                    {s.price.amountSek.toLocaleString('sv-SE')} kr <span class="muted small">{s.price.vatIncluded ? 'inkl. moms' : 'exkl. moms'}</span>
+                                </p>
+                            )}
+                            <a class="btn" href={orderHref(p)}>
+                                Beställ {PRODUCT_NAME[p].toLowerCase()} <Icon name="arrow" />
+                            </a>
+                        </>
+                    )}
+                    {s.kind === 'sample' && (
+                        <a class="btn btn--quiet" href={s.sampleHref}>
+                            <Icon name="doc" /> Se exempelrapport
+                        </a>
+                    )}
+                    {s.kind === 'unavailable' && (
+                        <p class="rp__state small">
+                            <Icon name="clock" />
+                            <span>{UNAVAILABLE_TEXT[s.reason]}</span>
+                        </p>
+                    )}
+                </li>
+            ))
+        }
+    </ul>
+    <p class="rp__foot small">
+        <a href="/rapporter/">Jämför rapporterna</a> · <a href="/rapporter/exempel/">Exempel</a>
+    </p>
+</aside>
+
+<style>
+    .rp {
+        background: var(--sheet);
+        border: 1px solid var(--rule);
+        border-top: 2px solid var(--ink);
+        padding: 18px 20px 16px;
+    }
+    .rp__title {
+        font-family: var(--sans);
+        font-size: 1rem;
+        font-weight: 600;
+        letter-spacing: 0;
+        line-height: 1.35;
+    }
+    .rp__list {
+        list-style: none;
+        margin: 14px 0 0;
+        padding: 0;
+    }
+    .rp__item {
+        padding-block: 16px;
+        border-top: 1px solid var(--rule);
+        display: grid;
+        gap: 10px;
+        justify-items: start;
+    }
+    .rp__row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 10px;
+        width: 100%;
+    }
+    .rp__row h3 {
+        font-size: 1.3rem;
+        font-weight: 600;
+    }
+    .rp__desc {
+        color: var(--ink-2);
+        font-size: 0.95rem;
+    }
+    .rp__price {
+        font-family: var(--serif);
+        font-size: 1.5rem;
+    }
+    .rp__state {
+        display: flex;
+        gap: 8px;
+        color: var(--ink-3);
+    }
+    .rp__state :global(svg) {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+        margin-top: 2px;
+    }
+    .rp__foot {
+        padding-top: 12px;
+        border-top: 1px solid var(--rule);
+        color: var(--ink-3);
+    }
+</style>

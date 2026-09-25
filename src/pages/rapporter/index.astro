@@ -1,0 +1,86 @@
+---
+import Page from '../../layouts/Page.astro'
+import ReportComparison from '../../components/ReportComparison.astro'
+import StateFlow from '../../components/StateFlow.astro'
+import Icon from '../../components/Icon.astro'
+---
+
+<Page
+    title="Kreditriskrapporter"
+    h1="Basrapport och AI-rapport"
+    description="Två rapporter om svenska företag från Valuatum: en basrapport byggd på bokslut och nyckeltal, och en AI-rapport med skriven analys. Under utveckling."
+    path="/rapporter/"
+    lede="Rapporterna samlar det du behöver för att bedöma en kund eller leverantör innan du ger kredit. Båda är under utveckling för svenska företag och kan inte beställas ännu."
+>
+    <div class="rr">
+        <div class="notice" role="note">
+            <Icon name="info" />
+            <p>
+                <strong>Inte lanserade.</strong> Innan rapporterna säljs ska datalicenser, modellvalidering, betalning och leverans vara på plats och granskade. Priser anges först när de
+                är fastställda.
+            </p>
+        </div>
+
+        <ReportComparison no="Tabell 1" />
+
+        <section class="rr__two">
+            <article>
+                <h2><a href="/rapporter/bas/">Basrapport</a></h2>
+                <p>
+                    För den som vill ha siffrorna samlade: registeruppgifter, flera års bokslut, nyckeltal med förklaringar och hur företaget står sig mot sin bransch. Texten skrivs
+                    automatiskt utifrån siffrorna.
+                </p>
+                <p><a href="/rapporter/bas/">Om basrapporten</a> · <a href="/rapporter/exempel/#basrapport">Exempel</a></p>
+            </article>
+            <article>
+                <h2><a href="/rapporter/ai/">AI-rapport</a></h2>
+                <p>
+                    Allt i basrapporten, plus en längre skriven analys av lönsamhet, soliditet och likviditet och en genomgång av vad som skrivs om företaget i offentliga källor på
+                    webben.
+                </p>
+                <p><a href="/rapporter/ai/">Om AI-rapporten</a> · <a href="/rapporter/exempel/#ai-rapport">Exempel</a></p>
+            </article>
+        </section>
+
+        <StateFlow no="Diagram 1" />
+    </div>
+</Page>
+
+<style>
+    .rr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: clamp(40px, 5vw, 64px);
+    }
+    .rr > .notice {
+        max-width: 760px;
+    }
+    .rr__two {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 24px 48px;
+    }
+    .rr__two article {
+        border-top: 2px solid var(--ink);
+        padding-top: 16px;
+        display: grid;
+        gap: 12px;
+        align-content: start;
+    }
+    .rr__two h2 {
+        font-size: var(--step-2);
+    }
+    .rr__two h2 a {
+        color: var(--ink);
+        text-decoration: none;
+    }
+    .rr__two p {
+        color: var(--ink-2);
+        max-width: 60ch;
+    }
+    @media (max-width: 760px) {
+        .rr__two {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>

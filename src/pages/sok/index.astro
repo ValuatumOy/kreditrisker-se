@@ -1,0 +1,223 @@
+---
+import Base from '../../layouts/Base.astro'
+import SearchBox from '../../components/SearchBox.astro'
+import { getSite } from '../../lib/store.ts'
+
+const site = getSite()
+const popular = site.industries.filter((h) => h.substantial).slice(0, 6)
+---
+
+<Base title="Sök företag" description="Sök bland svenska företag på namn eller organisationsnummer." path="/sok/" noindex>
+    <div class="shell sr">
+        <h1>Sök företag</h1>
+        <div class="sr__box">
+            <SearchBox id="page-q" />
+        </div>
+
+        <div class="sr__out" data-results aria-live="polite">
+            <noscript>
+                <p class="sr__msg">Sökningen kräver JavaScript. Du kan också bläddra bland <a href="/branscher/">branscher</a> och <a href="/kommuner/">kommuner</a>.</p>
+            </noscript>
+        </div>
+
+        <template id="tpl-empty">
+            <div class="sr__state">
+                <h2>Sök på namn eller organisationsnummer</h2>
+                <ul class="sr__tips">
+                    <li>Namn: skriv början av namnet, till exempel <em>Exempel Bygg</em>. Bolagsformen (AB, HB) behövs inte.</li>
+                    <li>Organisationsnummer: tio siffror, med eller utan bindestreck.</li>
+                    <li>Tidigare namn hittas också.</li>
+                </ul>
+                {
+                    popular.length > 0 && (
+                        <>
+                            <h3>Eller börja med en bransch</h3>
+                            <ul class="sr__chips">
+                                {popular.map((h) => (
+                                    <li>
+                                        <a href={`/branscher/${h.slug}/`}>{h.name}</a>
+                                    </li>
+                                ))}
+                            </ul>
+                        </>
+                    )
+                }
+            </div>
+        </template>
+        <template id="tpl-none">
+            <div class="sr__state">
+                <h2>Inga träffar på <q data-q></q></h2>
+                <p>Kontrollera stavningen eller sök på organisationsnumret. Enskilda firmor visas inte, eftersom deras organisationsnummer är ett personnummer.</p>
+            </div>
+        </template>
+        <template id="tpl-badnr">
+            <div class="sr__state">
+                <h2><q data-q></q> är inte ett giltigt organisationsnummer</h2>
+                <p>Kontrollsiffran stämmer inte. Ett organisationsnummer har tio siffror, till exempel NNNNNN-NNNN. Kontrollera numret mot fakturan eller avtalet.</p>
+            </div>
+        </template>
+    </div>
+</Base>
+
+<script>
+    import { searchIndex, type SearchHit } from '../../lib/search.ts'
+    import { formatOrgnr, looksLikeOrgnr, parseOrgnr } from '../../lib/orgnr.ts'
+
+    const out = document.querySelector<HTMLElement>('[data-results]')!
+    const q = new URLSearchParams(location.search).get('q')?.trim() ?? ''
+    const input = document.querySelector<HTMLInputElement>('#page-q')!
+    input.value = q
+    const STATUS: Record<string, string> = { liquidation: 'I likvidation', bankruptcy: 'Konkurs', reconstruction: 'Rekonstruktion', deregistered: 'Avregistrerat' }
+
+    const fromTpl = (id: string) => {
+        const node = (document.getElementById(id) as HTMLTemplateElement).content.cloneNode(true) as DocumentFragment
+        node.querySelectorAll('[data-q]').forEach((el) => (el.textContent = q))
+        out.replaceChildren(node)
+    }
+
+    async function run() {
+        if (!q) return fromTpl('tpl-empty')
+        if (looksLikeOrgnr(q) && !parseOrgnr(q).ok) return fromTpl('tpl-badnr')
+        const endpoint = document.querySelector<HTMLFormElement>('[data-search]')?.dataset.endpoint
+        const hits: SearchHit[] = endpoint
+            ? await fetch(`${endpoint}?q=${encodeURIComponent(q)}&limit=50`).then((r) => (r.ok ? r.json() : []))
+            : searchIndex(await fetch('/sok/index.json').then((r) => r.json()), q, 50)
+        if (hits.length === 1 && looksLikeOrgnr(q)) return location.replace(hits[0].p)
+        if (!hits.length) return fromTpl('tpl-none')
+        const h = document.createElement('p')
+        h.className = 'sr__count'
+        h.textContent = `${hits.length} ${hits.length === 1 ? 'träff' : 'träffar'} på ”${q}”`
+        const list = document.createElement('ol')
+        list.className = 'sr__list'
+        for (const hit of hits) {
+            const li = document.createElement('li')
+            const a = document.createElement('a')
+            a.href = hit.p
+            a.textContent = hit.n
+            const meta = document.createElement('span')
+            meta.className = 'sr__meta'
+            meta.textContent = [formatOrgnr(hit.o), hit.k, hit.s].filter(Boolean).join(' · ')
+            li.append(a, meta)
+            const fresh = document.createElement('span')
+            fresh.className = `tag ${hit.fr ? 'tag--warn' : 'tag--ok'}`
+            fresh.textContent = hit.y ? `${hit.fr ? 'Senaste bokslut' : 'Bokslut'} ${hit.y}` : 'Inget bokslut'
+            li.append(fresh)
+            if (hit.st) {
+                const tag = document.createElement('span')
+                tag.className = 'tag tag--alert'
+                tag.textContent = STATUS[hit.st] ?? hit.st
+                li.append(tag)
+            }
+            if (hit.f) {
+                const f = document.createElement('span')
+                f.className = 'sr__former'
+                f.textContent = `Tidigare: ${hit.f}`
+                li.append(f)
+            }
+            list.append(li)
+        }
+        out.replaceChildren(h, list)
+    }
+    run().catch(() => {
+        out.innerHTML = '<p class="sr__msg">Sökningen kunde inte laddas. Försök igen om en stund.</p>'
+    })
+</script>
+
+<style>
+    .sr {
+        padding-top: clamp(32px, 5vw, 64px);
+        max-width: 900px;
+    }
+    .sr h1 {
+        font-size: var(--step-3);
+    }
+    .sr__box {
+        margin-top: 24px;
+    }
+    .sr__out {
+        margin-top: 40px;
+        min-height: 240px;
+    }
+    .sr :global(.sr__state h2) {
+        font-size: var(--step-2);
+    }
+    .sr :global(.sr__state h3) {
+        font-size: 1.05rem;
+        margin-top: 28px;
+        font-family: var(--sans);
+        font-weight: 600;
+    }
+    .sr :global(.sr__state p),
+    .sr :global(.sr__tips) {
+        margin-top: 12px;
+        color: var(--ink-2);
+        max-width: 62ch;
+    }
+    .sr :global(.sr__tips) {
+        padding-left: 1.1em;
+        display: grid;
+        gap: 6px;
+    }
+    .sr :global(.sr__chips) {
+        list-style: none;
+        margin: 12px 0 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+    .sr :global(.sr__chips a) {
+        display: inline-block;
+        padding: 6px 12px;
+        border: 1px solid var(--rule-2);
+        border-radius: 999px;
+        background: var(--sheet);
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 0.92rem;
+    }
+    .sr :global(.sr__chips a:hover) {
+        border-color: var(--ink);
+    }
+    .sr :global(.sr__count) {
+        color: var(--ink-3);
+        font-size: var(--step--1);
+        margin-bottom: 10px;
+    }
+    .sr :global(.sr__list) {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        border-top: 1px solid var(--ink);
+    }
+    .sr :global(.sr__list li) {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 4px 14px;
+        padding: 16px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .sr :global(.sr__list a) {
+        font-family: var(--serif);
+        font-size: 1.3rem;
+        font-weight: 600;
+        color: var(--ink);
+        text-decoration: none;
+        letter-spacing: -0.01em;
+    }
+    .sr :global(.sr__list a:hover) {
+        text-decoration: underline;
+        text-decoration-color: var(--ochre);
+    }
+    .sr :global(.sr__meta) {
+        color: var(--ink-3);
+        font-size: 0.92rem;
+        font-variant-numeric: lining-nums;
+    }
+    .sr :global(.sr__former) {
+        flex-basis: 100%;
+        font-size: var(--step--1);
+        color: var(--ink-3);
+    }
+</style>

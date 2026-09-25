@@ -1,0 +1,75 @@
+---
+// Credit-model output. Shown only when the output is signed off as validated
+// for Sweden AND the public flag is on. Otherwise an honest explanation.
+import { FLAGS } from '../config/site.ts'
+import type { PublishedCompany } from '../lib/contract/types.ts'
+import { date } from '../lib/format.ts'
+
+interface Props {
+    company: PublishedCompany
+    no: string
+}
+const { company, no } = Astro.props
+const m = company.record.model
+const valid = !!m?.validation?.validatedForSweden && !company.record.synthetic
+const show = FLAGS.publicModelOutput && valid && company.freshness !== 'stale'
+---
+
+{
+    show && m && m.validation ? (
+        <figure class="fig">
+            <div class="fig__head">
+                <span class="fig__no">{no}</span>
+                <span class="fig__title">Riskbedömning</span>
+            </div>
+            <p class="ms__score num">
+                {m.score} <span class="muted">av {m.scale.max}</span>
+                {m.riskClass && <span class="tag tag--plain">Riskklass {m.riskClass}</span>}
+            </p>
+            <p class="small muted">
+                {m.scale.higherIsBetter ? 'Högre värde betyder lägre bedömd risk.' : 'Högre värde betyder högre bedömd risk.'} Prognoshorisont {m.horizonMonths} månader. Bygger på bokslutet
+                som slutade {date(m.inputsPeriodEnd)}.
+            </p>
+            <figcaption class="fig__src">
+                <b>Källa:</b> Valuatum, modell {m.modelId} version {m.modelVersion}, beräknad {date(m.generatedAt)}. <a href={m.validation.methodologyUrl}>Metod och begränsningar</a>.
+            </figcaption>
+        </figure>
+    ) : (
+        <div class="ms__none">
+            <h3>Ingen riskbedömning visas</h3>
+            <p>
+                Vi visar inga kreditbetyg för svenska företag förrän Valuatums modell är validerad på svenska data och granskad. Siffrorna ovan är
+                bokslutsuppgifter, inte en bedömning av företagets kreditvärdighet.
+            </p>
+        </div>
+    )
+}
+
+<style>
+    .ms__score {
+        font-family: var(--serif);
+        font-size: 2.6rem;
+        display: flex;
+        align-items: baseline;
+        gap: 12px;
+    }
+    .ms__score .muted {
+        font-size: 1.1rem;
+    }
+    .ms__none {
+        padding: 18px 20px;
+        background: var(--paper-2);
+        border-radius: var(--radius);
+    }
+    .ms__none h3 {
+        font-family: var(--sans);
+        font-size: 1rem;
+        font-weight: 600;
+        margin-bottom: 6px;
+    }
+    .ms__none p {
+        color: var(--ink-2);
+        font-size: 0.95rem;
+        max-width: 64ch;
+    }
+</style>

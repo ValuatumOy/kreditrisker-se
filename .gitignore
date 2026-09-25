@@ -1,0 +1,8 @@
+node_modules/
+dist/
+dist-preview/
+.astro/
+data/staging/
+data/releases/*
+!data/releases/.gitkeep
+dist-mock/

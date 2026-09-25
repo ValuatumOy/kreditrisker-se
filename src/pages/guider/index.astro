@@ -1,0 +1,63 @@
+---
+import Page from '../../layouts/Page.astro'
+import Icon from '../../components/Icon.astro'
+import { GUIDES } from '../../content/guides.ts'
+---
+
+<Page title="Guider" description="Korta guider om årsredovisningar, nyckeltal och att kontrollera en ny kund." path="/guider/" lede="Korta, konkreta texter om att läsa bokslut och bedöma en motpart.">
+    <ul class="gl">
+        {
+            GUIDES.map((g) => (
+                <li>
+                    <a href={`/guider/${g.slug}/`}>
+                        <span class="gl__t">{g.title}</span>
+                        <span class="gl__d">{g.description}</span>
+                        <Icon name="arrow" class="gl__i" />
+                    </a>
+                </li>
+            ))
+        }
+    </ul>
+</Page>
+
+<style>
+    .gl {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        max-width: 880px;
+        border-top: 2px solid var(--ink);
+    }
+    .gl li {
+        border-bottom: 1px solid var(--rule);
+    }
+    .gl a {
+        position: relative;
+        display: grid;
+        gap: 6px;
+        padding: 22px 48px 22px 0;
+        color: var(--ink);
+        text-decoration: none;
+    }
+    .gl__t {
+        font-family: var(--serif);
+        font-size: 1.55rem;
+        letter-spacing: -0.015em;
+    }
+    .gl a:hover .gl__t {
+        text-decoration: underline;
+        text-decoration-color: var(--ochre);
+        text-underline-offset: 0.15em;
+    }
+    .gl__d {
+        color: var(--ink-2);
+    }
+    .gl a :global(.gl__i) {
+        position: absolute;
+        right: 4px;
+        top: 30px;
+        width: 20px;
+        height: 20px;
+        color: var(--ochre-ink);
+    }
+</style>

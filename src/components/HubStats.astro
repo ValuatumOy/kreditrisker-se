@@ -1,0 +1,86 @@
+---
+// Aggregate figures for a hub, computed only from companies that report the
+// item, with the count shown so a thin base is visible.
+import type { PublishedCompany } from '../lib/contract/types.ts'
+import { computeMetrics, numeric } from '../lib/metrics.ts'
+
+interface Props {
+    companies: PublishedCompany[]
+    no: string
+    title: string
+}
+const { companies, no, title } = Astro.props
+const current = companies.filter((c) => c.freshness === 'current' || c.freshness === 'aging')
+const median = (xs: number[]) => {
+    if (!xs.length) return undefined
+    const s = [...xs].sort((a, b) => a - b)
+    const m = Math.floor(s.length / 2)
+    return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2
+}
+const collect = (f: (c: PublishedCompany) => number | undefined) => current.map(f).filter((x): x is number => x !== undefined)
+const sales = collect((c) => numeric(c.record.periods[0]?.income.netSales))
+const margins = collect((c) => c.record.periods[0] && numeric(computeMetrics(c.record.periods[0], c.record.periods[1]).operatingMargin))
+const equity = collect((c) => c.record.periods[0] && numeric(computeMetrics(c.record.periods[0]).equityRatio))
+const emp = collect((c) => numeric(c.record.periods[0]?.employees))
+const pct = (x?: number) => (x === undefined ? '–' : `${(x * 100).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`)
+const mkr = (x?: number) => (x === undefined ? '–' : `${(x / 1e6).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} Mkr`)
+const rows = [
+    { label: 'Företag på sajten', value: String(companies.length), n: null },
+    { label: 'Med aktuellt bokslut', value: String(current.length), n: null },
+    { label: 'Median nettoomsättning', value: mkr(median(sales)), n: sales.length },
+    { label: 'Median rörelsemarginal', value: pct(median(margins)), n: margins.length },
+    { label: 'Median soliditet', value: pct(median(equity)), n: equity.length },
+    { label: 'Anställda totalt', value: emp.length ? emp.reduce((a, b) => a + b, 0).toLocaleString('sv-SE') : '–', n: emp.length },
+]
+---
+
+<figure class="fig hs">
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">{title}</span></div>
+    <dl>
+        {
+            rows.map((r) => (
+                <div>
+                    <dt>{r.label}</dt>
+                    <dd class="num">{r.value}</dd>
+                    {r.n !== null && <dd class="hs__n num">underlag {r.n} företag</dd>}
+                </div>
+            ))
+        }
+    </dl>
+    <figcaption class="fig__src">
+        <b>Anm.</b> Medianer räknas på företag med aktuellt bokslut som redovisar posten. Företag utan uppgift räknas inte som noll.
+    </figcaption>
+</figure>
+
+<style>
+    .hs dl {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        margin: 0;
+    }
+    .hs dl > div {
+        padding: 12px 16px 14px 0;
+        border-bottom: 1px solid var(--rule);
+    }
+    .hs dt {
+        font-size: var(--step--1);
+        color: var(--ink-3);
+    }
+    .hs dd {
+        margin: 2px 0 0;
+        font-family: var(--serif);
+        font-size: 1.6rem;
+        letter-spacing: -0.015em;
+    }
+    .hs .hs__n {
+        font-family: var(--sans);
+        font-size: var(--step--1);
+        color: var(--ink-3);
+        letter-spacing: 0;
+    }
+    @media (max-width: 640px) {
+        .hs dl {
+            grid-template-columns: 1fr 1fr;
+        }
+    }
+</style>

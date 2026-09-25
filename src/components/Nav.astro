@@ -1,0 +1,246 @@
+---
+import { SITE } from '../config/site.ts'
+import Icon from './Icon.astro'
+
+interface Props {
+    current: string
+}
+const { current } = Astro.props
+const links = [
+    { href: '/branscher/', label: 'Branscher' },
+    { href: '/kommuner/', label: 'Kommuner' },
+    { href: '/topplistor/', label: 'Topplistor' },
+    { href: '/rapporter/', label: 'Rapporter' },
+    { href: '/metod/', label: 'Metod och källor' },
+    { href: '/fragor/', label: 'Frågor' },
+]
+const isCurrent = (href: string) => current.startsWith(href)
+const showSearch = current !== '/' && !current.startsWith('/sok/')
+---
+
+<header class="nav">
+    <div class="shell nav__bar">
+        <a class="nav__brand" href="/">
+            <span class="nav__name">{SITE.name}</span>
+            <span class="nav__by">från Valuatum</span>
+        </a>
+        <nav class="nav__links" aria-label="Huvudmeny">
+            <ul>
+                {
+                    links.map((l) => (
+                        <li>
+                            <a href={l.href} aria-current={isCurrent(l.href) ? 'page' : undefined}>
+                                {l.label}
+                            </a>
+                        </li>
+                    ))
+                }
+            </ul>
+        </nav>
+        {
+            showSearch && (
+                <form class="nav__search" action="/sok/" method="get" role="search">
+                    <label class="visually-hidden" for="nav-q">
+                        Sök företag
+                    </label>
+                    <Icon name="search" />
+                    <input id="nav-q" name="q" type="search" placeholder="Företag eller orgnr" autocomplete="off" />
+                </form>
+            )
+        }
+        <details class="nav__menu">
+            <summary aria-label="Meny">
+                <Icon name="menu" class="i-open" />
+                <Icon name="close" class="i-close" />
+            </summary>
+            <div class="nav__sheet">
+                <form action="/sok/" method="get" role="search" class="nav__sheet-search">
+                    <label class="visually-hidden" for="nav-q-m">Sök företag</label>
+                    <input id="nav-q-m" name="q" type="search" placeholder="Företag eller organisationsnummer" autocomplete="off" />
+                    <button class="btn" type="submit">Sök</button>
+                </form>
+                <ul>
+                    {
+                        links.map((l) => (
+                            <li>
+                                <a href={l.href} aria-current={isCurrent(l.href) ? 'page' : undefined}>
+                                    {l.label}
+                                </a>
+                            </li>
+                        ))
+                    }
+                    <li><a href="/om/">Om tjänsten och kontakt</a></li>
+                </ul>
+            </div>
+        </details>
+    </div>
+</header>
+
+<style>
+    .nav {
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        background: color-mix(in srgb, var(--paper) 94%, transparent);
+        backdrop-filter: saturate(1.2) blur(10px);
+        border-bottom: 1px solid var(--rule);
+    }
+    .nav__bar {
+        display: flex;
+        align-items: center;
+        gap: 28px;
+        min-height: 64px;
+    }
+    .nav__brand {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        color: var(--ink);
+        text-decoration: none;
+        margin-right: auto;
+        flex-shrink: 0;
+    }
+    .nav__name {
+        font-family: var(--serif);
+        font-size: 1.45rem;
+        font-weight: 600;
+        letter-spacing: -0.02em;
+    }
+    .nav__by {
+        font-size: var(--step--1);
+        color: var(--ink-3);
+    }
+    .nav__links ul {
+        display: flex;
+        gap: 22px;
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .nav__links a {
+        color: var(--ink-2);
+        text-decoration: none;
+        font-size: 0.94rem;
+        padding-block: 21px;
+        border-bottom: 2px solid transparent;
+    }
+    .nav__links a:hover {
+        color: var(--ink);
+    }
+    .nav__links a[aria-current='page'] {
+        color: var(--ink);
+        border-bottom-color: var(--ochre);
+    }
+    .nav__search {
+        position: relative;
+        display: flex;
+        align-items: center;
+    }
+    .nav__search :global(svg) {
+        position: absolute;
+        left: 10px;
+        width: 16px;
+        height: 16px;
+        color: var(--ink-3);
+        pointer-events: none;
+    }
+    .nav__search input {
+        width: 200px;
+        height: 38px;
+        padding: 0 12px 0 34px;
+        border: 1px solid var(--rule-2);
+        border-radius: var(--radius);
+        background: var(--sheet);
+        font: inherit;
+        font-size: 0.92rem;
+        color: var(--ink);
+        transition: border-color 160ms, box-shadow 160ms;
+    }
+    .nav__search input:focus {
+        box-shadow: 0 0 0 3px var(--blue-3);
+        border-color: var(--ink);
+        outline: none;
+    }
+    .nav__search input::placeholder {
+        color: var(--ink-3);
+    }
+    .nav__menu {
+        display: none;
+    }
+    .nav__menu summary {
+        list-style: none;
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        margin-right: -10px;
+        cursor: pointer;
+        color: var(--ink);
+    }
+    .nav__menu summary::-webkit-details-marker {
+        display: none;
+    }
+    .nav__menu :global(svg) {
+        width: 22px;
+        height: 22px;
+    }
+    .nav__menu :global(.i-close),
+    .nav__menu[open] :global(.i-open) {
+        display: none;
+    }
+    .nav__menu[open] :global(.i-close) {
+        display: block;
+    }
+    .nav__sheet {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 64px;
+        background: var(--paper);
+        border-bottom: 1px solid var(--rule);
+        padding: 18px var(--gutter) 28px;
+        box-shadow: 0 18px 30px -24px rgb(15 30 38 / 0.35);
+    }
+    .nav__sheet-search {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+    }
+    .nav__sheet-search input {
+        flex: 1;
+        min-width: 0;
+        height: 44px;
+        padding: 0 12px;
+        border: 1px solid var(--rule-2);
+        border-radius: var(--radius);
+        background: var(--sheet);
+        font: inherit;
+    }
+    .nav__sheet ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+    }
+    .nav__sheet a {
+        display: block;
+        padding: 12px 0;
+        border-bottom: 1px solid var(--rule);
+        color: var(--ink);
+        text-decoration: none;
+        font-family: var(--serif);
+        font-size: 1.2rem;
+    }
+    @media (max-width: 1180px) {
+        .nav__search {
+            display: none;
+        }
+    }
+    @media (max-width: 980px) {
+        .nav__links {
+            display: none;
+        }
+        .nav__menu {
+            display: block;
+        }
+    }
+</style>
