@@ -1,5 +1,5 @@
 ---
-// Floating glass profile card in the home hero. Renders three synthetic
+// Light profile card in the home hero. Renders three synthetic
 // fixtures (full, sparse, stale) with the real formatting and state rules;
 // numbers count up, the chart draws itself, tabs cycle when idle.
 import type { PublishedCompany, Value } from '../lib/contract/types.ts'
@@ -36,9 +36,9 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
 }
 ---
 
-<figure class="hc glass" data-hero-card data-tilt="5">
+<figure class="hc" data-hero-card>
     <div class="hc__top">
-        <span class="hc__label"><span class="hc__dot" aria-hidden="true"></span> Syntetiskt exempel</span>
+        <span class="chip">Exempelprofil</span>
         <div class="hc__tabs" role="tablist" aria-label="Exempeldata">
             {
                 samples.map((s, i) => (
@@ -58,9 +58,6 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
             return (
                 <section class="hc__panel" role="tabpanel" id={`hc-panel-${s.key}`} aria-labelledby={`hc-tab-${s.key}`} hidden={i !== 0}>
                     <div class="hc__id">
-                        <div class="hc__mark" aria-hidden="true">
-                            {r.name.replace('Exempel ', '').slice(0, 1)}
-                        </div>
                         <div class="hc__who">
                             <p class="hc__name">{r.name}</p>
                             <p class="hc__meta num">
@@ -145,164 +142,151 @@ const cellsFor = (c: PublishedCompany): Cell[] => {
 <style>
     .hc {
         margin: 0;
-        background: linear-gradient(180deg, #17332a, #0d1f18) !important;
-        border: 1px solid #0d1f18 !important;
-        box-shadow: 0 50px 90px -40px rgb(13 31 24 / 0.75), 0 2px 0 rgb(255 255 255 / 0.06) inset !important;
-        padding: 20px;
-        border-radius: 16px;
-        color: var(--ice);
-        transition: transform 500ms var(--ease-out);
-        will-change: transform;
+        padding: 22px 24px 20px;
+        border: 1px solid var(--rule);
+        border-radius: var(--radius-lg);
+        background: var(--sheet);
+        color: var(--ink);
+        box-shadow: 0 40px 80px -48px rgb(15 33 26 / 0.45);
     }
     .hc__top {
         display: flex;
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        margin-bottom: 18px;
-    }
-    .hc__label {
-        display: inline-flex;
-        align-items: center;
-        gap: 8px;
-        font-size: 0.76rem;
-        color: var(--gold);
-        white-space: nowrap;
-    }
-    .hc__dot {
-        width: 6px;
-        height: 6px;
-        border-radius: 50%;
-        background: var(--gold);
+        padding-bottom: 14px;
+        border-bottom: 1px solid var(--rule);
     }
     .hc__tabs {
         display: flex;
-        gap: 2px;
-        padding: 3px;
-        border-radius: 5px;
-        background: rgb(0 0 0 / 0.25);
-        border: 1px solid rgb(255 255 255 / 0.08);
+        gap: 18px;
     }
     .hc__tabs button {
-        min-height: 30px;
-        padding: 0 12px;
+        position: relative;
+        padding: 4px 0;
         border: 0;
-        border-radius: 3px;
-        background: transparent;
-        color: var(--ice-3);
-        font: 500 0.78rem var(--sans);
+        background: none;
+        color: var(--ink-3);
+        font: 400 0.82rem var(--sans);
         cursor: pointer;
-        transition:
-            background 200ms,
-            color 200ms;
+        transition: color 200ms;
     }
+    .hc__tabs button::after {
+        content: '';
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: -15px;
+        height: 1px;
+        background: var(--ink);
+        transform: scaleX(0);
+        transition: transform 300ms var(--ease-out);
+    }
+    .hc__tabs button:hover,
     .hc__tabs button[aria-selected='true'] {
-        background: rgb(255 255 255 / 0.14);
-        color: var(--ice);
+        color: var(--ink);
+    }
+    .hc__tabs button[aria-selected='true']::after {
+        transform: scaleX(1);
     }
     .hc__id {
         display: flex;
-        align-items: center;
+        align-items: flex-start;
+        justify-content: space-between;
         gap: 12px;
-        margin-bottom: 18px;
-    }
-    .hc__mark {
-        display: grid;
-        place-items: center;
-        width: 42px;
-        height: 42px;
-        flex-shrink: 0;
-        border-radius: 6px;
-        background: #2b5444;
-        border: 1px solid rgb(255 255 255 / 0.16);
-        font-size: 1.15rem;
-        font-weight: 500;
-        color: var(--ice);
+        padding: 18px 0;
     }
     .hc__who {
-        flex: 1;
         min-width: 0;
     }
     .hc__name {
-        font-weight: 600;
-        font-size: 1.02rem;
-        letter-spacing: -0.01em;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+        font-size: 1.45rem;
+        font-weight: 300;
+        line-height: 1.1;
+        letter-spacing: -0.04em;
     }
     .hc__meta {
-        font-size: 0.76rem;
-        color: var(--ice-3);
+        margin-top: 4px;
+        font-size: 0.78rem;
+        color: var(--ink-3);
     }
     .hc__kf {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 8px;
-        margin: 0 0 16px;
+        margin: 0 0 18px;
+        border-block: 1px solid var(--rule);
     }
     .hc__kf > div {
-        padding: 12px;
-        border-radius: 6px;
-        background: rgb(0 0 0 / 0.22);
-        border: 1px solid rgb(255 255 255 / 0.07);
+        padding: 12px 12px 14px;
+        border-left: 1px solid var(--rule);
+    }
+    .hc__kf > div:first-child {
+        padding-left: 0;
+        border-left: 0;
     }
     .hc__kf dt {
-        font-size: 0.7rem;
-        color: var(--ice-3);
+        font-size: 0.72rem;
+        color: var(--ink-3);
         white-space: nowrap;
     }
     .hc__kf dd {
-        margin: 4px 0 0;
-        font-size: 1.08rem;
-        font-weight: 500;
-        color: var(--ice);
+        margin: 6px 0 0;
+        font-size: 1.3rem;
+        font-weight: 300;
+        letter-spacing: -0.03em;
         white-space: nowrap;
     }
     .hc__kf dd.val--missing,
-    .hc__kf dd.val--incomparable {
-        font-size: 0.9rem;
-        color: var(--gold);
-    }
-    .hc__chart {
-        padding: 14px 14px 8px;
-        border-radius: 6px;
-        background: rgb(0 0 0 / 0.22);
-        border: 1px solid rgb(255 255 255 / 0.07);
+    .hc__kf dd.val--incomparable,
+    .hc__kf dd.val--not_applicable {
+        font-style: normal;
+        text-decoration: none;
+        color: var(--tone);
     }
     .hc__charthead {
         display: flex;
         justify-content: space-between;
         font-size: 0.74rem;
-        color: var(--ice-3);
+        color: var(--ink-3);
         margin-bottom: 2px;
     }
     .hc__note {
-        margin-top: 14px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid var(--rule);
         font-size: 0.8rem;
-        color: var(--ice-2);
+        color: var(--ink-3);
         line-height: 1.5;
     }
     .hc__panel.is-in {
-        animation: hc-in 600ms var(--ease-out);
+        animation: hc-in 500ms var(--ease-out);
     }
     @keyframes hc-in {
         from {
             opacity: 0;
-            filter: blur(4px);
-            translate: 0 8px;
+            translate: 0 6px;
         }
     }
     @media (max-width: 560px) {
         .hc {
-            padding: 14px;
+            padding: 16px;
         }
         .hc__top {
             flex-direction: column;
             align-items: flex-start;
         }
+        .hc__tabs button::after {
+            bottom: -15px;
+        }
         .hc__kf {
             grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .hc__kf > div:nth-child(3) {
+            padding-left: 0;
+            border-left: 0;
+        }
+        .hc__kf > div:nth-child(n + 3) {
+            border-top: 1px solid var(--rule);
         }
     }
 </style>

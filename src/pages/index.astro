@@ -79,7 +79,7 @@ const statement =
         <div class="shell hero__stage">
             <p class="hero__left reveal" style="--d:2">
                 <span class="hero__mini" aria-hidden="true"><Icon name="doc" /> Så fungerar det</span>
-                Kreditrisker hjälper dig att <b>läsa ett företag på en minut</b>: fem års bokslut, nyckeltal med öppna formler
+                Kreditrisker hjälper dig att <b>läsa ett företag på en minut</b>: fem års bokslut, nyckeltal med öppna formler{' '}
                 <span class="tone">och luckor som visas som luckor, aldrig som nollor.</span>
             </p>
             <div class="hero__card reveal" style="--d:3">
@@ -377,6 +377,7 @@ const statement =
         margin-top: clamp(48px, 7vw, 88px);
     }
     .hero__left {
+        position: relative;
         align-self: end;
         max-width: 30ch;
         padding-bottom: 48px;
@@ -384,6 +385,13 @@ const statement =
         line-height: 1.3;
         letter-spacing: -0.02em;
         color: var(--ink);
+    }
+    .hero__left::before {
+        content: '';
+        position: absolute;
+        inset: -64px -72px 0;
+        z-index: -1;
+        background: radial-gradient(closest-side, var(--paper) 78%, transparent);
     }
     .hero__left b {
         font-weight: 500;
