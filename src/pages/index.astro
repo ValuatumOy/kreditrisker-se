@@ -361,6 +361,8 @@ const statement =
         font-size: 1.02rem;
     }
     .hero__search {
+        position: relative;
+        z-index: 10;
         margin-top: 30px;
         width: min(560px, 100%);
     }
@@ -1289,7 +1291,7 @@ const statement =
     /* ---------------- cta */
     .cta {
         position: relative;
-        overflow: hidden;
+        z-index: 2;
         isolation: isolate;
         padding-block: clamp(96px, 12vw, 160px);
         text-align: center;
@@ -1297,6 +1299,7 @@ const statement =
     }
     .cta :global(.circuit) {
         z-index: -1;
+        clip-path: inset(0 round 28px 28px 0 0);
         mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, transparent 25%, #000 70%);
     }
     .cta__inner {

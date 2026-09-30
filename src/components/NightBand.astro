@@ -22,7 +22,7 @@ const { compact = false } = Astro.props
 <style>
     .band {
         position: relative;
-        overflow: hidden;
+        z-index: 2;
         isolation: isolate;
         margin-inline: clamp(8px, 1.4vw, 20px);
         border-radius: 20px;
@@ -37,6 +37,8 @@ const { compact = false } = Astro.props
         position: absolute;
         inset: 0;
         z-index: -1;
+        overflow: hidden;
+        border-radius: inherit;
     }
     .band__media :global(.circuit) {
         opacity: 0.8;
