@@ -2,6 +2,7 @@
 import Page from '../layouts/Page.astro'
 import Doc from '../components/Doc.astro'
 import { SITE } from '../config/site.ts'
+const analytics = Boolean(import.meta.env.PUBLIC_GA_TRACKING_ID)
 ---
 
 <Page
@@ -11,15 +12,27 @@ import { SITE } from '../config/site.ts'
     lede="Den här sidan beskriver vilka personuppgifter som behandlas, varför och vilka rättigheter du har."
     draft
 >
-    <Doc toc={[['ansvarig', 'Personuppgiftsansvarig'], ['besokare', 'Besökare'], ['profiler', 'Uppgifter i företagsprofiler'], ['bestallningar', 'Beställningar'], ['rattigheter', 'Dina rättigheter']]}>
+    <Doc toc={[['ansvarig', 'Personuppgiftsansvarig'], ['besokare', 'Besökare'], ['kakor', 'Kakor och statistik'], ['profiler', 'Uppgifter i företagsprofiler'], ['bestallningar', 'Beställningar'], ['rattigheter', 'Dina rättigheter']]}>
         <h2 id="ansvarig">Personuppgiftsansvarig</h2>
         <p>{SITE.provider.name} ({SITE.provider.businessId}), {SITE.provider.country}, är personuppgiftsansvarig för behandlingen som beskrivs här.</p>
 
         <h2 id="besokare">Besökare</h2>
         <p>
-            Sajten använder inga spårningscookies och ingen annonsering i nuvarande version. Webbservern loggar tekniska uppgifter som IP-adress och tidpunkt för drift och
-            säkerhet. Om statistikverktyg läggs till uppdateras den här sidan och samtycke inhämtas där det krävs.
+            Webbservern loggar tekniska uppgifter som IP-adress och tidpunkt för drift och säkerhet. Sajten visar ingen annonsering.
         </p>
+
+        <h2 id="kakor">Kakor och statistik</h2>
+        {
+            analytics ? (
+                <p>
+                    Med ditt samtycke använder vi Google Analytics (Google Ireland Ltd) för att se hur sajten används, till exempel vilka sidor som besöks. Det sätter kakor
+                    (_ga, _ga_*) som sparas i upp till två år. Utan samtycke laddas inget statistikverktyg och inga sådana kakor sätts. Ditt val sparas i webbläsarens lokala
+                    lagring under nyckeln kreditrisker_consent. Du kan ändra eller återkalla samtycket när som helst via <em>Cookieinställningar</em> längst ner på sidan.
+                </p>
+            ) : (
+                <p>Sajten använder inga kakor för statistik eller annonsering i nuvarande version. Om statistik läggs till inhämtas ditt samtycke först.</p>
+            )
+        }
 
         <h2 id="profiler">Uppgifter i företagsprofiler</h2>
         <p>

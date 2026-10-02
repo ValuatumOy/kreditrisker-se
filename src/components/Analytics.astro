@@ -1,0 +1,80 @@
+---
+// Google Analytics behind consent, as on the Danish site: Consent Mode v2
+// defaults to denied, gtag.js loads only after "Godkänn", and "Avvisa" is
+// offered on equal terms. No advertising. Off unless PUBLIC_GA_TRACKING_ID is set.
+const id = import.meta.env.PUBLIC_GA_TRACKING_ID || ''
+const script = `
+(function () {
+  var id = ${JSON.stringify(id)}, key = 'kreditrisker_consent', loaded = false;
+  window.dataLayer = window.dataLayer || [];
+  window.gtag = function () { window.dataLayer.push(arguments); };
+  gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+  function get() { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  function set(v) { try { localStorage.setItem(key, v); } catch (e) {} }
+  function load() {
+    if (loaded) return;
+    loaded = true;
+    gtag('consent', 'update', { analytics_storage: 'granted' });
+    var s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+    document.head.appendChild(s);
+    gtag('js', new Date());
+    gtag('config', id);
+    var ai = { 'chatgpt.com': 'chatgpt', 'chat.openai.com': 'chatgpt', 'perplexity.ai': 'perplexity', 'www.perplexity.ai': 'perplexity', 'claude.ai': 'claude', 'gemini.google.com': 'gemini', 'copilot.microsoft.com': 'copilot' };
+    try { var src = document.referrer && ai[new URL(document.referrer).hostname]; if (src) gtag('event', 'ai_referral_session', { ai_referrer: src }); } catch (e) {}
+  }
+  var banner = document.getElementById('consent');
+  function open() { banner.hidden = false; }
+  if (get() === 'granted') load();
+  else if (get() !== 'denied') open();
+  banner.querySelector('[data-accept]').addEventListener('click', function () { set('granted'); banner.hidden = true; load(); });
+  banner.querySelector('[data-reject]').addEventListener('click', function () {
+    set('denied');
+    banner.hidden = true;
+    if (loaded) location.reload(); // withdrawing consent stops measurement from the next page
+  });
+  document.querySelectorAll('[data-consent-open]').forEach(function (b) { b.hidden = false; b.addEventListener('click', open); });
+})();`
+---
+
+{
+    id && (
+        <>
+            <aside id="consent" class="consent" aria-label="Cookieinställningar" hidden>
+                <p>
+                    Vi vill använda Google Analytics för att se hur sajten används. Det sätter kakor och sker bara om du godkänner. <a href="/integritet/#kakor">Läs mer</a>
+                </p>
+                <div class="consent__actions">
+                    <button type="button" class="btn btn--quiet" data-reject>Avvisa</button>
+                    <button type="button" class="btn btn--quiet" data-accept>Godkänn</button>
+                </div>
+            </aside>
+            <script is:inline set:html={script} />
+        </>
+    )
+}
+
+<style>
+    .consent {
+        position: fixed;
+        z-index: 40;
+        left: 16px;
+        bottom: 16px;
+        width: min(420px, calc(100vw - 32px));
+        padding: 18px;
+        border: 1px solid var(--rule-2);
+        border-radius: var(--radius-lg);
+        background: var(--sheet);
+        color: var(--ink);
+        box-shadow: 0 30px 60px -30px rgb(15 33 26 / 0.45);
+        font-size: 0.9rem;
+        line-height: 1.45;
+    }
+    .consent__actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin-top: 14px;
+    }
+</style>

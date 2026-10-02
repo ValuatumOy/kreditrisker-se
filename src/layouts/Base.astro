@@ -4,6 +4,7 @@ import { FLAGS, SITE } from '../config/site.ts'
 import { isIndexable } from '../lib/seo.ts'
 import Nav from '../components/Nav.astro'
 import Footer from '../components/Footer.astro'
+import Analytics from '../components/Analytics.astro'
 import { getSite } from '../lib/store.ts'
 
 interface Props {
@@ -66,6 +67,7 @@ FINISH: unreviewed and undocumented is unfinished; this build ends with the fini
             <slot />
         </main>
         <Footer />
+        <Analytics />
         <script>
             import '../scripts/motion.ts'
         </script>

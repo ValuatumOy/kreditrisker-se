@@ -33,6 +33,7 @@ const cols = [
         <span>© {year} {SITE.provider.name} · FO-nummer {SITE.provider.businessId}</span>
         {!FLAGS.checkout && <span>Tjänsten är under uppbyggnad. Inga rapporter om svenska företag säljs ännu.</span>}
         <span>Foton: Unsplash</span>
+        <button type="button" class="foot__consent" data-consent-open hidden>Cookieinställningar</button>
     </div>
 </footer>
 
@@ -96,6 +97,16 @@ const cols = [
         padding-block: 22px 28px;
         color: var(--ice-3);
         font-size: 0.78rem;
+    }
+    .foot__consent {
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-decoration: underline;
+        text-underline-offset: 3px;
+        cursor: pointer;
     }
     @media (max-width: 860px) {
         .foot__grid {
