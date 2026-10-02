@@ -1,0 +1,19 @@
+---
+// The Kreditrisker V: two-tone, rising right arm. Same paths as public/favicon.svg.
+interface Props {
+    tone?: 'light' | 'dark'
+    class?: string
+}
+const { tone = 'light', class: cls } = Astro.props
+const [a, b] = tone === 'dark' ? ['#eaf0ea', '#9fd4b0'] : ['#1d3d31', '#4f8a6c']
+---
+
+<svg class:list={['mark', cls]} viewBox="11.5 9 41.5 41.5" aria-hidden="true"><path d="M13 14h11l8 24.5V50h-5.5z" fill={a}></path><path d="M32 38.5 41.5 9H52L37.5 50H32z" fill={b}></path></svg>
+
+<style>
+    .mark {
+        width: 0.95em;
+        height: 0.95em;
+        flex-shrink: 0;
+    }
+</style>

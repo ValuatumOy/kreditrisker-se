@@ -1,6 +1,7 @@
 ---
 import { SITE } from '../config/site.ts'
 import Icon from './Icon.astro'
+import LogoMark from './LogoMark.astro'
 
 interface Props {
     current: string
@@ -18,7 +19,7 @@ const isCurrent = (href: string) => current.startsWith(href)
 
 <header class="nav" data-nav>
     <div class="shell nav__bar">
-        <a class="nav__brand" href="/">{SITE.name}</a>
+        <a class="nav__brand" href="/"><LogoMark />{SITE.name}</a>
         <details class="nav__menu">
             <summary aria-label="Meny">
                 <Icon name="menu" class="i-open" />
@@ -84,6 +85,9 @@ const isCurrent = (href: string) => current.startsWith(href)
         height: 64px;
     }
     .nav__brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
         font-size: 1.12rem;
         font-weight: 500;
         letter-spacing: -0.04em;

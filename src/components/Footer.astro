@@ -1,5 +1,6 @@
 ---
 import { FLAGS, SITE } from '../config/site.ts'
+import LogoMark from './LogoMark.astro'
 const year = SITE.asOf.slice(0, 4)
 const cols = [
     { h: 'Utforska', links: [['/sok/', 'Sök företag'], ['/branscher/', 'Branscher'], ['/kommuner/', 'Kommuner'], ['/topplistor/', 'Topplistor'], ['/guider/', 'Guider']] },
@@ -11,7 +12,7 @@ const cols = [
 <footer class="foot dark">
     <div class="shell foot__grid">
         <div class="foot__brand">
-            <a href="/" class="foot__name">{SITE.name}</a>
+            <a href="/" class="foot__name"><LogoMark tone="dark" />{SITE.name}</a>
             <p>Bokslut, nyckeltal och kreditrisk för svenska företag. <span class="tone">Byggt av {SITE.provider.name}.</span></p>
         </div>
         {
@@ -49,7 +50,10 @@ const cols = [
         gap: 40px 24px;
         padding-bottom: 64px;
     }
-    .foot__name {
+    .foot .foot__name {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
         color: var(--ice);
         text-decoration: none;
         font-size: 1.5rem;
