@@ -66,7 +66,7 @@ const TERMS_VERSION = 'utkast-2026-09'
         <div class="od__panel" data-view="paid" hidden aria-live="polite">
             <p class="od__state"><Icon name="check" /> <span class="tag tag--ok">{STATE_LABEL.paid}</span></p>
             <p>Tack för din beställning. Rapporten tas fram nu och skickas till din e-post, oftast inom några minuter.</p>
-            <p class="small muted">Beloppet reserveras på ditt kort och dras först när rapporten är klar. Om rapporten inte kan tas fram släpps reservationen och du debiteras inget.</p>
+            <p class="small muted">Beloppet reserveras och dras först när rapporten är klar. Om rapporten inte kan tas fram släpps reservationen och du debiteras inget.</p>
         </div>
 
         <div class="od__panel" data-view="failure" hidden aria-live="assertive">
@@ -99,7 +99,7 @@ const TERMS_VERSION = 'utkast-2026-09'
     const views = [...root.querySelectorAll<HTMLElement>('[data-view]')]
     const $ = <T extends Element>(sel: string) => root.querySelectorAll<T>(sel)
 
-    root.querySelector('[data-product-name]')!.textContent = PRODUCT_NAME[product].toLowerCase()
+    root.querySelector('[data-product-name]')!.textContent = product === 'ai' ? PRODUCT_NAME.ai : PRODUCT_NAME.basic.toLowerCase()
 
     function show(s: ReportState) {
         views.forEach((v) => (v.hidden = v.dataset.view !== s.kind))

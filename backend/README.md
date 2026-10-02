@@ -1,19 +1,19 @@
 # Report checkout backend
 
-On-site Stripe checkout for company-specific credit-risk reports — bought
-directly on a creditreports.dk company page, no registration. Products:
-the **AI credit risk report**, the basic **Credit Risk Report**, and three-report
-bundles for both products (EUR 6 / EUR 2). Single-report prices come from Stripe.
-Bundles are linked to the buyer's email address without registration. The first
-report is generated immediately; the remaining reports can be redeemed on any
-company page with the same email address.
+Ported from the Danish directory (creditreports.dk), where it runs in
+production. The flow is unchanged; the Swedish differences are:
 
-The flow is **parameterized by `reportType`**: the same checkout + webhook +
-poller serve every report type by adding an entry to the product map
-(`src/lib/products.js`) — not by forking the flow. AI uses
-`generator: 'reportEngine'` (async render job). Basic reports use
-`generator: 'valuatumRest'`, where one Valuatum REST call returns the finished
-PDF.
+- products `se_ai_credit_risk`, `se_credit_risk` and their 3-report bundles, in SEK;
+  a product is sold only when its Stripe product id is set (`STRIPE_PRODUCT_SE_*`),
+  and prices always come from Stripe
+- languages `sv` and `en`, Swedish email copy in the site's colours
+- Swish instead of MobilePay for bundles (single reports need manual capture,
+  which Swish does not support)
+- `kreditrisker.se` origins, secret `kreditrisker-se-<env>`, no hardcoded promotion codes
+- the order page prefills the buyer's email in Stripe Checkout
+
+Deployment: docs/AWS-SETUP.md step 5. The rest of this file describes the
+shared design, with Danish examples.
 
 ## Architecture
 
