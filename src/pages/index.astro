@@ -52,7 +52,7 @@ const explore = [
     { href: '/guider/', title: 'Guider', text: 'Läs en årsredovisning, förstå nyckeltalen.', n: `${GUIDES.length}` },
 ]
 const statement =
-    'Kreditrisker samlar bokslut, nyckeltal och källor för svenska företag, så att du kan se hur en kund eller leverantör faktiskt ser ut innan du skickar fakturan.'
+    'Kreditrisker samlar bokslut, nyckeltal och källor för svenska företag, så att du kan se hur en kund eller leverantör ser ut innan du skickar fakturan.'
 ---
 
 <Base
@@ -79,8 +79,8 @@ const statement =
         <div class="shell hero__stage">
             <p class="hero__left reveal" style="--d:2">
                 <span class="hero__mini" aria-hidden="true"><Icon name="doc" /> Så fungerar det</span>
-                Kreditrisker hjälper dig att <b>läsa ett företag på en minut</b>: fem års bokslut, nyckeltal med öppna formler{' '}
-                <span class="tone">och luckor som visas som luckor, aldrig som nollor.</span>
+                Kreditrisker visar <b>fem års bokslut</b> och nyckeltal med öppna formler.{' '}
+                <span class="tone">Saknas en uppgift står det saknas, inte noll.</span>
             </p>
             <div class="hero__card reveal" style="--d:3">
                 <HeroCard samples={samples} />
@@ -129,7 +129,7 @@ const statement =
     <section class="section">
         <div class="shell">
             <div class="section__head">
-                <h2 class="reveal">Allt du vill veta <span class="tone">innan du skickar fakturan.</span></h2>
+                <h2 class="reveal">Kolla kunden <span class="tone">innan du skickar fakturan.</span></h2>
                 <p class="reveal" style="--d:1">En profil per organisationsnummer, byggd på inlämnade årsredovisningar och uppdaterad när nya bokslut registreras.</p>
             </div>
             <div class="bento">
@@ -159,7 +159,7 @@ const statement =
                         <div><span>Rörelsemarginal</span><b class="gap">ej jämförbar</b></div>
                         <div><span>Årets resultat</span><b class="num neg">−490 tkr</b></div>
                     </div>
-                    <h3>Luckor visas som luckor</h3>
+                    <h3>Saknade uppgifter syns</h3>
                     <p>En uppgift som saknas blir aldrig en nolla, och en negativ siffra syns direkt.</p>
                 </article>
                 <article class="tile tile--report reveal" style="--d:1" data-spotlight>
@@ -184,7 +184,7 @@ const statement =
     <section class="section states">
         <div class="shell">
             <div class="section__head">
-                <h2 class="reveal">Varje värde har ett tillstånd, <span class="tone">inte bara en siffra.</span></h2>
+                <h2 class="reveal">Fem sorters värden. <span class="tone">Noll betyder noll.</span></h2>
                 <p class="reveal" style="--d:1">Små bolag lämnar ofta förkortade bokslut, och alla räkenskapsår är inte tolv månader. Därför skiljer vi på fem sorters värden.</p>
             </div>
             <ol class="states__row">
@@ -218,8 +218,8 @@ const statement =
             </div>
             <div class="sources__copy">
                 <p class="chip reveal"><Icon name="doc" /> Källor</p>
-                <h2 class="reveal">Källan först. <span class="tone">Alltid.</span></h2>
-                <p class="lede reveal" style="--d:1">Under varje tabell står varifrån siffrorna kommer, vilket räkenskapsår de gäller och när vi hämtade dem.</p>
+                <h2 class="reveal">Källan står <span class="tone">under varje tabell.</span></h2>
+                <p class="lede reveal" style="--d:1">Där står också vilket räkenskapsår siffrorna gäller och när vi hämtade dem.</p>
                 <ul class="sources__list">
                     <li class="reveal" style="--d:2"><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></li>
                     <li class="reveal" style="--d:3"><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></li>
@@ -236,7 +236,7 @@ const statement =
         <div class="reports__shade" aria-hidden="true"></div>
         <div class="shell reports__inner">
             <div class="section__head">
-                <h2 class="reveal">Två rapporter. <span class="tone">När de är redo.</span></h2>
+                <h2 class="reveal">Rapporterna <span class="tone">kommer senare.</span></h2>
                 <p class="reveal" style="--d:1">Rapporterna om svenska företag är under utveckling. Vi visar inga priser och tar inga beställningar förrän allt är granskat.</p>
             </div>
             <div class="reports__grid">
