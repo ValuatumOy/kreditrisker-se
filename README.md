@@ -89,3 +89,5 @@ Before launch, read [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md) (inputs and sig
 ## Builds and data
 
 Company pages come from the Valuatum REST API and build like the Finnish and Danish sites (batch pages, full-directory hubs and sitemaps). Local previews, Vercel test links and the Jenkins production job are described in [docs/BUILD-AND-DEPLOY.md](docs/BUILD-AND-DEPLOY.md).
+
+AWS resources and their setup order: [docs/AWS-SETUP.md](docs/AWS-SETUP.md).
