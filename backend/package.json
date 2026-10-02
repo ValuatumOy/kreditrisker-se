@@ -1,0 +1,26 @@
+{
+  "name": "kreditrisker-se-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Stripe Checkout + async report-generation fulfillment Lambdas for kreditrisker.se (on-site report purchase).",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --require ./test/setup.js --test"
+  },
+  "devDependencies": {
+    "esbuild": "^0.23.0"
+  },
+  "dependencies": {
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@aws-sdk/client-dynamodb": "^3.658.0",
+    "@aws-sdk/client-secrets-manager": "^3.658.0",
+    "@aws-sdk/client-sesv2": "^3.1088.0",
+    "@aws-sdk/credential-provider-node": "^3.658.0",
+    "@aws-sdk/lib-dynamodb": "^3.658.0",
+    "@aws-sdk/protocol-http": "^3.374.0",
+    "@aws-sdk/signature-v4": "^3.374.0",
+    "stripe": "^17.3.1"
+  }
+}

@@ -13,3 +13,4 @@ data/build/
 data/api-cache/
 data/params/
 build/bin/
+backend/node_modules/

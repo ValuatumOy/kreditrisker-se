@@ -65,7 +65,7 @@ const popular = site.industries.filter((h) => h.substantial).slice(0, 6)
 </Base>
 
 <script>
-    import { searchIndex, type SearchHit } from '../../lib/search.ts'
+    import { findCompanies, type SearchHit } from '../../lib/search.ts'
     import { formatOrgnr, looksLikeOrgnr, parseOrgnr } from '../../lib/orgnr.ts'
 
     const out = document.querySelector<HTMLElement>('[data-results]')!
@@ -84,9 +84,7 @@ const popular = site.industries.filter((h) => h.substantial).slice(0, 6)
         if (!q) return fromTpl('tpl-empty')
         if (looksLikeOrgnr(q) && !parseOrgnr(q).ok) return fromTpl('tpl-badnr')
         const endpoint = document.querySelector<HTMLFormElement>('[data-search]')?.dataset.endpoint
-        const hits: SearchHit[] = endpoint
-            ? await fetch(`${endpoint}?q=${encodeURIComponent(q)}&limit=50`).then((r) => (r.ok ? r.json() : []))
-            : searchIndex(await fetch('/sok/index.json').then((r) => r.json()), q, 50)
+        const hits: SearchHit[] = await findCompanies(endpoint, q, 50)
         if (hits.length === 1 && looksLikeOrgnr(q)) return location.replace(hits[0].p)
         if (!hits.length) return fromTpl('tpl-none')
         const h = document.createElement('p')

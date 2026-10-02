@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { disabledBackend, httpBackend, mockBackend, parseState } from '../src/lib/reports/adapter.ts'
+import { disabledBackend, httpBackend, mockBackend } from '../src/lib/reports/adapter.ts'
 import { staticReportState } from '../src/lib/reports/availability.ts'
 
 test('default build: both products unavailable, no price', () => {
@@ -37,14 +37,25 @@ test('mock backend walks processing -> success and processing -> failure', async
     assert.deepEqual(f, { kind: 'failure', orderId: 'mock-ai-2', code: 'generation_failed', retryable: true })
 })
 
-test('http adapter: malformed or unsafe responses become failures, prices are ignored', async () => {
-    assert.equal(parseState({ kind: 'success', orderId: '1', downloadHref: 'javascript:alert(1)' }).kind, 'failure')
-    assert.deepEqual(parseState({ kind: 'available', price: { amountSek: 1 } }), { kind: 'available' })
-    assert.equal(parseState(null).kind, 'failure')
-    const down = httpBackend('https://api.invalid/', async () => {
+test('http adapter: Stripe redirect only to Stripe, errors become states', async () => {
+    const req = { orgnr: '5569876542', product: 'basic' as const, email: 'a@b.se', acceptedTermsVersion: 'v', fid: '900001', returnPath: '/bestall/?orgnr=5569876542' }
+    let sent: Record<string, unknown> = {}
+    const ok = httpBackend('https://www.kreditrisker.se/api/', async (url, init) => {
+        assert.equal(String(url), 'https://www.kreditrisker.se/api/create-checkout')
+        sent = JSON.parse(String(init!.body))
+        return Response.json({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
+    })
+    assert.deepEqual(await ok.createOrder(req), { kind: 'redirect', url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
+    assert.equal(sent.reportType, 'se_credit_risk')
+    assert.equal(sent.businessId, '5569876542')
+    assert.equal(sent.fid, '900001')
+    assert.equal('price' in sent || 'amount' in sent, false, 'the client never sends a price')
+    const evil = httpBackend('https://x/api/', async () => Response.json({ url: 'https://evil.example/pay' }))
+    assert.equal((await evil.createOrder(req)).kind, 'failure')
+    const down = httpBackend('https://x/api/', async () => {
         throw new Error('offline')
     })
-    assert.deepEqual(await down.availability('x', 'basic'), { kind: 'unavailable', reason: 'backend_unreachable' })
-    const err = httpBackend('https://api.invalid/', async () => new Response('', { status: 503 }))
-    assert.deepEqual(await err.orderStatus('1', 'ai'), { kind: 'failure', code: 'http_503', retryable: true })
+    assert.deepEqual(await down.createOrder(req), { kind: 'unavailable', reason: 'backend_unreachable' })
+    const err = httpBackend('https://x/api/', async () => new Response('', { status: 503 }))
+    assert.deepEqual(await err.createOrder(req), { kind: 'failure', code: 'http_503', retryable: true })
 })

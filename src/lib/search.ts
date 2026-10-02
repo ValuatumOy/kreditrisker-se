@@ -59,3 +59,27 @@ export function searchIndex(index: SearchHit[], query: string, limit = 8): Searc
         .slice(0, limit)
         .map((x) => x.h)
 }
+
+/** CloudSearch response (via /api/search, see aws-infra/lib/functions.ts) to SearchHit[]. */
+export function fromCloudSearch(body: unknown): SearchHit[] {
+    const hits = (body as { hits?: { hit?: { fields?: Record<string, string | string[]> }[] } })?.hits?.hit ?? []
+    const one = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v) || undefined
+    return hits.flatMap(({ fields: f = {} }) => {
+        const h: SearchHit = { o: one(f.orgnr) ?? '', n: one(f.name) ?? '', p: one(f.path) ?? '' }
+        if (!h.o || !h.n || !h.p.startsWith('/foretag/')) return []
+        const opt = { f: one(f.former), k: one(f.kommun), s: one(f.sni), st: one(f.status), y: one(f.year), fr: one(f.fresh) }
+        for (const [k, v] of Object.entries(opt)) if (v) (h as unknown as Record<string, string>)[k] = v
+        return [h]
+    })
+}
+
+/** Company search for the browser: the search API when configured, else the static index. */
+export async function findCompanies(endpoint: string | undefined, q: string, limit = 8, staticIndex?: () => Promise<SearchHit[]>): Promise<SearchHit[]> {
+    if (endpoint) {
+        if (q.trim().length < 2) return []
+        const res = await fetch(`${endpoint}?q=${encodeURIComponent(q)}&size=${Math.min(limit, 99)}`).catch(() => null)
+        return res?.ok ? fromCloudSearch(await res.json()) : []
+    }
+    const index = staticIndex ? await staticIndex() : await fetch('/sok/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => [])
+    return searchIndex(index, q, limit)
+}

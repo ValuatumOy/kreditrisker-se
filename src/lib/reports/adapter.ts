@@ -1,7 +1,7 @@
 // Report backend adapters. Selected by PUBLIC_SE_REPORT_ADAPTER.
 //   disabled: every product unavailable (default, production-safe)
 //   mock:     simulated lifecycle for development and preview only
-//   http:     the future Swedish backend (endpoints documented in docs/REPORTS.md)
+//   http:     the Stripe checkout backend in backend/ (PUBLIC_SE_REPORT_API=/api/)
 // Runs in the browser, so it must not import Node modules.
 
 import type { OrderRequest, ReportBackend, ReportProduct, ReportState } from './types.ts'
@@ -43,46 +43,48 @@ export function mockBackend(processingMs = 2500, now: () => number = Date.now): 
     }
 }
 
-export function httpBackend(base: string, fetchImpl: typeof fetch = fetch): ReportBackend {
-    const call = async (path: string, init?: RequestInit): Promise<ReportState> => {
-        try {
-            const res = await fetchImpl(new URL(path, base), { ...init, headers: { 'content-type': 'application/json' } })
-            if (!res.ok) return { kind: 'failure', code: `http_${res.status}`, retryable: res.status >= 500 }
-            return parseState(await res.json())
-        } catch {
-            return { kind: 'unavailable', reason: 'backend_unreachable' }
-        }
-    }
-    return {
-        availability: (orgnr, product) => call(`se/reports/${product}/availability?orgnr=${encodeURIComponent(orgnr)}`),
-        createOrder: (req) => call(`se/reports/${req.product}/orders`, { method: 'POST', body: JSON.stringify(req) }),
-        orderStatus: (orderId, product) => call(`se/reports/${product}/orders/${encodeURIComponent(orderId)}`),
-    }
-}
+/** Swedish product ids in the checkout backend (backend/src/lib/products.js). */
+export const REPORT_TYPE: Record<ReportProduct, string> = { basic: 'se_credit_risk', ai: 'se_ai_credit_risk' }
 
-/** Accepts only well-formed states from the backend; anything else is a failure. */
-export function parseState(x: unknown): ReportState {
-    const o = (x ?? {}) as Record<string, unknown>
-    switch (o.kind) {
-        case 'unavailable':
-            return { kind: 'unavailable', reason: (['not_launched', 'company_not_supported', 'insufficient_data', 'backend_unreachable'].includes(o.reason as string) ? o.reason : 'not_launched') as never }
-        case 'sample':
-            return typeof o.sampleHref === 'string' ? { kind: 'sample', sampleHref: o.sampleHref } : bad()
-        case 'available':
-            return { kind: 'available' } // prices come only from VERIFIED_PRICES, never from the wire
-        case 'processing':
-            return typeof o.orderId === 'string' ? { kind: 'processing', orderId: o.orderId, startedAt: String(o.startedAt ?? '') } : bad()
-        case 'success':
-            return typeof o.orderId === 'string' && typeof o.downloadHref === 'string' && /^https:\/\//.test(o.downloadHref)
-                ? { kind: 'success', orderId: o.orderId, downloadHref: o.downloadHref, expiresAt: typeof o.expiresAt === 'string' ? o.expiresAt : undefined }
-                : bad()
-        case 'failure':
-            return { kind: 'failure', orderId: typeof o.orderId === 'string' ? o.orderId : undefined, code: String(o.code ?? 'unknown'), retryable: o.retryable === true }
-        default:
-            return bad()
+/**
+ * The checkout backend (backend/, ported from the Danish directory): POST
+ * /api/create-checkout returns a Stripe Checkout URL. Payment is authorised,
+ * the report generated, then captured and emailed; a failed report is never
+ * charged. Prices come from Stripe; the page shows only VERIFIED_PRICES.
+ */
+export function httpBackend(base: string, fetchImpl: typeof fetch = fetch): ReportBackend {
+    return {
+        async availability() {
+            return { kind: 'available' }
+        },
+        async createOrder(req) {
+            try {
+                const res = await fetchImpl(new URL('create-checkout', base), {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({
+                        reportType: REPORT_TYPE[req.product],
+                        fid: req.fid,
+                        businessId: req.orgnr,
+                        companyName: req.companyName,
+                        email: req.email,
+                        lang: 'sv',
+                        reportLang: 'sv',
+                        cancelPath: req.returnPath,
+                    }),
+                })
+                if (!res.ok) return { kind: 'failure', code: `http_${res.status}`, retryable: res.status >= 500 }
+                const { url } = (await res.json()) as { url?: unknown }
+                return typeof url === 'string' && url.startsWith('https://checkout.stripe.com/') ? { kind: 'redirect', url } : { kind: 'failure', code: 'malformed_response', retryable: true }
+            } catch {
+                return { kind: 'unavailable', reason: 'backend_unreachable' }
+            }
+        },
+        async orderStatus() {
+            return { kind: 'paid' } // delivery is by email; there is no status endpoint
+        },
     }
 }
-const bad = (): ReportState => ({ kind: 'failure', code: 'malformed_response', retryable: true })
 
 export function selectBackend(kind: string | undefined, apiBase: string | undefined): ReportBackend {
     if (kind === 'http' && apiBase) return httpBackend(apiBase)

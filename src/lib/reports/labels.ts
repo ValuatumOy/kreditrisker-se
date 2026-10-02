@@ -9,6 +9,8 @@ export const STATE_LABEL: Record<ReportState['kind'], string> = {
     processing: 'Skapas',
     success: 'Klar',
     failure: 'Misslyckades',
+    redirect: 'Till betalning',
+    paid: 'Betald',
 }
 
 export const UNAVAILABLE_TEXT: Record<UnavailableReason, string> = {

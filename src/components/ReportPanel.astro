@@ -15,7 +15,9 @@ const DESC: Record<ReportProduct, string> = {
     ai: 'Som basrapporten, med en skriven analys och genomgång av offentliga källor.',
 }
 const products = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, company) }))
-const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}&produkt=${p === 'basic' ? 'bas' : 'ai'}`
+// The basic report is generated from Valuatum's model id (API data carries it as fid:N).
+const fid = company.record.status.source.documentId?.match(/^fid:(\d+)$/)?.[1]
+const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}&produkt=${p === 'basic' ? 'bas' : 'ai'}${fid ? `&fid=${fid}` : ''}`
 ---
 
 <aside class="rp dark grain" aria-labelledby="rp-title" data-spotlight>

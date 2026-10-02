@@ -50,7 +50,7 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
 </form>
 
 <script>
-    import { searchIndex, type SearchHit } from '../lib/search.ts'
+    import { findCompanies, type SearchHit } from '../lib/search.ts'
     import { formatOrgnr } from '../lib/orgnr.ts'
 
     let indexPromise: Promise<SearchHit[]> | null = null
@@ -154,12 +154,7 @@ const endpoint = process.env.PUBLIC_SE_SEARCH_ENDPOINT ?? ''
         const query = async () => {
             const q = input.value
             const mine = ++seq
-            let res: SearchHit[]
-            if (endpoint) {
-                res = q.trim().length < 2 ? [] : await fetch(`${endpoint}?q=${encodeURIComponent(q)}`).then((r) => (r.ok ? r.json() : [])).catch(() => [])
-            } else {
-                res = searchIndex(await loadIndex(), q)
-            }
+            const res = await findCompanies(endpoint, q, 8, loadIndex)
             if (mine !== seq) return
             hits = res
             render()

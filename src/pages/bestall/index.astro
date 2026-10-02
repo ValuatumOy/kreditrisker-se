@@ -1,7 +1,8 @@
 ---
 // Order flow behind flags. With the default 'disabled' adapter every product
 // is unavailable. 'mock' (preview builds only) simulates the lifecycle; ?demo=<state>
-// renders a single state for review. 'http' talks to the Swedish report backend.
+// renders a single state for review. 'http' sends the buyer to Stripe Checkout
+// via backend/; Stripe returns here with ?checkout=success and the PDF is emailed.
 import Base from '../../layouts/Base.astro'
 import Icon from '../../components/Icon.astro'
 import NightBand from '../../components/NightBand.astro'
@@ -57,6 +58,17 @@ const TERMS_VERSION = 'utkast-2026-09'
             <p class="small muted">Order <span class="num" data-order-id></span></p>
         </div>
 
+        <div class="od__panel" data-view="redirect" hidden aria-live="polite">
+            <p class="od__state"><span class="od__spin" aria-hidden="true"></span> <span class="tag">{STATE_LABEL.redirect}</span></p>
+            <p>Du skickas vidare till betalningen hos Stripe.</p>
+        </div>
+
+        <div class="od__panel" data-view="paid" hidden aria-live="polite">
+            <p class="od__state"><Icon name="check" /> <span class="tag tag--ok">{STATE_LABEL.paid}</span></p>
+            <p>Tack för din beställning. Rapporten tas fram nu och skickas till din e-post, oftast inom några minuter.</p>
+            <p class="small muted">Beloppet reserveras på ditt kort och dras först när rapporten är klar. Om rapporten inte kan tas fram släpps reservationen och du debiteras inget.</p>
+        </div>
+
         <div class="od__panel" data-view="failure" hidden aria-live="assertive">
             <p class="od__state"><Icon name="alert" /> <span class="tag tag--alert">{STATE_LABEL.failure}</span></p>
             <p>Rapporten kunde inte tas fram (<span class="num" data-code></span>).</p>
@@ -72,13 +84,15 @@ const TERMS_VERSION = 'utkast-2026-09'
     import type { ReportProduct, ReportState } from '../../lib/reports/types.ts'
     import { UNAVAILABLE_TEXT, PRODUCT_NAME } from '../../lib/reports/labels.ts'
     import { formatOrgnr, parseOrgnr } from '../../lib/orgnr.ts'
-    import type { SearchHit } from '../../lib/search.ts'
+    import { findCompanies, type SearchHit } from '../../lib/search.ts'
 
     const root = document.querySelector<HTMLElement>('[data-order]')!
     const params = new URLSearchParams(location.search)
     const product: ReportProduct = params.get('produkt') === 'ai' ? 'ai' : 'basic'
     const parsed = parseOrgnr(params.get('orgnr') ?? '')
     const orgnr = parsed.ok ? parsed.orgnr : ''
+    const fid = /^\d+$/.test(params.get('fid') ?? '') ? params.get('fid')! : undefined
+    let companyName: string | undefined
     const adapter = root.dataset.adapter
     const flags = JSON.parse(root.dataset.flags!) as Record<ReportProduct, string>
     const backend = selectBackend(adapter, root.dataset.api)
@@ -108,10 +122,12 @@ const TERMS_VERSION = 'utkast-2026-09'
 
     async function start() {
         if (!orgnr) return show({ kind: 'unavailable', reason: 'insufficient_data' })
-        const hits: SearchHit[] = await fetch('/sok/index.json').then((r) => r.json()).catch(() => [])
+        const hits: SearchHit[] = await findCompanies(import.meta.env.PUBLIC_SE_SEARCH_ENDPOINT, orgnr, 3)
         const hit = hits.find((h) => h.o === orgnr)
         const co = root.querySelector('[data-company]')!
         co.textContent = hit ? `${hit.n}, org.nr ${formatOrgnr(orgnr)}` : `Org.nr ${formatOrgnr(orgnr)}`
+        companyName = hit?.n
+        if (params.get('checkout') === 'success') return show({ kind: 'paid' })
         if (hit) root.querySelector<HTMLAnchorElement>('[data-back]')!.href = hit.p
 
         const demo = params.get('demo')
@@ -128,6 +144,7 @@ const TERMS_VERSION = 'utkast-2026-09'
         }
         if (flags[product] === 'unavailable') return show({ kind: 'unavailable', reason: 'not_launched' })
         if (flags[product] === 'sample') return show({ kind: 'sample', sampleHref: `/rapporter/exempel/#${product === 'basic' ? 'basrapport' : 'ai-rapport'}` })
+        if (adapter === 'http' && product === 'basic' && !fid) return show({ kind: 'unavailable', reason: 'insufficient_data' })
         show(await backend.availability(orgnr, product))
     }
 
@@ -142,8 +159,10 @@ const TERMS_VERSION = 'utkast-2026-09'
         email.setAttribute('aria-invalid', String(!emailOk))
         if (!emailOk) return email.focus()
         if (!terms.checked) return terms.focus()
-        const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms! })
+        const returnPath = `/bestall/?orgnr=${orgnr}&produkt=${product === 'ai' ? 'ai' : 'bas'}${fid ? `&fid=${fid}` : ''}`
+        const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!, fid, companyName, returnPath })
         show(s)
+        if (s.kind === 'redirect') location.assign(s.url)
         if (s.kind === 'processing') poll(s.orderId)
     })
     root.querySelector('[data-retry]')!.addEventListener('click', () => show({ kind: 'available' }))

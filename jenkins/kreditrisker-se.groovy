@@ -19,6 +19,7 @@ pipeline {
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Include fids updated since this time (linux date syntax).')
         string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet.')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3 and save the index state')
+        booleanParam(name: 'SEARCH_FULL', defaultValue: false, description: 'Re-upload every company to CloudSearch (first load)')
         string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Git branch')
     }
 
@@ -26,7 +27,8 @@ pipeline {
         AWS_REGION = 'eu-west-1'
         BUILD_BUCKET = 'REPLACE_ME_SE_BUCKET'
         CLOUDFRONT_DISTRIBUTION_ID = 'REPLACE_ME_SE_CLOUDFRONT_ID'
-        STATE_URI = 'REPLACE_ME_PRIVATE_STATE_URI' // e.g. s3://valu-produ/kreditrisker-se/state/index.jsonl, never in the public bucket
+        STATE_URI = 'REPLACE_ME_PRIVATE_STATE_URI' // SiteStack output StateUri (private bucket)
+        CLOUDSEARCH_DOC_ENDPOINT = 'REPLACE_ME_SE_CLOUDSEARCH_DOC_ENDPOINT' // scripts/create-cloudsearch-domain.sh
         STATIC_PARAMS_PROPERTIES = 'REPLACE_ME_SE_PROPERTIES_PATH'
         SE_ACCOUNTS = 'XBRLSweden'
 
@@ -37,6 +39,7 @@ pipeline {
         SECRET_VALUATUM_API_TOKEN = credentials('REPLACE_ME_SE_API_TOKEN_CRED_ID')
         SE_SITE_ORIGIN = 'https://www.kreditrisker.se'
         SE_INDEXING = '0' // launch gates 1-3 and 9 (docs/LAUNCH-GATES.md)
+        PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> CloudSearch (aws-infra)
     }
 
     stages {
@@ -97,6 +100,21 @@ pipeline {
                     done < data/build/removed.txt
                     aws s3 cp data/build/index.jsonl "$STATE_URI" --only-show-errors
                     aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
+                '''
+            }
+        }
+
+        stage('Update search') {
+            when { expression { params.DEPLOY } }
+            steps {
+                sh '''#!/bin/bash
+                    set -e
+                    node scripts/search-docs.ts $( [ "$SEARCH_FULL" = "true" ] && echo --full )
+                    for f in data/build/search/batch-*.json; do
+                        [ -f "$f" ] || continue
+                        aws cloudsearchdomain upload-documents --endpoint-url "https://$CLOUDSEARCH_DOC_ENDPOINT"                             --content-type application/json --documents "$f" > /dev/null
+                        echo "uploaded $f"
+                    done
                 '''
             }
         }

@@ -16,6 +16,9 @@ export type ReportState =
     | { kind: 'processing'; orderId: string; startedAt: string }
     | { kind: 'success'; orderId: string; downloadHref: string; expiresAt?: string }
     | { kind: 'failure'; orderId?: string; code: string; retryable: boolean }
+    // Stripe Checkout flow (backend/): leave for Stripe, then come back paid; the PDF arrives by email.
+    | { kind: 'redirect'; url: string }
+    | { kind: 'paid' }
 
 export const STATE_KINDS = ['unavailable', 'sample', 'available', 'processing', 'success', 'failure'] as const
 
@@ -24,6 +27,11 @@ export interface OrderRequest {
     product: ReportProduct
     email: string
     acceptedTermsVersion: string
+    /** Valuatum followed-model id; the basic report is generated from it. */
+    fid?: string
+    companyName?: string
+    /** Same-origin path Stripe returns to (with ?checkout=success) or cancels to. */
+    returnPath?: string
 }
 
 /** Contract for the future Swedish report backend. */
