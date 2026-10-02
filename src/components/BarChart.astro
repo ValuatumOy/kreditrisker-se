@@ -13,7 +13,7 @@ interface Props {
 }
 const { points, title, height = 190, highlightLast = true } = Astro.props
 const uid = `h${Math.abs([...title].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7))}`
-const W = 560
+const W = 400 // narrow viewBox so labels stay legible in half-width cards
 const top = 26
 const hasNeg = points.some((p) => (p.value.status === 'reported' || p.value.status === 'derived') && p.value.value < 0)
 const bottom = hasNeg ? 50 : 30
@@ -30,6 +30,7 @@ const barW = Math.min(64, band * 0.56)
 const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).join(', ')
 ---
 
+<div class="chart" data-chart>
 <svg class="bars" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`${title}. ${summary}`}>
     <defs>
         <linearGradient id={`${uid}-bar`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc9ab" /><stop offset="1" stop-color="#d8e7dc" /></linearGradient>
@@ -48,7 +49,7 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
             const last = highlightLast && i === points.length - 1
             if (n === null)
                 return (
-                    <g class="bars__gap">
+                    <g class="bars__gap" data-col={i}>
                         <rect x={cx - barW / 2} y={top} width={barW} height={plotH} fill={`url(#${uid})`} />
                         <text x={cx} y={top + plotH / 2} text-anchor="middle" dominant-baseline="middle" class="bars__gaplabel">
                             {d.text}
@@ -61,7 +62,7 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
             const yv = y(n)
             const h = Math.abs(zeroY - yv)
             return (
-                <g class:list={['bars__bar', { 'is-neg': n < 0, 'is-last': last }]} style={`--i:${i}`}>
+                <g class:list={['bars__bar', { 'is-neg': n < 0, 'is-last': last }]} style={`--i:${i}`} data-col={i}>
                     {n === 0 ? (
                         <line x1={cx - barW / 2} x2={cx + barW / 2} y1={zeroY} y2={zeroY} class="bars__zero" />
                     ) : (
@@ -77,9 +78,72 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
             )
         })
     }
+    {
+        points.map((p, i) => {
+            const d = compactSek(p.value)
+            const n = nums[i]
+            return (
+                <rect
+                    class="hit"
+                    data-col={i}
+                    data-label={p.label}
+                    data-text={d.text}
+                    data-x={(band * i + band / 2) / W}
+                    data-y={(n === null ? top + plotH / 2 : Math.min(y(n), zeroY)) / height}
+                    x={band * i}
+                    y="0"
+                    width={band}
+                    height={height}
+                    tabindex="0"
+                    aria-label={`${p.label}: ${d.text}`}
+                />
+            )
+        })
+    }
 </svg>
+<div class="chart__tip" hidden></div>
+</div>
+
+<script>
+    import '../scripts/charts.ts'
+</script>
 
 <style>
+    .chart {
+        position: relative;
+    }
+    .hit {
+        fill: transparent;
+        cursor: crosshair;
+        outline: none;
+    }
+    .chart__tip {
+        position: absolute;
+        z-index: 3;
+        display: grid;
+        gap: 1px;
+        padding: 7px 10px;
+        border: 1px solid var(--rule-2);
+        border-radius: 4px;
+        background: var(--sheet);
+        box-shadow: 0 14px 30px -18px rgb(15 33 26 / 0.5);
+        transform: translate(-50%, calc(-100% - 10px));
+        pointer-events: none;
+        white-space: nowrap;
+        font-size: 0.78rem;
+        color: var(--ink-3);
+        line-height: 1.3;
+    }
+    .chart__tip :global(strong) {
+        font-size: 1rem;
+        font-weight: 500;
+        color: var(--ink);
+        font-variant-numeric: tabular-nums;
+    }
+    .bars__bar.is-active rect,
+    .bars__gap.is-active rect {
+        filter: brightness(0.9);
+    }
     .bars {
         width: 100%;
         height: auto;

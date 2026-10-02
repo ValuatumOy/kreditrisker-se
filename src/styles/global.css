@@ -420,7 +420,7 @@ table {
 .fig__title {
     font-family: var(--sans);
     font-size: 1rem;
-    font-weight: 600;
+    font-weight: 500;
     letter-spacing: -0.01em;
     line-height: 1.3;
 }
@@ -461,46 +461,40 @@ table {
 .tag {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
-    padding: 2px 8px;
-    border: 1px solid var(--rule);
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid var(--rule-2);
     border-radius: 3px;
-    font-size: 0.75rem;
-    font-weight: 500;
-    line-height: 1.5;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
     color: var(--ink-2);
-    background: var(--sheet);
+    background: transparent;
     white-space: nowrap;
 }
-.tag::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--ink-3);
-}
-.tag--ok::before {
-    background: var(--green);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--green) 22%, transparent);
+.tag--ok {
+    color: var(--blue);
 }
 .tag--warn {
-    border-color: color-mix(in srgb, var(--ochre) 40%, transparent);
-    background: var(--ochre-wash);
     color: var(--ochre-ink);
 }
-.tag--warn::before {
-    background: var(--ochre);
-}
 .tag--alert {
-    border-color: color-mix(in srgb, var(--red) 35%, transparent);
-    background: var(--red-wash);
     color: var(--red);
 }
-.tag--alert::before {
-    background: var(--red);
+.dark .tag {
+    border-color: rgb(255 255 255 / 0.22);
+    color: var(--ice-2);
 }
-.tag--plain::before {
-    display: none;
+.dark .tag--ok {
+    color: var(--glow);
+}
+.dark .tag--warn {
+    color: var(--gold);
+}
+.dark .tag--alert {
+    color: #f1a198;
 }
 
 /* ------------------------------------------------------------------ tables */

@@ -88,7 +88,6 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                 <Crumbs items={crumbs} />
                 <header class="co__head">
                     <div class="co__titlerow">
-                        <div class="co__mark reveal" aria-hidden="true">{r.name.replace(/^Exempel /, '').slice(0, 1)}</div>
                         <h1 class="reveal" style="--d:1">{r.name}</h1>
                     </div>
                     <div class="co__ids reveal" style="--d:2">
@@ -293,19 +292,6 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         align-items: center;
         gap: 20px;
     }
-    .co__mark {
-        display: grid;
-        place-items: center;
-        width: clamp(52px, 6vw, 72px);
-        height: clamp(52px, 6vw, 72px);
-        flex-shrink: 0;
-        border-radius: 8px;
-        background: #2b5444;
-        border: 1px solid rgb(255 255 255 / 0.14);
-        font-weight: 400;
-        font-size: clamp(1.6rem, 1rem + 1.6vw, 2.2rem);
-        color: var(--ice);
-    }
     .co__head h1 {
         font-size: clamp(2.2rem, 1.2rem + 3.6vw, 4.2rem);
         font-weight: 300;
@@ -509,7 +495,8 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         box-shadow: var(--card-shadow);
     }
     .co__related a {
-        font-weight: 600;
+        font-weight: 450;
+        letter-spacing: -0.01em;
         color: var(--ink);
         text-decoration: none;
     }
