@@ -2,7 +2,7 @@
 // quality verdicts, hubs and rankings. Pure; no IO.
 
 import { FLAGS, SITE } from '../config/site.ts'
-import type { CompanyRecord, PublishedCompany } from './contract/types.ts'
+import type { CompanyRecord, CompanyStatusCode, Freshness, Municipality, PublishedCompany, SniCode } from './contract/types.ts'
 import { freshnessOf } from './freshness.ts'
 import { computeMetrics, numeric, type MetricKey } from './metrics.ts'
 import type { Release } from './pipeline.ts'
@@ -16,13 +16,71 @@ export const MIN_HUB_COMPANIES = 3
 /** Rankings list only indexable profiles, and need at least this many entries. */
 export const MIN_RANKING_ENTRIES = 3
 
+/**
+ * One slim line per company in the whole directory. Hubs, rankings, sitemaps,
+ * search and related links are built from these, so a partial build (only the
+ * companies that changed, as on the Finnish and Danish sites) still lists every
+ * company. Full records are needed only for the pages being built.
+ */
+export interface IndexRow {
+    /** orgnr */
+    o: string
+    /** name, former names */
+    n: string
+    f?: string
+    /** canonical path, and old paths that redirect to it */
+    p: string
+    rf: string[]
+    st: CompanyStatusCode
+    k?: Municipality
+    s?: SniCode
+    fr: Freshness
+    /** indexable, meets content threshold, synthetic */
+    ix: boolean
+    q: boolean
+    syn: boolean
+    /** newest period */
+    per?: { start: string; end: string; months: number; filedAt?: string }
+    /** newest-period figures: net sales (and prior year), employees */
+    ns?: number
+    nsp?: number
+    emp?: number
+    /** metrics: operating margin, equity ratio, revenue growth (fractions) */
+    om?: number
+    er?: number
+    rg?: number
+    /** import date, for sitemap lastmod */
+    im: string
+}
+
+export function toRow(c: PublishedCompany): IndexRow {
+    const r = c.record
+    const [p, prior] = r.periods
+    const row: IndexRow = { o: r.orgnr, n: r.name, p: c.path, rf: c.redirectsFrom, st: r.status.code, fr: c.freshness, ix: c.quality.indexable, q: c.quality.meetsThreshold, syn: r.synthetic, im: r.provenance.importedAt.slice(0, 10) }
+    if (r.formerNames.length) row.f = r.formerNames.map((x) => x.name).join(' ')
+    if (r.municipality) row.k = r.municipality
+    if (r.sni[0]) row.s = r.sni[0]
+    if (p) {
+        const m = computeMetrics(p, prior)
+        row.per = { start: p.start, end: p.end, months: p.months, ...(p.filedAt ? { filedAt: p.filedAt } : {}) }
+        row.ns = numeric(p.income.netSales)
+        row.nsp = numeric(prior?.income.netSales)
+        row.emp = numeric(p.employees)
+        row.om = numeric(m.operatingMargin)
+        row.er = numeric(m.equityRatio)
+        row.rg = numeric(m.revenueGrowth)
+    }
+    return JSON.parse(JSON.stringify(row)) // drop undefined keys
+}
+
 export interface Hub {
     kind: 'bransch' | 'kommun'
     slug: string
     name: string
     code: string
     detail?: string
-    companies: PublishedCompany[]
+    /** Every company in the hub, largest net sales first. */
+    companies: IndexRow[]
     indexable: boolean
     /** Enough threshold-passing profiles to be a useful page (ignores synthetic flag). */
     substantial: boolean
@@ -34,12 +92,15 @@ export interface Ranking {
     metric: 'netSales' | MetricKey
     description: string
     rule: string
-    entries: { company: PublishedCompany; value: number; periodEnd: string }[]
+    entries: { company: IndexRow; value: number; periodEnd: string }[]
 }
 
 export interface Site {
+    /** Companies whose pages are built in this run. */
     companies: PublishedCompany[]
     byOrgnr: Map<string, PublishedCompany>
+    /** The whole directory. */
+    rows: IndexRow[]
     redirects: { from: string; to: string }[]
     industries: Hub[]
     municipalities: Hub[]
@@ -64,13 +125,10 @@ export function publishCompany(record: CompanyRecord, slugHistory: string[] | un
     }
 }
 
-function hubs(kind: Hub['kind'], companies: PublishedCompany[]): Hub[] {
+function hubs(kind: Hub['kind'], rows: IndexRow[]): Hub[] {
     const groups = new Map<string, Hub>()
-    for (const c of companies) {
-        const key =
-            kind === 'bransch'
-                ? c.record.sni[0] && { code: c.record.sni[0].code, name: c.record.sni[0].label, detail: c.record.sni[0].version }
-                : c.record.municipality && { code: c.record.municipality.code, name: c.record.municipality.name, detail: c.record.municipality.county }
+    for (const c of rows) {
+        const key = kind === 'bransch' ? c.s && { code: c.s.code, name: c.s.label, detail: c.s.version } : c.k && { code: c.k.code, name: c.k.name, detail: c.k.county }
         if (!key) continue
         const slug = kind === 'bransch' ? `${key.code}-${slugify(key.name)}` : slugify(key.name)
         const hub = groups.get(slug) ?? { kind, slug, name: key.name, code: key.code, detail: key.detail, companies: [], indexable: false, substantial: false }
@@ -78,9 +136,9 @@ function hubs(kind: Hub['kind'], companies: PublishedCompany[]): Hub[] {
         groups.set(slug, hub)
     }
     for (const h of groups.values()) {
-        h.companies.sort((a, b) => (numeric(b.record.periods[0]?.income.netSales) ?? -1) - (numeric(a.record.periods[0]?.income.netSales) ?? -1) || a.record.name.localeCompare(b.record.name, 'sv'))
-        h.indexable = h.companies.filter((c) => c.quality.indexable).length >= MIN_HUB_COMPANIES
-        h.substantial = h.companies.filter((c) => c.quality.meetsThreshold).length >= MIN_HUB_COMPANIES
+        h.companies.sort((a, b) => (b.ns ?? -1) - (a.ns ?? -1) || a.n.localeCompare(b.n, 'sv'))
+        h.indexable = h.companies.filter((c) => c.ix).length >= MIN_HUB_COMPANIES
+        h.substantial = h.companies.filter((c) => c.q).length >= MIN_HUB_COMPANIES
     }
     return [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'sv'))
 }
@@ -116,18 +174,17 @@ const RANKINGS: Omit<Ranking, 'entries'>[] = [
     },
 ]
 
-function rankings(companies: PublishedCompany[]): Ranking[] {
-    const eligible = companies.filter((c) => c.quality.meetsThreshold && c.freshness === 'current' && c.record.periods[0]?.months === 12)
+const RANK_FIELD = { netSales: 'ns', revenueGrowth: 'rg', equityRatio: 'er', operatingMargin: 'om' } as const
+
+function rankings(rows: IndexRow[]): Ranking[] {
+    const eligible = rows.filter((c) => c.q && c.fr === 'current' && c.per?.months === 12)
     return RANKINGS.map((def) => {
+        const floor = def.metric === 'revenueGrowth' ? 'nsp' : def.metric === 'netSales' ? null : 'ns'
         const entries = eligible
             .map((company) => {
-                const [p, prior] = company.record.periods
-                const sales = numeric(p.income.netSales)
-                if (def.metric === 'netSales') return sales === undefined ? null : { company, value: sales, periodEnd: p.end }
-                if (def.metric === 'revenueGrowth' && (numeric(prior?.income.netSales) ?? 0) < 5_000_000) return null
-                if (def.metric !== 'revenueGrowth' && (sales ?? 0) < 5_000_000) return null
-                const value = numeric(computeMetrics(p, prior)[def.metric])
-                return value === undefined ? null : { company, value, periodEnd: p.end }
+                if (floor && (company[floor] ?? 0) < 5_000_000) return null
+                const value = company[RANK_FIELD[def.metric as keyof typeof RANK_FIELD]]
+                return value === undefined ? null : { company, value, periodEnd: company.per!.end }
             })
             .filter((e): e is NonNullable<typeof e> => e !== null)
             .sort((a, b) => b.value - a.value)
@@ -136,32 +193,48 @@ function rankings(companies: PublishedCompany[]): Ranking[] {
     })
 }
 
-export function buildSite(release: Release, asOf: string = SITE.asOf): Site {
-    const companies = release.companies
+/** Publishable companies of a release, sorted by name. */
+export function publishAll(release: Release, asOf: string = SITE.asOf): PublishedCompany[] {
+    return release.companies
         .map((r) => publishCompany(r, release.slugHistory[r.orgnr], asOf))
         .filter((c) => c.quality.publishable)
         .sort((a, b) => a.record.name.localeCompare(b.record.name, 'sv'))
-    const redirects = companies.flatMap((c) => [
-        ...c.redirectsFrom.map((from) => ({ from, to: c.path })),
-        { from: `/foretag/${c.record.orgnr}/`, to: c.path },
-    ])
+}
+
+export function buildSite(pages: PublishedCompany[], rows: IndexRow[], releaseId: string): Site {
+    rows = [...rows].sort((a, b) => a.n.localeCompare(b.n, 'sv'))
     return {
-        companies,
-        byOrgnr: new Map(companies.map((c) => [c.record.orgnr as string, c])),
-        redirects,
-        industries: hubs('bransch', companies),
-        municipalities: hubs('kommun', companies),
-        rankings: rankings(companies),
-        releaseId: release.manifest.releaseId,
-        synthetic: release.companies.some((c) => c.synthetic),
+        companies: pages,
+        byOrgnr: new Map(pages.map((c) => [c.record.orgnr as string, c])),
+        rows,
+        redirects: rows.flatMap((c) => [...c.rf.map((from) => ({ from, to: c.p })), { from: `/foretag/${c.o}/`, to: c.p }]),
+        industries: hubs('bransch', rows),
+        municipalities: hubs('kommun', rows),
+        rankings: rankings(rows),
+        releaseId,
+        synthetic: rows.some((c) => c.syn),
     }
 }
 
 /** Companies in the same industry, then same municipality, for internal links. */
-export function relatedCompanies(site: Site, c: PublishedCompany, limit = 6): PublishedCompany[] {
-    const sni = c.record.sni[0]?.code
-    const kommun = c.record.municipality?.code
-    const pick = (f: (x: PublishedCompany) => boolean) => site.companies.filter((x) => x !== c && f(x))
-    const out = [...pick((x) => x.record.sni[0]?.code === sni), ...pick((x) => x.record.municipality?.code === kommun && x.record.sni[0]?.code !== sni)]
-    return out.slice(0, limit)
+export function relatedCompanies(site: Site, c: PublishedCompany, limit = 6): IndexRow[] {
+    const r = c.record
+    const ind = r.sni[0] && site.industries.find((h) => h.code === r.sni[0].code)
+    const kom = r.municipality && site.municipalities.find((h) => h.code === r.municipality!.code)
+    const seen = new Set<string>([r.orgnr])
+    const out: IndexRow[] = []
+    for (const x of [...(ind?.companies ?? []), ...(kom?.companies ?? [])]) {
+        if (out.length >= limit) break
+        if (!seen.has(x.o)) {
+            out.push(x)
+            seen.add(x.o)
+        }
+    }
+    return out
+}
+
+/** A full build from one release: every company is both a page and an index row. */
+export function siteFromRelease(release: Release, asOf: string = SITE.asOf): Site {
+    const pages = publishAll(release, asOf)
+    return buildSite(pages, pages.map(toRow), release.manifest.releaseId)
 }

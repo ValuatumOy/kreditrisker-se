@@ -7,7 +7,7 @@ import { AS_OF, batch1 } from './helpers.ts'
 import { luhnCheckDigit } from '../src/lib/orgnr.ts'
 
 process.env.SE_INDEXING = '1'
-const { buildSite } = await import('../src/lib/publish.ts')
+const { siteFromRelease } = await import('../src/lib/publish.ts')
 const { stageBatch, publishRelease, emptyRelease } = await import('../src/lib/pipeline.ts')
 const { companyUrls, hubUrls, staticUrls, sitemapIndex, urlset } = await import('../src/lib/sitemap.ts')
 
@@ -21,14 +21,14 @@ const realRelease = () => {
 }
 
 test('synthetic dataset: every sitemap is empty even with indexing on', () => {
-    const site = buildSite(publishRelease(stageBatch(batch1(), { batchId: 's', importedAt: '2026-09-01T00:00:00Z', current: emptyRelease() }), emptyRelease(), { releaseId: 's', createdAt: '' }), AS_OF)
+    const site = siteFromRelease(publishRelease(stageBatch(batch1(), { batchId: 's', importedAt: '2026-09-01T00:00:00Z', current: emptyRelease() }), emptyRelease(), { releaseId: 's', createdAt: '' }), AS_OF)
     assert.equal(companyUrls(site).length, 0)
     assert.equal(hubUrls(site).length, 0)
     assert.equal(staticUrls(site).length, 0)
 })
 
 test('real dataset: only threshold-passing canonical profiles are listed', () => {
-    const site = buildSite(realRelease(), AS_OF)
+    const site = siteFromRelease(realRelease(), AS_OF)
     const urls = companyUrls(site).map((u) => u.path)
     const indexable = site.companies.filter((c) => c.quality.indexable)
     assert.ok(indexable.length >= 10)
@@ -42,9 +42,9 @@ test('real dataset: only threshold-passing canonical profiles are listed', () =>
 })
 
 test('real dataset: hubs need three indexable profiles; index lists segments', () => {
-    const site = buildSite(realRelease(), AS_OF)
+    const site = siteFromRelease(realRelease(), AS_OF)
     const hubs = hubUrls(site).map((u) => u.path)
-    for (const h of site.industries) assert.equal(hubs.includes(`/branscher/${h.slug}/`), h.companies.filter((c) => c.quality.indexable).length >= 3, h.name)
+    for (const h of site.industries) assert.equal(hubs.includes(`/branscher/${h.slug}/`), h.companies.filter((c) => c.ix).length >= 3, h.name)
     const xml = sitemapIndex(site)
     assert.match(xml, /sitemap-companies-1\.xml/)
     assert.match(urlset(companyUrls(site)), /<loc>https:\/\/.+\/foretag\/5\d{9}\/exempel-/)

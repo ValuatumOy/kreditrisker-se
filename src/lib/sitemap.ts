@@ -31,9 +31,7 @@ export function hubUrls(site: Site): SitemapUrl[] {
 }
 
 export function companyUrls(site: Site): SitemapUrl[] {
-    return site.companies
-        .filter((c) => isIndexable(!c.quality.indexable, site.synthetic))
-        .map((c) => ({ path: c.path, lastmod: c.record.periods[0]?.filedAt ?? c.record.provenance.importedAt.slice(0, 10) }))
+    return site.rows.filter((c) => isIndexable(!c.ix, site.synthetic)).map((c) => ({ path: c.p, lastmod: c.per?.filedAt ?? c.im }))
 }
 
 export function companyChunks(site: Site): SitemapUrl[][] {

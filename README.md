@@ -85,3 +85,7 @@ Deployment is not set up; it deliberately doesn't reuse the Finnish Jenkins job.
 ## Launch
 
 Before launch, read [docs/LAUNCH-GATES.md](docs/LAUNCH-GATES.md) (inputs and sign-offs) and [docs/DOMAIN.md](docs/DOMAIN.md) (domain recommendation). The design direction is recorded in `PRODUCT.md` and `DESIGN.md`.
+
+## Builds and data
+
+Company pages come from the Valuatum REST API and build like the Finnish and Danish sites (batch pages, full-directory hubs and sitemaps). Local previews, Vercel test links and the Jenkins production job are described in [docs/BUILD-AND-DEPLOY.md](docs/BUILD-AND-DEPLOY.md).

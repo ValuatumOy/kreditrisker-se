@@ -16,6 +16,7 @@ export type SourceId =
     | 'bolagsverket-arsredovisning' // Digitally filed annual report (iXBRL)
     | 'scb-foretagsregister' // SCB business register
     | 'valuatum-credit-model' // Valuatum model output (Sweden: not yet validated)
+    | 'valuatum-rest' // Valuatum REST API (annual-report figures and register data as Valuatum holds them)
     | 'synthetic' // Development fixture, never real
 
 export interface SourceRef {

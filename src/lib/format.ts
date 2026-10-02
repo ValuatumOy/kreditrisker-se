@@ -119,6 +119,7 @@ export const SOURCE_TEXT: Record<string, string> = {
     'bolagsverket-arsredovisning': 'Bolagsverket, digital årsredovisning',
     'scb-foretagsregister': 'SCB, företagsregistret',
     'valuatum-credit-model': 'Valuatum, kreditriskmodell',
+    'valuatum-rest': 'Valuatum, bokslutsdatabas',
     synthetic: 'Syntetiska testdata',
 }
 

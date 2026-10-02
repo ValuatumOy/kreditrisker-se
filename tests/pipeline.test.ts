@@ -8,7 +8,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { publishRelease, stageBatch, emptyRelease } from '../src/lib/pipeline.ts'
-import { buildSite } from '../src/lib/publish.ts'
+import { siteFromRelease } from '../src/lib/publish.ts'
 import { currentReleaseId, readCurrentRelease, readRelease, readStaged, setCurrent, writeRelease, writeStaged } from '../src/lib/releaseio.ts'
 import { AS_OF, FIXTURES, batch1, batch2, byName } from './helpers.ts'
 
@@ -66,7 +66,7 @@ test('publish update: incremental change list, redirects for the renamed company
     assert.equal(rel.manifest.changed.length, 3)
     assert.equal(rel.companies.length, before.companies.length + 1)
 
-    const site = buildSite(rel, AS_OF)
+    const site = siteFromRelease(rel, AS_OF)
     const el = site.companies.find((c) => c.record.name === 'Exempel Elteknik Syd AB')!
     assert.equal(el.path, `/foretag/${el.record.orgnr}/exempel-elteknik-syd-ab/`)
     assert.ok(site.redirects.some((r) => r.from === `/foretag/${el.record.orgnr}/exempel-elinstallation-syd-ab/` && r.to === el.path))

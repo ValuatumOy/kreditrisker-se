@@ -19,7 +19,7 @@ import {
     writeRelease,
     writeStaged,
 } from '../src/lib/releaseio.ts'
-import { buildSite } from '../src/lib/publish.ts'
+import { siteFromRelease } from '../src/lib/publish.ts'
 
 const [cmd, ...args] = process.argv.slice(2)
 const opt = (name: string) => {
@@ -75,7 +75,7 @@ switch (cmd) {
             const m = readRelease(id).manifest
             console.log(`${id === cur ? '*' : ' '} ${id}  parent=${m.parent ?? '-'}  companies=${m.counts.companies}  synthetic=${m.counts.synthetic}  changed=${m.changed.length}`)
         }
-        const site = buildSite(readCurrentRelease())
+        const site = siteFromRelease(readCurrentRelease())
         const idx = site.companies.filter((c) => c.quality.indexable).length
         console.log(`profiles: ${site.companies.length} publishable, ${idx} pass the index threshold`)
         for (const c of site.companies.filter((c) => !c.quality.indexable))

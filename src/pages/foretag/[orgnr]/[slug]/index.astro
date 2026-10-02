@@ -250,10 +250,10 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                             <ul class="co__related">
                                 {related.map((x) => (
                                     <li>
-                                        <a href={x.path}>{x.record.name}</a>
+                                        <a href={x.p}>{x.n}</a>
                                         <span class="small muted">
-                                            {x.record.municipality?.name}
-                                            {x.record.sni[0] && ` · ${x.record.sni[0].label}`}
+                                            {x.k?.name}
+                                            {x.s && ` · ${x.s.label}`}
                                         </span>
                                     </li>
                                 ))}

@@ -16,7 +16,11 @@
     "data:publish": "node scripts/data.ts publish",
     "data:rollback": "node scripts/data.ts rollback",
     "data:status": "node scripts/data.ts status",
-    "data:preview": "node scripts/data.ts preview"
+    "data:preview": "node scripts/data.ts preview",
+    "fetch": "node --env-file-if-exists=.env scripts/fetch.ts",
+    "preview:companies": "node --env-file-if-exists=.env scripts/preview.ts",
+    "build:vercel": "node scripts/build-vercel.ts",
+    "build:scripts": "sh build/get_static_params/build.sh"
   },
   "dependencies": {
     "@fontsource-variable/geist": "^5.3.0",

@@ -1,0 +1,116 @@
+{
+ "fid": "900001",
+ "retrievedAt": "2026-10-02",
+ "modeldata": {
+  "followedModelId": 900001,
+  "companyName": "Testbolaget Norrland AB",
+  "companyId": 7001,
+  "companyCode": "5569876542",
+  "currency": "SEK",
+  "dataMap": {
+   "2020": {
+    "cr_shareholders_equity": 2151.753,
+    "cr_net_earnings": 1134.773,
+    "bs_total_assets": 3613.061,
+    "pre_tax_profit": 1471.0,
+    "ns": 5152.01,
+    "net_earnings": 1471.0,
+    "ebit": 1471.0,
+    "cr_fiscal_period_length": 12.0,
+    "cr_employees": 1707.0
+   },
+   "2021": {
+    "cr_shareholders_equity": 2224.203,
+    "cr_net_earnings": 1198.204,
+    "bs_total_assets": 3223.62,
+    "pre_tax_profit": 1533.932,
+    "ns": 5750.238,
+    "net_earnings": 1533.932,
+    "ebit": 1533.932,
+    "cr_fiscal_period_length": 12.0,
+    "cr_employees": 2040.0
+   },
+   "2022": {
+    "cr_shareholders_equity": 2333.979,
+    "net_earnings": 1659.073,
+    "cr_net_earnings": 1307.98,
+    "bs_total_assets": 3300.937,
+    "ebit": 1659.073,
+    "pre_tax_profit": 1659.073,
+    "cr_fiscal_period_length": 12.0,
+    "cr_employees": 2145.0,
+    "ns": 5978.188
+   },
+   "2023": {
+    "cr_shareholders_equity": 2113.788,
+    "net_earnings": 1405.495,
+    "cr_net_earnings": 1087.789,
+    "bs_total_assets": 3077.257,
+    "ebit": 1405.495,
+    "pre_tax_profit": 1405.495,
+    "cr_fiscal_period_length": 12.0,
+    "cr_employees": 2035.0,
+    "ns": 5925.711
+   },
+   "2024": {
+    "cr_cash_and_bank_deposits": 10.515,
+    "cr_shareholders_equity": 2432.183,
+    "cr_net_earnings": 1406.184,
+    "bs_total_assets": 3509.921,
+    "fundu_financial_income_and_expenses": 19.186,
+    "inventories": 1292.362,
+    "pre_tax_profit": 1802.8,
+    "ns": 5902.461,
+    "net_earnings": 1406.184,
+    "cr_employee_benefit_expenses": -1170.298,
+    "ebit": 1783.614,
+    "cr_current_liabilities_total": 1077.738,
+    "cr_cash_and_cash_eq_total": 10.515,
+    "cr_fiscal_period_length": 12.0,
+    "cr_employees": 2163.0,
+    "cr_inventory": 1292.362,
+    "cr_current_assets_total": 1292.362
+   },
+   "2025": {
+    "cr_cash_and_bank_deposits": 76.233,
+    "cr_shareholders_equity": 3469.889,
+    "cr_net_earnings": 2443.89,
+    "bs_total_assets": 4841.166,
+    "fundu_financial_income_and_expenses": 24.203,
+    "inventories": 1382.014,
+    "pre_tax_profit": 3133.192,
+    "ns": 6518.822,
+    "net_earnings": 2443.89,
+    "cr_employee_benefit_expenses": -1391.195,
+    "ebit": 3108.989,
+    "cr_current_liabilities_total": 1371.277,
+    "cr_cash_and_cash_eq_total": 76.233,
+    "cr_fiscal_period_length": 12.0,
+    "cr_employees": 2271.0,
+    "cr_inventory": 1382.014,
+    "cr_current_assets_total": 1382.014
+   }
+  }
+ },
+ "companies": [
+  {
+   "companyId": 7001,
+   "companyName": "Testbolaget Norrland AB",
+   "companyCode": "5569876542",
+   "industryCode": "47599",
+   "models": [
+    {
+     "followedModelId": 900001,
+     "analystName": "XBRLSweden"
+    }
+   ],
+   "companyData": {
+    "industryText": "Övrig specialiserad butikshandel",
+    "municipality": "UMEÅ",
+    "businessType": "Aktiebolag",
+    "status": "NORMAL",
+    "dateEstablished": "1989-11-01"
+   }
+  }
+ ]
+}

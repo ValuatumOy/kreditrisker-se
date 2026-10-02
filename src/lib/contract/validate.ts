@@ -10,6 +10,7 @@ const SOURCES = new Set([
     'bolagsverket-arsredovisning',
     'scb-foretagsregister',
     'valuatum-credit-model',
+    'valuatum-rest',
     'synthetic',
 ])
 const LEGAL_FORMS = new Set(['AB', 'PUBL', 'HB', 'KB', 'EF', 'EK', 'BRF', 'IF', 'ST', 'FL', 'OTHER'])

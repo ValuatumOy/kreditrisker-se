@@ -9,3 +9,7 @@ dist-mock/
 
 .vercel
 .env*
+data/build/
+data/api-cache/
+data/params/
+build/bin/

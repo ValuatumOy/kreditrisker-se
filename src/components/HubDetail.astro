@@ -20,10 +20,15 @@ const lede = isIndustry
     : `Företag med säte i ${kommunName(hub.name)}${hub.detail ? `, ${hub.detail}` : ''}, med bokslut och nyckeltal från senaste räkenskapsåret.`
 // Cross links: where companies in this industry sit, or which industries this municipality has.
 const cross = new Map<string, { href: string; label: string; n: number }>()
+const kommunHubs = new Map(site.municipalities.map((h) => [h.code, h]))
+const industryHubs = new Map(site.industries.map((h) => [h.code, h]))
+// Large hubs list the biggest companies only; the full set is in the sitemaps.
+const LIST_MAX = 200
+const listed = hub.companies.slice(0, LIST_MAX)
 for (const c of hub.companies) {
     const other = isIndustry
-        ? c.record.municipality && site.municipalities.find((h) => h.code === c.record.municipality!.code)
-        : c.record.sni[0] && site.industries.find((h) => h.code === c.record.sni[0].code)
+        ? c.k && kommunHubs.get(c.k.code)
+        : c.s && industryHubs.get(c.s.code)
     if (!other) continue
     const href = `${isIndustry ? '/kommuner/' : '/branscher/'}${other.slug}/`
     const e = cross.get(href) ?? { href, label: other.name, n: 0 }
@@ -55,9 +60,9 @@ const crossList = [...cross.values()].sort((a, b) => b.n - a.n)
             )
         }
         <CompanyTable
-            companies={hub.companies}
+            companies={listed}
             no="Tabell 2"
-            title={`Företag, sorterade efter nettoomsättning`}
+            title={listed.length < hub.companies.length ? `De ${LIST_MAX} största av ${hub.companies.length.toLocaleString('sv-SE')} företag, efter nettoomsättning` : `Företag, sorterade efter nettoomsättning`}
             source={`${site.synthetic ? 'Syntetiska testdata' : 'Bolagsverket'}, senaste inlämnade årsredovisning per företag. Äldre bokslut markeras i sista kolumnen.`}
             show={isIndustry ? 'kommun' : 'bransch'}
         />

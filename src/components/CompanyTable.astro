@@ -1,12 +1,12 @@
 ---
 // Company list for hubs and rankings: newest-year figures with state.
-import type { PublishedCompany } from '../lib/contract/types.ts'
+import type { Value } from '../lib/contract/types.ts'
+import type { IndexRow } from '../lib/publish.ts'
 import { compactSek, percent, periodLabel, STATUS_TEXT } from '../lib/format.ts'
-import { computeMetrics } from '../lib/metrics.ts'
 import Val from './Val.astro'
 
 interface Props {
-    companies: PublishedCompany[]
+    companies: IndexRow[]
     no: string
     title: string
     source: string
@@ -14,6 +14,8 @@ interface Props {
     rank?: { value: string }[]
 }
 const { companies, no, title, source, show = 'kommun', rank } = Astro.props
+// Index rows keep plain numbers; absent means the newest report lacks the item.
+const val = (n?: number): Value => (n === undefined ? { status: 'missing', reason: 'not_in_source' } : { status: 'derived', value: n, formula: 'index', inputs: [] })
 ---
 
 <figure class="fig">
@@ -34,20 +36,19 @@ const { companies, no, title, source, show = 'kommun', rank } = Astro.props
             <tbody>
                 {
                     companies.map((c, i) => {
-                        const [p, prior] = c.record.periods
-                        const m = p && computeMetrics(p, prior)
+                        const p = c.per
                         return (
                             <tr>
                                 {rank && <td class="ct__rank num">{i + 1}</td>}
                                 <th scope="row">
-                                    <a href={c.path}>{c.record.name}</a>
-                                    {c.record.status.code !== 'active' && <span class="tag tag--alert ct__tag">{STATUS_TEXT[c.record.status.code]}</span>}
+                                    <a href={c.p}>{c.n}</a>
+                                    {c.st !== 'active' && c.st !== 'unknown' && <span class="tag tag--alert ct__tag">{STATUS_TEXT[c.st]}</span>}
                                 </th>
-                                <td class="ct__txt">{show === 'kommun' ? c.record.municipality?.name : c.record.sni[0]?.label}</td>
+                                <td class="ct__txt">{show === 'kommun' ? c.k?.name : c.s?.label}</td>
                                 {rank && <td class="num ct__val">{rank[i].value}</td>}
-                                <td>{p ? <Val d={compactSek(p.income.netSales)} /> : <span class="val--missing">inget bokslut</span>}</td>
-                                <td>{m ? <Val d={percent(m.operatingMargin)} /> : ''}</td>
-                                <td class:list={['num', { 'ct__stale': c.freshness === 'stale' || c.freshness === 'aging' }]}>{p ? periodLabel(p) : '–'}</td>
+                                <td>{p ? <Val d={compactSek(val(c.ns))} /> : <span class="val--missing">inget bokslut</span>}</td>
+                                <td>{p ? <Val d={percent(val(c.om))} /> : ''}</td>
+                                <td class:list={['num', { 'ct__stale': c.fr === 'stale' || c.fr === 'aging' }]}>{p ? periodLabel(p) : '–'}</td>
                             </tr>
                         )
                     })
