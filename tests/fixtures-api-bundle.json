@@ -62,14 +62,14 @@
     "pre_tax_profit": 1802.8,
     "ns": 5902.461,
     "net_earnings": 1406.184,
-    "cr_employee_benefit_expenses": -1170.298,
     "ebit": 1783.614,
     "cr_current_liabilities_total": 1077.738,
     "cr_cash_and_cash_eq_total": 10.515,
     "cr_fiscal_period_length": 12.0,
     "cr_employees": 2163.0,
     "cr_inventory": 1292.362,
-    "cr_current_assets_total": 1292.362
+    "fundu_personnel_expenses": -1170.298,
+    "cr_ifrs_current_assets_total": 1292.362
    },
    "2025": {
     "cr_cash_and_bank_deposits": 76.233,
@@ -81,14 +81,14 @@
     "pre_tax_profit": 3133.192,
     "ns": 6518.822,
     "net_earnings": 2443.89,
-    "cr_employee_benefit_expenses": -1391.195,
     "ebit": 3108.989,
     "cr_current_liabilities_total": 1371.277,
     "cr_cash_and_cash_eq_total": 76.233,
     "cr_fiscal_period_length": 12.0,
     "cr_employees": 2271.0,
     "cr_inventory": 1382.014,
-    "cr_current_assets_total": 1382.014
+    "fundu_personnel_expenses": -1391.195,
+    "cr_ifrs_current_assets_total": 1382.014
    }
   }
  },
@@ -97,7 +97,7 @@
    "companyId": 7001,
    "companyName": "Testbolaget Norrland AB",
    "companyCode": "5569876542",
-   "industryCode": "47599",
+   "industryCode": "47789",
    "models": [
     {
      "followedModelId": 900001,
@@ -105,11 +105,19 @@
     }
    ],
    "companyData": {
-    "industryText": "Övrig specialiserad butikshandel",
-    "municipality": "UMEÅ",
-    "businessType": "Aktiebolag",
-    "status": "NORMAL",
-    "dateEstablished": "1989-11-01"
+    "YHTIOMUOTO": "AB",
+    "TILAKOODI": "1",
+    "PERUSTETTU": "01-11-1989",
+    "MENETTELY": "",
+    "MENETTELY_PVM": "",
+    "KOTIPAIKKA": "Umeå"
+   },
+   "industryTree": {
+    "nace": "47789",
+    "name": {
+     "default": "47.789 Other specialised retail sale",
+     "sv": "47.789 Övrig specialiserad detaljhandel"
+    }
    }
   }
  ]

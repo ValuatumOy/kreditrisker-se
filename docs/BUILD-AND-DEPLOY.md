@@ -10,7 +10,8 @@ Jenkins.
 
 ```
 get_static_params (Go, DB)      staticparams.txt        every company: fid, slug, name, SNI, orgnr
-                                staticparams_batch.txt  companies updated since SINCE (+ includeparams.txt)
+                                staticparams_batch.txt  the batch: MODE=changed (updated since SINCE), listed or all,
+                                                        plus COMPANIES (scripts/select-batch.ts)
         │
 scripts/fetch.ts                for each batch fid: POST /rest/modeldata + GET /rest/company/:id
         │                       → map (src/lib/valuatum/map.ts) → validate → publish
@@ -67,7 +68,8 @@ data is committed; the Vercel site is a test environment, not the public site.
 
 `jenkins/kreditrisker-se.groovy`, nightly like the Danish job:
 
-1. Get static params (Go tool, `--accounts XBRLSweden`)
+1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
+   then `scripts/select-batch.ts` picks the batch by `MODE` and `COMPANIES` (no file upload)
 2. Fetch (restores the index state from `STATE_URI`, a private S3 key)
 3. Build (`SE_DATA_SOURCE=build`)
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
@@ -80,46 +82,43 @@ Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
 the full directory set `PUBLIC_SE_SEARCH_ENDPOINT` to a search API returning
 `SearchHit[]` (CloudSearch as on the Finnish site; not built yet).
 
-## Variable mapping (to confirm against the Swedish backend)
+## Variable mapping (checked against sweden.valuatum.com, 2026-10-08)
 
 `src/lib/valuatum/map.ts` maps REST variables to the contract. Amounts arrive in
 millions and are stored in kronor. Absent variables become `missing`
-(`not_in_source`), never 0. Names follow the Danish backend:
+(`not_in_source`), never 0.
 
 | Contract | Variable(s) |
 |---|---|
 | netSales | `ns` |
 | operatingProfit | `ebit` |
 | financialNet | `fundu_financial_income_and_expenses` |
-| profitAfterFinancialItems | `pre_tax_profit` |
+| profitAfterFinancialItems | `cr_pre_tax_profit`, `pre_tax_profit` (the latter is after bokslutsdispositioner and group contributions) |
 | netProfit | `cr_net_earnings`, `net_earnings` |
-| personnelCosts | `cr_employee_benefit_expenses` (sign flipped) |
+| personnelCosts | `fundu_personnel_expenses`, `cr_employee_expenses` (sign flipped) |
 | totalAssets | `bs_total_assets` |
 | equity | `cr_shareholders_equity` |
-| untaxedReserves | `cr_untaxed_reserves` |
+| untaxedReserves | `cr_appropriations_total` |
 | inventories | `cr_inventory`, `inventories` |
 | cash | `cr_cash_and_cash_eq_total`, `cr_cash_and_bank_deposits` |
-| currentAssets / currentLiabilities | `cr_current_assets_total` / `cr_current_liabilities_total` |
+| currentAssets / currentLiabilities | `cr_ifrs_current_assets_total` (`cr_current_assets_total` leaves the receivables out) / `cr_current_liabilities_total` |
 | longTermLiabilities | `cr_non_current_liabilities_total` |
 | employees | `cr_employees` |
-| period length | `cr_fiscal_period_length` |
+| period length / end | `cr_fiscal_period_length` / `cr_fiscal_year_end` (e.g. 20250430, so broken fiscal years are right) |
 
-Open questions for the Swedish backend team:
+Register data (`/rest/company`) comes from the Bolagsverket import
+(profinder-environment `parsing-worker-lambda`) under the Finnish COMPANYDATA keys:
+`YHTIOMUOTO` (form code, AB …), `PERUSTETTU` (DD-MM-YYYY), `TILAKOODI` (1 / L),
+`MENETTELY` + `MENETTELY_PVM` (ongoing konkurs, likvidation, rekonstruktion),
+`LOPETTAMISSYY` + `LOPETTAMIS_PVM` (deregistration), and `KOTIPAIKKA` (kommun of the
+registered seat in the annual report; about 80 % of companies have one). The industry
+is the SNI 2025 code (`industryCode`, 5 digits; `0000` = not allocated) with its
+Swedish name in `industryTree.name.sv`.
 
-1. **Untaxed reserves (obeskattade reserver).** Soliditet needs it. The Danish
-   backend has no such variable, so soliditet shows "saknas" for every company.
-   Ask for `cr_untaxed_reserves`, reported as 0 when the annual report has none.
-2. **Fiscal period end date.** Positions are years only. Broken fiscal years
-   (brutet räkenskapsår) are common in Sweden; without an end date the mapper
-   assumes December. Ask for `text_fiscal_period_end` (YYYY-MM-DD).
-3. **Resultat efter finansiella poster.** Is `pre_tax_profit` before or after
-   bokslutsdispositioner (appropriations)? The Swedish line is before.
-4. **Current assets.** In the Danish data `cr_current_assets_total` sometimes
-   equals inventories while receivables are larger, which gives kassalikviditet 0 %.
-   Check the Swedish mapping.
-5. **Company register fields.** Status values (Danish: `NORMAL`), legal form
-   text, municipality (name or kommunkod; both are handled), SNI code with a
-   Swedish label, and former names.
-6. **Accounting framework (K2/K3/IFRS) and filing date.** Needed for the
+Still open:
+
+1. **Accounting framework (K2/K3/IFRS) and filing date.** Needed for the
    comparability rules and sitemap `lastmod`.
-7. **Account nicknames** for the Swedish followed models (`--accounts`).
+2. **Kommun for the companies whose annual report names no seat**, or a town
+   instead of a kommun. SCB's company register (kommunSate) would cover all, but
+   needs an API key.

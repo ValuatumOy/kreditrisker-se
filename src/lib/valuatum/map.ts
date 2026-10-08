@@ -1,7 +1,19 @@
 // Maps a Valuatum REST bundle (modeldata + company register row) to the
-// Swedish CompanyRecord contract. Pure. The variable names follow the Danish
-// directory; confirm each against the Swedish backend before launch
-// (docs/VALUATUM-API.md lists the open questions).
+// Swedish CompanyRecord contract. Pure. The variable names were checked
+// against the Swedish backend (sweden.valuatum.com) on 2026-10-08.
+//
+// companyData has the Finnish COMPANYDATA keys, filled by the Bolagsverket
+// import from /organisationer (profinder-environment organisation_metadata.py):
+//   YHTIOMUOTO                     organisationsform code (AB, HB, KB ...)
+//   PERUSTETTU                     registration date, DD-MM-YYYY
+//   TILAKOODI                      "1" registered, "L" deregistered
+//   MENETTELY, MENETTELY_PVM       ongoing bankruptcy, liquidation or reconstruction and its start date
+//   LOPETTAMISSYY, LOPETTAMIS_PVM  deregistration reason and date
+//   KOTIPAIKKA                     kommun of the registered seat (SCB's name, from the annual report)
+//
+// industryCode is the SNI 2025 code (5 digits; "0000" = not allocated) and industryTree its node,
+// with the Swedish name in name.sv ("24.330 Tillverkning av ..."). sweden-db's 5-digit industry level
+// is SNI 2025 since 2026-10-08.
 
 import type { CompanyRecord, CompanyStatusCode, FiscalPeriod, LegalFormCode, SourceRef, Value } from '../contract/types.ts'
 import { KOMMUNER } from '../../config/kommuner.ts'
@@ -16,51 +28,65 @@ export const VARS = {
     netSales: ['ns'],
     operatingProfit: ['ebit'],
     financialNet: ['fundu_financial_income_and_expenses'],
-    profitAfterFinancialItems: ['pre_tax_profit'],
+    // pre_tax_profit is after appropriations and group contributions (bokslutsdispositioner).
+    profitAfterFinancialItems: ['cr_pre_tax_profit', 'pre_tax_profit'],
     netProfit: ['cr_net_earnings', 'net_earnings'],
-    personnelCosts: ['cr_employee_benefit_expenses'],
+    personnelCosts: ['fundu_personnel_expenses', 'cr_employee_expenses'],
     totalAssets: ['bs_total_assets'],
     equity: ['cr_shareholders_equity'],
-    untaxedReserves: ['cr_untaxed_reserves'],
+    untaxedReserves: ['cr_appropriations_total'],
     inventories: ['cr_inventory', 'inventories'],
     cash: ['cr_cash_and_cash_eq_total', 'cr_cash_and_bank_deposits'],
-    currentAssets: ['cr_current_assets_total'],
+    // cr_current_assets_total leaves the receivables out; the IFRS total is the whole sum.
+    currentAssets: ['cr_ifrs_current_assets_total'],
     currentLiabilities: ['cr_current_liabilities_total'],
     longTermLiabilities: ['cr_non_current_liabilities_total'],
     employees: ['cr_employees'],
 } as const
 const PERIOD_MONTHS = 'cr_fiscal_period_length'
-const PERIOD_END = 'text_fiscal_period_end'
+/** Period end as a number, e.g. 20251231. */
+const PERIOD_END = 'cr_fiscal_year_end'
 /** Every variable the mapper reads; the API cache keeps only these. */
 export const USED_VARS = new Set<string>([...Object.values(VARS).flat(), PERIOD_MONTHS, PERIOD_END])
 
+/** Bolagsverket organisationsform code (YHTIOMUOTO) -> contract code. */
 const LEGAL_FORMS: Record<string, LegalFormCode> = {
-    aktiebolag: 'AB',
-    'publikt aktiebolag': 'PUBL',
-    handelsbolag: 'HB',
-    kommanditbolag: 'KB',
-    'enskild näringsidkare': 'EF',
-    'ekonomisk förening': 'EK',
-    bostadsrättsförening: 'BRF',
-    'ideell förening': 'IF',
-    stiftelse: 'ST',
-    filial: 'FL',
+    AB: 'AB',
+    HB: 'HB',
+    KB: 'KB',
+    E: 'EF',
+    EK: 'EK',
+    BRF: 'BRF',
+    I: 'IF',
+    S: 'ST',
+    FL: 'FL',
 }
-const STATUSES: Record<string, CompanyStatusCode> = {
-    NORMAL: 'active',
-    AKTIV: 'active',
-    LIKVIDATION: 'liquidation',
-    KONKURS: 'bankruptcy',
-    REKONSTRUKTION: 'reconstruction',
-    AVREGISTRERAD: 'deregistered',
+
+const isoDate = (v?: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : undefined)
+
+/** DD-MM-YYYY (PERUSTETTU) -> YYYY-MM-DD. */
+function isoFromFinnishDate(v?: string): string | undefined {
+    const m = v?.match(/^(\d{2})-(\d{2})-(\d{4})$/)
+    return m ? `${m[3]}-${m[2]}-${m[1]}` : undefined
+}
+
+/** Deregistration first, then the ongoing procedure (MENETTELY holds Bolagsverket's klartext). */
+function companyStatus(data: Record<string, string | undefined>): { code: CompanyStatusCode; since?: string } {
+    if (data.TILAKOODI === 'L') return { code: 'deregistered', since: isoDate(data.LOPETTAMIS_PVM) }
+    const procedure = (data.MENETTELY ?? '').toLowerCase()
+    const since = isoDate(data.MENETTELY_PVM)
+    if (procedure.includes('konkurs')) return { code: 'bankruptcy', since }
+    if (procedure.includes('likvidation')) return { code: 'liquidation', since }
+    if (procedure.includes('rekonstruktion')) return { code: 'reconstruction', since }
+    return { code: data.TILAKOODI === '1' ? 'active' : 'unknown' }
 }
 
 export type MapResult = { ok: true; record: CompanyRecord } | { ok: false; reason: string }
 
 const kommunByName = new Map(Object.entries(KOMMUNER).map(([code, k]) => [k.name.toLowerCase(), code]))
 
-function municipality(raw?: string, code?: string): CompanyRecord['municipality'] {
-    const c = code && KOMMUNER[code] ? code : raw && kommunByName.get(raw.trim().toLowerCase())
+function municipality(name?: string): CompanyRecord['municipality'] {
+    const c = name && kommunByName.get(name.trim().toLowerCase())
     if (!c) return undefined
     return { code: c, name: KOMMUNER[c].name, county: KOMMUNER[c].county }
 }
@@ -94,10 +120,9 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
         }
         if (get(VARS.netSales) === undefined && get(VARS.totalAssets) === undefined) continue
         const months = Math.round(get([PERIOD_MONTHS]) ?? 12)
-        // ponytail: without an explicit end date the year is assumed to end in December;
-        // broken fiscal years (brutet räkenskapsår) need text_fiscal_period_end from the backend.
-        const endText = typeof row[PERIOD_END] === 'string' ? (row[PERIOD_END] as string) : undefined
-        const end = endText && /^\d{4}-\d{2}-\d{2}$/.test(endText) ? endText : `${y}-12-31`
+        // Without an end date the year is assumed to end in December.
+        const endText = String(get([PERIOD_END]) ?? '')
+        const end = /^\d{8}$/.test(endText) ? `${endText.slice(0, 4)}-${endText.slice(4, 6)}-${endText.slice(6)}` : `${y}-12-31`
         const endDate = new Date(end + 'T00:00:00Z')
         const startDate = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() - months + 1, 1))
         const employees = get(VARS.employees)
@@ -132,18 +157,20 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
     }
 
     const sniCode = (company.industryCode ?? '').replace(/\D/g, '')
-    const sniLabel = data.industryText ?? company.industryTree?.name?.sv
+    // The tree node's Swedish name without its code prefix ("24.330 ").
+    const sniNode = company.industryTree?.nace === company.industryCode ? company.industryTree : undefined
+    const sniLabel = sniNode?.name?.sv?.replace(/^[\d.]+\s+/, '')
     const record: CompanyRecord = {
         schemaVersion: 1,
         orgnr: parsed.orgnr,
         synthetic: false,
         name: company.companyName.trim(),
         formerNames: [],
-        legalForm: LEGAL_FORMS[(data.businessType ?? '').toLowerCase()] ?? 'OTHER',
-        status: { code: STATUSES[(data.status ?? '').toUpperCase()] ?? 'unknown', source: src },
-        registeredAt: data.dateEstablished && /^\d{4}-\d{2}-\d{2}$/.test(data.dateEstablished) ? data.dateEstablished : undefined,
-        municipality: municipality(data.municipality, data.municipalityCode),
-        sni: /^\d{5}$/.test(sniCode) && sniLabel ? [{ version: 'SNI2007', code: sniCode, label: sniLabel }] : [],
+        legalForm: LEGAL_FORMS[(data.YHTIOMUOTO ?? '').trim().toUpperCase()] ?? 'OTHER',
+        status: { ...companyStatus(data), source: src },
+        registeredAt: isoFromFinnishDate(data.PERUSTETTU),
+        municipality: municipality(data.KOTIPAIKKA),
+        sni: /^\d{5}$/.test(sniCode) && sniLabel ? [{ version: 'SNI2025', code: sniCode, label: sniLabel }] : [],
         periods,
         provenance: { batchId: opts.batchId, importedAt: opts.importedAt, sources: [src] },
     }
