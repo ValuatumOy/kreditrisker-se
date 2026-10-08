@@ -2,23 +2,34 @@
 // Danish jobs: list every company, build pages only for those that changed,
 // copy the result on top of the S3 bucket behind CloudFront.
 //
+// Simpler to run than the Finnish job: no file upload. Which pages to build is
+// chosen with MODE, and single companies are typed into COMPANIES:
+//   nightly                 MODE=changed (default), COMPANIES empty
+//   rebuild some companies  MODE=listed, COMPANIES=556448-0282, 5565675906
+//   first load / everything MODE=all (with SEARCH_FULL on the first time)
+//
 // Differences from the Danish job:
 //  - a Fetch stage (scripts/fetch.ts) pulls the batch from the Swedish REST API
 //    before `astro build`, so network errors never break the page build;
 //  - the directory index (data/build/index.jsonl) is carried between runs in
 //    STATE_URI, so hubs, rankings and sitemaps always cover every company;
 //  - companies that left the list are deleted from the bucket;
-//  - BUILD_UNBUILT builds the initial 400k pages in nightly chunks.
+//  - BUILD_UNBUILT builds the initial pages in nightly chunks.
+// The helper binaries are committed in build/bin/ (agents have no Go): after
+// changing build/get_static_params, run `npm run build:scripts` and commit them.
 // Testing does not go through this job: see docs/BUILD-AND-DEPLOY.md.
 
 pipeline {
-    agent { label 'REPLACE_ME_AGENT_LABEL' }
+    agent { label 'REPLACE_ME_AGENT_LABEL' } // arm64, Node >= 22.12, AWS CLI
 
     parameters {
-        stashedFile 'includeparams.txt'
-        string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Include fids updated since this time (linux date syntax).')
+        choice(name: 'MODE', choices: ['changed', 'listed', 'all'], description: '''changed: companies updated since SINCE (nightly run), plus any in COMPANIES.
+listed: only the companies in COMPANIES.
+all: every company in the directory.''')
+        text(name: 'COMPANIES', defaultValue: '', description: 'Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. The run stops if one is not in the directory.')
+        string(name: 'SINCE', defaultValue: '24 hours ago', description: 'MODE=changed: include companies updated since this time (linux date syntax).')
         string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet.')
-        booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3 and save the index state')
+        booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
         booleanParam(name: 'SEARCH_FULL', defaultValue: false, description: 'Re-upload every company to CloudSearch (first load)')
         string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Git branch')
     }
@@ -29,14 +40,14 @@ pipeline {
         CLOUDFRONT_DISTRIBUTION_ID = 'REPLACE_ME_SE_CLOUDFRONT_ID'
         STATE_URI = 'REPLACE_ME_PRIVATE_STATE_URI' // SiteStack output StateUri (private bucket)
         CLOUDSEARCH_DOC_ENDPOINT = 'REPLACE_ME_SE_CLOUDSEARCH_DOC_ENDPOINT' // scripts/create-cloudsearch-domain.sh
-        STATIC_PARAMS_PROPERTIES = 'REPLACE_ME_SE_PROPERTIES_PATH'
-        SE_ACCOUNTS = 'XBRLSweden'
+        STATIC_PARAMS_PROPERTIES = 's3://valu-produ/sweden/config/local_server.properties'
+        SE_ACCOUNTS = 'Bolagsverket data import' // comma-separated USERACCOUNT nicknames
 
         BUILD_STATIC_PARAMS_FILE = 'staticparams_batch.txt'
         BUILD_STATIC_PARAMS_FILE_ALL = 'staticparams.txt'
         SE_INDEX_IN = 'prev-index.jsonl'
-        PUBLIC_VALUATUM_API_BASE_URL = 'REPLACE_ME_SE_REST_BASE_URL'
-        SECRET_VALUATUM_API_TOKEN = credentials('REPLACE_ME_SE_API_TOKEN_CRED_ID')
+        PUBLIC_VALUATUM_API_BASE_URL = 'https://sweden.valuatum.com'
+        SECRET_VALUATUM_API_TOKEN = credentials('REPLACE_ME_SE_API_TOKEN_CRED_ID') // Secret text: token of user swecompanydirectory
         SE_SITE_ORIGIN = 'https://www.kreditrisker.se'
         SE_INDEXING = '0' // launch gates 1-3 and 9 (docs/LAUNCH-GATES.md)
         PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> CloudSearch (aws-infra)
@@ -53,22 +64,20 @@ pipeline {
 
         stage('Get static params') {
             steps {
-                sh 'rm -f includeparams.txt'
-                script {
-                    try { unstash 'includeparams.txt' } catch (e) { echo 'No includeparams.txt provided.' }
-                }
                 sh '''#!/bin/bash
                     set -e
                     rm -f "$BUILD_STATIC_PARAMS_FILE" "$BUILD_STATIC_PARAMS_FILE_ALL"
-                    npm run build:scripts
+                    since_args=()
+                    if [ "$MODE" = "changed" ]; then
+                        since_args=(--include-updated-since $(($(date -d "$SINCE" +%s) * 1000)))
+                    fi
                     ./build/bin/get_static_params_arm64 \
                         --output-dir . \
                         --properties "$STATIC_PARAMS_PROPERTIES" \
                         --accounts "$SE_ACCOUNTS" \
-                        --include-updated-since $(($(date -d "$SINCE" +%s) * 1000))
-                    touch "$BUILD_STATIC_PARAMS_FILE"
-                    if [ -f includeparams.txt ]; then cat includeparams.txt >> "$BUILD_STATIC_PARAMS_FILE"; fi
-                    echo "batch: $(wc -l < "$BUILD_STATIC_PARAMS_FILE") fids, directory: $(wc -l < "$BUILD_STATIC_PARAMS_FILE_ALL")"
+                        "${since_args[@]}"
+                    node scripts/select-batch.ts
+                    echo "batch: $(wc -l < "$BUILD_STATIC_PARAMS_FILE") rows, directory: $(wc -l < "$BUILD_STATIC_PARAMS_FILE_ALL")"
                 '''
             }
         }
@@ -112,7 +121,8 @@ pipeline {
                     node scripts/search-docs.ts $( [ "$SEARCH_FULL" = "true" ] && echo --full )
                     for f in data/build/search/batch-*.json; do
                         [ -f "$f" ] || continue
-                        aws cloudsearchdomain upload-documents --endpoint-url "https://$CLOUDSEARCH_DOC_ENDPOINT"                             --content-type application/json --documents "$f" > /dev/null
+                        aws cloudsearchdomain upload-documents --endpoint-url "https://$CLOUDSEARCH_DOC_ENDPOINT" \
+                            --content-type application/json --documents "$f" > /dev/null
                         echo "uploaded $f"
                     done
                 '''

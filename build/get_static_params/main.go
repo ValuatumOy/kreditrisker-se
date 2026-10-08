@@ -50,8 +50,9 @@ func parseArgs() (string, []string, []string, []string, *int64) {
 	includeUpdatedSince := flag.String("include-updated-since", "",
 		"Optional. Unix timestamp in milliseconds. Get fids that have been updated since the given"+
 			"timestamp. These will be included in the 'staticparams_batch.txt' file.")
-	accounts := flag.String("accounts", "XBRLSweden",
-		"Space-separated USERACCOUNT nicknames whose followed models are the Swedish companies.")
+	accounts := flag.String("accounts", "Bolagsverket data import",
+		"Comma-separated USERACCOUNT nicknames whose followed models are the Swedish companies "+
+			"(nicknames contain spaces, e.g. the Bolagsverket import user 'Bolagsverket data import').")
 	flag.Parse()
 
 	if *outputDir == "" || *properties == "" {
@@ -70,7 +71,7 @@ func parseArgs() (string, []string, []string, []string, *int64) {
 	}
 
 	return *outputDir, strings.Fields(*properties), strings.Fields(*fids),
-		strings.Fields(*accounts), includeUpdatedSinceRet
+		splitList(*accounts, ","), includeUpdatedSinceRet
 }
 
 func writeFile(path string, data []string) error {
@@ -132,4 +133,15 @@ func main() {
 		fmt.Println("No staticparams_batch.txt file was created.")
 	}
 	fmt.Println("Done.")
+}
+
+// splitList splits on sep and drops empty, space-only items.
+func splitList(s, sep string) []string {
+	var out []string
+	for _, item := range strings.Split(s, sep) {
+		if item = strings.TrimSpace(item); item != "" {
+			out = append(out, item)
+		}
+	}
+	return out
 }

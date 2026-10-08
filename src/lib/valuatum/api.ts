@@ -19,13 +19,26 @@ export interface ModelData {
     dataMap: Record<string, Record<string, number | string>>
 }
 
+export interface IndustryNode {
+    nace: string
+    name: Record<string, string>
+    children?: IndustryNode[]
+}
+
+/** The node of the given code in the tree (depth first), or the root when the code is not in it. */
+function industryNode(tree: IndustryNode, code?: string): IndustryNode {
+    const find = (n: IndustryNode): IndustryNode | undefined => (n.nace === code ? n : n.children?.map(find).find(Boolean))
+    return find(tree) ?? tree
+}
+
 export interface ApiCompany {
     companyId: number | string
     companyName: string
     companyCode: string
     industryCode?: string
     industryText?: string
-    industryTree?: { nace: string; name: Record<string, string> }
+    /** The company's own industry: the API's tree goes from the 2-digit level down to it. */
+    industryTree?: IndustryNode
     models: { followedModelId: number | string; analystName: string }[]
     companyData?: Record<string, string | undefined>
 }
@@ -84,10 +97,11 @@ export async function fetchBundle(fid: string): Promise<Bundle | null> {
         fid,
         retrievedAt: new Date().toISOString().slice(0, 10),
         modeldata: trim(md),
-        // Board members are personal data and not published (launch gate 3); only the industry name is kept.
+        // Board members are personal data and not published (launch gate 3). Of the industry tree only
+        // the company's own industry (the 5-digit SNI node) is kept.
         companies: companies.map(({ industryTree, ...c }) => ({
             ...c,
-            industryTree: industryTree && { nace: industryTree.nace, name: industryTree.name },
+            industryTree: industryTree && (({ nace, name }) => ({ nace, name }))(industryNode(industryTree, c.industryCode)),
             companyData: { ...c.companyData, participants: undefined },
         })),
     }

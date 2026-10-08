@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
-import { readParams } from '../src/lib/valuatum/params.ts'
+import { readParams, selectBatch } from '../src/lib/valuatum/params.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
 
@@ -26,7 +26,7 @@ test('maps a REST bundle to a valid record', () => {
     assert.equal(r.legalForm, 'AB')
     assert.equal(r.status.code, 'active')
     assert.deepEqual(r.municipality, { code: '2480', name: 'Umeå', county: 'Västerbottens län' })
-    assert.equal(r.sni[0].code, '47599')
+    assert.deepEqual(r.sni[0], { version: 'SNI2025', code: '47789', label: 'Övrig specialiserad detaljhandel' })
     assert.deepEqual(r.periods.map((p) => p.end), ['2025-12-31', '2024-12-31', '2023-12-31', '2022-12-31', '2021-12-31', '2020-12-31'])
     const p24 = r.periods[1]
     assert.deepEqual(p24.income.netSales, { status: 'reported', value: 5_902_461_000, source: r.status.source })
@@ -74,4 +74,19 @@ test('fetch stage: batch pages, merged index, removed companies dropped, renames
     assert.equal(rows[0].ns, 6_518_822_000, 'newest year in kronor')
     assert.equal(read('rejected.jsonl')[0].fid, '900404', 'uncached company without API access is rejected, not fatal')
     assert.equal(fs.readFileSync(path.join(dir, 'data', 'build', 'removed.txt'), 'utf8'), 'foretag/5560000019/\n', 'deploy deletes pages of removed companies')
+})
+
+test('batch selection: modes, orgnr with or without hyphen, fids, group rows, unknown companies', () => {
+    const all = [
+        '1\ta\tAlfa AB\t62100\t5564480282',
+        '2\ta\tAlfa AB\t62100\t5564480282K',
+        '3\tb\tBeta AB\t47789\t5565675906',
+        '4\tc\tGamma AB\t41000\t5591844112',
+    ]
+    assert.deepEqual(selectBatch(all, [], 'all', ''), all)
+    assert.deepEqual(selectBatch(all, [], 'listed', '556448-0282'), all.slice(0, 2), 'orgnr selects the group row too')
+    assert.deepEqual(selectBatch(all, [], 'listed', '5565675906,\n4'), all.slice(2), 'orgnr and fid, any separator')
+    assert.deepEqual(selectBatch(all, [all[3]], 'changed', ''), [all[3]])
+    assert.deepEqual(selectBatch(all, [all[3]], 'changed', '3'), all.slice(2), 'changed plus listed, directory order')
+    assert.throws(() => selectBatch(all, [], 'listed', '5560659475 99'), /5560659475, 99/)
 })
