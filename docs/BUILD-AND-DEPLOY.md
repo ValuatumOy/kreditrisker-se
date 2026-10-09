@@ -52,8 +52,10 @@ Bitbucket is the primary repository as of 2026-10-09:
 branches and their complete Git history were copied; pull-request discussions
 remain on GitHub.
 
-Vercel is currently connected to the GitHub copy. Login works again, and the
-deployment of commit `a55c354` was verified Ready on 2026-10-09. The project is
+Vercel is connected to the GitHub copy. The full sync chain was verified on
+2026-10-09: commit `5c0f514` was pushed only to Bitbucket, pipeline
+[#1](https://bitbucket.org/valuatum/kreditrisker-se/pipelines/results/1) succeeded
+in 11 seconds, GitHub matched the commit, and Vercel showed it as Ready. The project is
 on the Hobby plan: Vercel's [private-repository rules](https://vercel.com/docs/git#using-hobby-teams)
 require Pro for direct deployment from a private Bitbucket workspace repository.
 `bitbucket-pipelines.yml` runs one-way synchronization from Bitbucket to
@@ -65,9 +67,9 @@ has diverged, the sync fails instead of overwriting those commits.
 Pipelines was enabled on 2026-10-09. Its SSH key is managed in Bitbucket's
 Pipelines > SSH Keys settings; the public key is registered only on
 `ValuatumOy/kreditrisker-se` as the read/write deploy key
-`Bitbucket kreditrisker-se mirror`. `github.com` is in the pipeline's known hosts
-with the RSA fingerprint verified against GitHub's published fingerprint. The
-private key stays in Bitbucket. Normal updates need only:
+`Bitbucket kreditrisker-se mirror`. Bitbucket manages the SSH host fingerprint
+for `github.com`; the displayed RSA fingerprint was checked against GitHub's
+published fingerprint. The private key stays in Bitbucket. Normal updates need only:
 
 ```bash
 git push origin main
