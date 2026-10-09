@@ -3,7 +3,7 @@
 // Keeps every value state; missing/incomparable never animate from zero.
 import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
 import { compactSek, count, percent, type Display } from '../lib/format.ts'
-import { computeMetrics } from '../lib/metrics.ts'
+import { computeMetrics, periodsConsecutive } from '../lib/metrics.ts'
 
 interface Props {
     periods: FiscalPeriod[]
@@ -24,9 +24,9 @@ const sekAnim = (v: Value): Anim => {
 }
 const pctAnim = (v: Value, d = 1): Anim => (v.status === 'derived' ? { to: v.value * 100, decimals: d, suffix: ' %' } : undefined)
 const delta = (a: Value, b: Value | undefined, kind: 'pct' | 'pp'): { text: string; up: boolean } | null => {
-    if (!b) return null
+    if (!b || !periodsConsecutive(p, prior)) return null
     if (kind === 'pct') {
-        if (a.status !== 'reported' || b.status !== 'reported' || b.value <= 0 || p.months !== 12 || prior?.months !== 12) return null
+        if (a.status !== 'reported' || b.status !== 'reported' || m.revenueGrowth.status !== 'derived') return null
         const d = (a.value / b.value - 1) * 100
         return { text: `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`, up: d >= 0 }
     }

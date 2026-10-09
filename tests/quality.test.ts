@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { assessQuality } from '../src/lib/quality.ts'
 import { freshnessOf } from '../src/lib/freshness.ts'
 import { summarize } from '../src/lib/summary.ts'
-import { publishCompany } from '../src/lib/publish.ts'
+import { buildSite, publishCompany, toRow } from '../src/lib/publish.ts'
 import { AS_OF, batch1, byName } from './helpers.ts'
 import type { CompanyRecord } from '../src/lib/contract/types.ts'
 
@@ -47,6 +47,19 @@ test('sole traders are not published unless explicitly enabled', () => {
     const r = asReal(byName(batch1(), 'Exempel Frisör'))
     assert.equal(assessQuality(r, 'none', opts).publishable, false)
     assert.equal(assessQuality(r, 'none', { publishSoleTraders: true }).publishable, true)
+})
+
+test('missing municipality preserves indexing and rankings but creates no municipality hub', () => {
+    const r = asReal(byName(batch1(), 'Exempel Mjukvara'))
+    delete r.municipality
+    const c = publishCompany(r, undefined, AS_OF)
+    assert.equal(c.quality.indexable, true)
+    assert.deepEqual(c.quality.reasons, [])
+    const site = buildSite([c], [toRow(c)], 'test')
+    assert.equal(site.municipalities.length, 0)
+    assert.equal(site.industries.length, 1)
+    assert.ok(site.rankings.find((x) => x.slug === 'storst-omsattning')!.entries.some((x) => x.company.o === r.orgnr))
+    assert.doesNotMatch(summarize(c).join(' '), /kommun/)
 })
 
 test('summary states facts only and flags stale data', () => {

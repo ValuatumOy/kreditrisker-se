@@ -47,8 +47,26 @@ ask an AI agent for a preview, ask it to run this and screenshot the pages.
 
 ## 2. Shared test link, about a minute (Vercel)
 
-Every push to GitHub builds a Vercel preview with its own URL (`vercel.json` runs
-`npm run build:vercel`). It renders the committed sample:
+Bitbucket is the primary repository as of 2026-10-09:
+`git@bitbucket.org:valuatum/kreditrisker-se.git`, branch `main`. Both GitHub
+branches and their complete Git history were copied; pull-request discussions
+remain on GitHub.
+
+Vercel is still connected to the GitHub copy. The provider change could not be
+completed because the GitHub login callback returned HTTP 500. Until it is
+reconnected to Bitbucket, update that copy explicitly after pushing to Bitbucket:
+
+```bash
+git push origin main
+git push github main
+```
+
+The existing local checkout has the `github` remote; a fresh Bitbucket clone can
+add it with `git remote add github https://github.com/ValuatumOy/kreditrisker-se.git`.
+Pushes made only to Bitbucket do not currently redeploy the Vercel test site.
+
+Every push to the GitHub copy builds a Vercel preview with its own URL
+(`vercel.json` runs `npm run build:vercel`). It renders the committed sample:
 
 - `data/sample/staticparams.txt`: the sample batch (about 200 companies chosen
   to cover edge cases: sparse, stale, negative equity, bankrupt, K2/K3,
@@ -93,7 +111,7 @@ millions and are stored in kronor. Absent variables become `missing`
 | netSales | `ns` |
 | operatingProfit | `ebit` |
 | financialNet | `fundu_financial_income_and_expenses` |
-| profitAfterFinancialItems | `cr_pre_tax_profit`, `pre_tax_profit` (the latter is after bokslutsdispositioner and group contributions) |
+| profitAfterFinancialItems | `cr_pre_tax_profit` only (`pre_tax_profit` is after bokslutsdispositioner and group contributions, so it is not a fallback) |
 | netProfit | `cr_net_earnings`, `net_earnings` |
 | personnelCosts | `fundu_personnel_expenses`, `cr_employee_expenses` (sign flipped) |
 | totalAssets | `bs_total_assets` |
@@ -122,3 +140,41 @@ Still open:
 2. **Kommun for the companies whose annual report names no seat**, or a town
    instead of a kommun. SCB's company register (kommunSate) would cover all, but
    needs an API key.
+
+Missing municipality data does not block company indexing or rankings. The company
+is simply absent from municipality hubs. SNI `0000` is left unclassified; those
+profiles are generated but remain below the current index threshold.
+
+Missing API values stay `saknas`: an absent variable does not prove that the
+annual report reported zero or omitted the item. Growth and year-over-year KPI
+changes are shown only between consecutive fiscal periods.
+
+When updating an existing production dataset to these quality/calculation rules,
+run a full rebuild (`MODE=all`): an incremental batch retains old index rows and
+profile HTML for companies outside the batch.
+
+## First sample review (2026-10-09)
+
+The committed `data/sample/api-cache/52.json` maps S M Entreprenad Aktiebolag
+(556193-9215) to the fiscal period 2025-07-01–2026-06-30. The source has
+net sales SEK 427,568,195, operating profit SEK 43,049,755 and 52 employees.
+Computed growth is 20.9 %, soliditet 48.1 % and kassalikviditet 176 %.
+These agree with the preview; this checks the API-to-page mapping, not the
+original annual report.
+
+Follow-up data checks:
+
+- Inspect the other imported companies, including missing municipality,
+  SNI `0000`, bankruptcy and deregistration, sparse data and broken fiscal years.
+- Confirm nonempty `MENETTELY_PVM` and `LOPETTAMIS_PVM` formats with real responses.
+  The mapper accepts ISO dates. Deregistration currently takes precedence over an
+  ongoing procedure; `LOPETTAMISSYY` is not displayed on the profile.
+- The unsupported 2017 taxonomy must be handled in the upstream importer. Do not
+  treat a missing imported year as zero or compare across that gap as annual growth.
+- Confirm whether an absent balance-sheet line is a reported zero before changing
+  its display. Missing long-term liabilities in this sample are still `saknas`.
+- Accounting framework and filing date remain unavailable. Fiscal-period dates,
+  Swedish SNI labels, registration date, legal form and active status are mapped.
+
+The backend's inherited ASP `DEFAULTID` and `calculate_adjusted_credit_score`
+setting concern the Swedish backend, not this site's static page mapper.

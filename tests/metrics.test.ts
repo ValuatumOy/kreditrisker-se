@@ -64,3 +64,20 @@ test('consolidation change between years makes growth incomparable', () => {
     prior.consolidated = false
     assert.deepEqual(computeMetrics(r.periods[0], prior).revenueGrowth, { status: 'incomparable', reason: 'consolidation_change' })
 })
+
+test('missing or overlapping fiscal years are not annual growth', () => {
+    const r = byName(batch1(), 'Exempel Mjukvara')
+    assert.deepEqual(computeMetrics(r.periods[0], r.periods[2]).revenueGrowth, { status: 'incomparable', reason: 'period_gap' })
+    assert.deepEqual(computeMetrics(r.periods[0], r.periods[0]).revenueGrowth, { status: 'incomparable', reason: 'period_gap' })
+})
+
+test('consecutive broken fiscal years remain comparable', () => {
+    const r = byName(batch1(), 'Exempel Mjukvara')
+    const p = structuredClone(r.periods[0])
+    const prior = structuredClone(r.periods[1])
+    p.start = '2025-07-01'
+    p.end = '2026-06-30'
+    prior.start = '2024-07-01'
+    prior.end = '2025-06-30'
+    assert.equal(computeMetrics(p, prior).revenueGrowth.status, 'derived')
+})

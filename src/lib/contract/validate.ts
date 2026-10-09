@@ -18,6 +18,7 @@ const STATUSES = new Set(['active', 'liquidation', 'bankruptcy', 'reconstruction
 const MISSING = new Set(['not_filed', 'not_in_source', 'not_digitised', 'parse_failed', 'withheld'])
 const INCOMPARABLE = new Set([
     'period_length',
+    'period_gap',
     'denominator_not_positive',
     'framework_change',
     'consolidation_change',

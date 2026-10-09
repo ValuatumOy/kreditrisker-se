@@ -33,13 +33,14 @@ export interface SourceRef {
 
 export type MissingReason =
     | 'not_filed' // No annual report filed for the period
-    | 'not_in_source' // Report exists but does not contain the item (e.g. K2 abridged)
+    | 'not_in_source' // Item is absent from the supplied source data
     | 'not_digitised' // Filed on paper; not machine-readable
     | 'parse_failed' // Source present but could not be parsed reliably
     | 'withheld' // Excluded on purpose (privacy, licence)
 
 export type IncomparableReason =
     | 'period_length' // Fiscal period is not 12 months
+    | 'period_gap' // Fiscal periods are not consecutive
     | 'denominator_not_positive' // Ratio base is zero or negative
     | 'framework_change' // K2/K3/IFRS switch between periods
     | 'consolidation_change' // Group vs. entity accounts

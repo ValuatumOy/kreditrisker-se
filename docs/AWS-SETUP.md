@@ -41,9 +41,14 @@ Test site runs on its `*.cloudfront.net` domain and always sends
 
 ## 4. Jenkins
 
-Create the job from `jenkins/kreditrisker-se.groovy` and fill its `REPLACE_ME`
-values: the Swedish backend's properties file and REST URL, the API token
-credential, the outputs above and the CloudSearch document endpoint. First run:
+Use the Swedish job `SweCompanyDirecotry-ProdUpdate` with the pipeline from
+`jenkins/kreditrisker-se.groovy`. Configure its Git source as
+`git@bitbucket.org:valuatum/kreditrisker-se.git`, branch `main`, script path
+`jenkins/kreditrisker-se.groovy`. `REPLACE_ME_GIT_CRED_ID` needs the existing
+Jenkins Bitbucket SSH credential (username `git`). Fill the remaining
+`REPLACE_ME` values: agent label, API token credential, the outputs above and
+the CloudSearch document endpoint. The Swedish properties URI and REST URL
+are already set in the template. First run:
 `BUILD_UNBUILT=20000` and `SEARCH_FULL=true`; repeat nightly with
 `BUILD_UNBUILT` until every company has a page.
 

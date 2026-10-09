@@ -7,7 +7,7 @@
 // A publishable profile is indexable only if ALL of these hold:
 //   1. not synthetic
 //   2. registration status is known
-//   3. municipality and a primary SNI code are present
+//   3. a primary SNI code is present
 //   4. at least one fiscal period exists and the newest is not stale
 //   5. the newest period reports at least MIN_CORE_ITEMS of the CORE_ITEMS
 // Everything else gets <meta name="robots" content="noindex,follow"> and is
@@ -48,7 +48,6 @@ export function assessQuality(
     if (!publishable) reasons.push('enskild näringsidkare: personuppgifter, sidan genereras inte')
     if (record.synthetic) reasons.push(SYNTHETIC_REASON)
     if (record.status.code === 'unknown') reasons.push('registreringsstatus okänd')
-    if (!record.municipality) reasons.push('kommun saknas')
     if (!record.sni[0]) reasons.push('SNI-kod saknas')
     if (freshness === 'none') reasons.push('inget bokslut')
     if (freshness === 'stale') reasons.push('senaste bokslut äldre än 31 månader')

@@ -1,15 +1,18 @@
 # Swedish company directory (Kreditrisker, working name)
 
-This is a standalone Astro 7 static site for Swedish company profiles and, later, Basic and AI credit-risk reports from Valuatum. It is isolated from the Finnish site in `../../src`: it has its own `package.json`, config, data, tests and output. The Finnish build and Jenkins job don't touch it. The only root change is `sites` in the root `tsconfig.json` exclude.
+This is a standalone Astro 7 static site for Swedish company profiles and, later, Basic and AI credit-risk reports from Valuatum. It has its own repository, data, tests and deployment, separate from the Finnish and Danish sites.
 
-**Status:** the foundation is complete. It runs on **synthetic fixtures only**, is noindex everywhere, and nothing is for sale.
+**Repository:** [valuatum/kreditrisker-se on Bitbucket](https://bitbucket.org/valuatum/kreditrisker-se/), branch `main`. Migrated from GitHub on 2026-10-09 with both branches and their complete Git history. GitHub remains available during the Vercel transition; pull-request discussions remain there.
+
+**Status:** Vercel previews use one real Swedish company cached in `data/sample/`. The default local dataset contains synthetic fixtures. All pages are noindex and nothing is for sale. AWS/Jenkins deployment still needs configuration.
 
 ## Run
 
 ```bash
-cd sites/se
+git clone git@bitbucket.org:valuatum/kreditrisker-se.git
+cd kreditrisker-se
 npm install
-npm test                      # 37 tests: contract, metrics, freshness/threshold, pipeline + CLI, reports, sitemaps
+npm test                      # contract, metrics, freshness/threshold, pipeline + CLI, reports, sitemaps
 npm run dev                   # http://localhost:4331
 npm run build                 # dist/ (static)
 ```
@@ -76,7 +79,7 @@ Routes (Swedish):
 
 ## Deployment
 
-Deployment is not set up; it deliberately doesn't reuse the Finnish Jenkins job. The simplest path is a separate S3 bucket and CloudFront distribution, like the Finnish and Danish sites:
+The production Jenkins template fetches from Bitbucket. It uses a separate S3 bucket and CloudFront distribution; see [docs/AWS-SETUP.md](docs/AWS-SETUP.md) for the remaining configuration.
 
 - Build with `npm ci && npm test && npm run build`, then sync `dist/`.
 - Use `dist/redirects.json` to generate CloudFront Function 301s.

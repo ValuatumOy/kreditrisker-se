@@ -28,8 +28,8 @@ export const VARS = {
     netSales: ['ns'],
     operatingProfit: ['ebit'],
     financialNet: ['fundu_financial_income_and_expenses'],
-    // pre_tax_profit is after appropriations and group contributions (bokslutsdispositioner).
-    profitAfterFinancialItems: ['cr_pre_tax_profit', 'pre_tax_profit'],
+    // pre_tax_profit is after bokslutsdispositioner, so it cannot substitute this line.
+    profitAfterFinancialItems: ['cr_pre_tax_profit'],
     netProfit: ['cr_net_earnings', 'net_earnings'],
     personnelCosts: ['fundu_personnel_expenses', 'cr_employee_expenses'],
     totalAssets: ['bs_total_assets'],

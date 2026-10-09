@@ -126,9 +126,14 @@ export function computeMetrics(p: FiscalPeriod, prior?: FiscalPeriod): Metrics {
     }
 }
 
+export function periodsConsecutive(p: FiscalPeriod, prior?: FiscalPeriod): boolean {
+    return !!prior && p.start === new Date(Date.parse(prior.end + 'T00:00:00Z') + 86_400_000).toISOString().slice(0, 10)
+}
+
 function growth(p: FiscalPeriod, prior?: FiscalPeriod): Value {
     if (!prior) return { status: 'incomparable', reason: 'no_prior_period' }
     if (p.months !== 12 || prior.months !== 12) return { status: 'incomparable', reason: 'period_length' }
+    if (!periodsConsecutive(p, prior)) return { status: 'incomparable', reason: 'period_gap' }
     if (p.consolidated !== prior.consolidated) return { status: 'incomparable', reason: 'consolidation_change' }
     if (p.framework !== prior.framework && p.framework !== 'unknown' && prior.framework !== 'unknown')
         return { status: 'incomparable', reason: 'framework_change' }

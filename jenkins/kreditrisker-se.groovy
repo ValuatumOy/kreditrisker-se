@@ -57,7 +57,7 @@ all: every company in the directory.''')
         stage('Preparation') {
             steps {
                 checkout([$class: 'GitSCM', branches: [[name: "*/${params.GIT_BRANCH}"]],
-                    userRemoteConfigs: [[credentialsId: 'REPLACE_ME_GIT_CRED_ID', url: 'https://github.com/ValuatumOy/kreditrisker-se.git']]])
+                    userRemoteConfigs: [[credentialsId: 'REPLACE_ME_GIT_CRED_ID', url: 'git@bitbucket.org:valuatum/kreditrisker-se.git']]])
                 sh 'npm ci'
             }
         }
