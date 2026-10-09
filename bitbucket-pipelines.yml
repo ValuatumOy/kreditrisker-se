@@ -1,0 +1,17 @@
+image: atlassian/default-image:5
+
+clone:
+  depth: full
+
+pipelines:
+  default:
+    - step:
+        name: Sync branch to GitHub for Vercel
+        script:
+          - git push git@github.com:ValuatumOy/kreditrisker-se.git "HEAD:refs/heads/${BITBUCKET_BRANCH}"
+  tags:
+    '**':
+      - step:
+          name: Sync tag to GitHub
+          script:
+            - git push git@github.com:ValuatumOy/kreditrisker-se.git "refs/tags/${BITBUCKET_TAG}:refs/tags/${BITBUCKET_TAG}"

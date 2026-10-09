@@ -52,9 +52,22 @@ Bitbucket is the primary repository as of 2026-10-09:
 branches and their complete Git history were copied; pull-request discussions
 remain on GitHub.
 
-Vercel is still connected to the GitHub copy. The provider change could not be
-completed because the GitHub login callback returned HTTP 500. Until it is
-reconnected to Bitbucket, update that copy explicitly after pushing to Bitbucket:
+Vercel is currently connected to the GitHub copy. Login works again, and the
+deployment of commit `a55c354` was verified Ready on 2026-10-09. The project is
+on the Hobby plan: Vercel's [private-repository rules](https://vercel.com/docs/git#using-hobby-teams)
+require Pro for direct deployment from a private Bitbucket workspace repository.
+`bitbucket-pipelines.yml` prepares one-way synchronization from Bitbucket to
+GitHub: each branch push updates the same GitHub branch, and tag pushes copy the
+same tag. GitHub then triggers Vercel as before. Branch/tag deletions are not
+mirrored, and force-pushes are not used. Make code changes in Bitbucket; if GitHub
+has diverged, the sync fails instead of overwriting those commits.
+
+Before enabling Pipelines, generate its repository SSH key in Bitbucket's
+Pipelines > SSH Keys settings. Add only its public key to
+`ValuatumOy/kreditrisker-se` in GitHub as a deploy key with write access, and add
+`github.com` to the pipeline's known hosts. The private key remains managed by
+Bitbucket. Then enable Pipelines and verify one branch push and the resulting
+Vercel deployment. Until that setup is complete, update the GitHub copy explicitly:
 
 ```bash
 git push origin main
@@ -68,9 +81,9 @@ Pushes made only to Bitbucket do not currently redeploy the Vercel test site.
 Every push to the GitHub copy builds a Vercel preview with its own URL
 (`vercel.json` runs `npm run build:vercel`). It renders the committed sample:
 
-- `data/sample/staticparams.txt`: the sample batch (about 200 companies chosen
-  to cover edge cases: sparse, stale, negative equity, bankrupt, K2/K3,
-  broken fiscal years, long names, group accounts)
+- `data/sample/staticparams.txt`: currently one real company, S M Entreprenad
+  Aktiebolag. Expand the sample to cover sparse data, stale data, negative equity,
+  bankruptcy, K2/K3, broken fiscal years, long names and group accounts.
 - `data/sample/api-cache/<fid>.json`: their cached API responses
 
 so previews need no API access. To refresh the sample: run `npm run fetch`
