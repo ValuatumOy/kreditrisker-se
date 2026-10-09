@@ -16,7 +16,7 @@ const nf = (digits: number) => new Intl.NumberFormat('sv-SE', { minimumFractionD
 
 export const MISSING_TEXT: Record<MissingReason, string> = {
     not_filed: 'Inget bokslut har lämnats för perioden.',
-    not_in_source: 'Posten finns inte i det inlämnade bokslutet.',
+    not_in_source: 'Uppgiften saknas i datakällan.',
     not_digitised: 'Bokslutet är inte digitalt inlämnat och har inte kunnat läsas.',
     parse_failed: 'Uppgiften kunde inte läsas tillförlitligt ur källan.',
     withheld: 'Uppgiften visas inte.',
@@ -24,6 +24,7 @@ export const MISSING_TEXT: Record<MissingReason, string> = {
 
 export const INCOMPARABLE_TEXT: Record<IncomparableReason, string> = {
     period_length: 'Räkenskapsåret är inte 12 månader, så jämförelsen blir missvisande.',
+    period_gap: 'Det saknas ett mellanliggande räkenskapsår eller perioderna överlappar, så årsjämförelsen visas inte.',
     denominator_not_positive: 'Går inte att räkna eftersom nämnaren är noll eller negativ.',
     framework_change: 'Redovisningsregelverket har bytts mellan åren.',
     consolidation_change: 'Jämförelsen blandar koncern- och moderbolagssiffror.',

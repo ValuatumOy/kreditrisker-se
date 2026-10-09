@@ -47,12 +47,45 @@ ask an AI agent for a preview, ask it to run this and screenshot the pages.
 
 ## 2. Shared test link, about a minute (Vercel)
 
-Every push to GitHub builds a Vercel preview with its own URL (`vercel.json` runs
-`npm run build:vercel`). It renders the committed sample:
+Bitbucket is the primary repository as of 2026-10-09:
+`git@bitbucket.org:valuatum/kreditrisker-se.git`, branch `main`. Both GitHub
+branches and their complete Git history were copied; pull-request discussions
+remain on GitHub.
 
-- `data/sample/staticparams.txt`: the sample batch (about 200 companies chosen
-  to cover edge cases: sparse, stale, negative equity, bankrupt, K2/K3,
-  broken fiscal years, long names, group accounts)
+Vercel is connected to the GitHub copy. The full sync chain was verified on
+2026-10-09: commit `5c0f514` was pushed only to Bitbucket, pipeline
+[#1](https://bitbucket.org/valuatum/kreditrisker-se/pipelines/results/1) succeeded
+in 11 seconds, GitHub matched the commit, and Vercel showed it as Ready. The project is
+on the Hobby plan: Vercel's [private-repository rules](https://vercel.com/docs/git#using-hobby-teams)
+require Pro for direct deployment from a private Bitbucket workspace repository.
+`bitbucket-pipelines.yml` runs one-way synchronization from Bitbucket to
+GitHub: each branch push updates the same GitHub branch, and tag pushes copy the
+same tag. GitHub then triggers Vercel as before. Branch/tag deletions are not
+mirrored, and force-pushes are not used. Make code changes in Bitbucket; if GitHub
+has diverged, the sync fails instead of overwriting those commits.
+
+Pipelines was enabled on 2026-10-09. Its SSH key is managed in Bitbucket's
+Pipelines > SSH Keys settings; the public key is registered only on
+`ValuatumOy/kreditrisker-se` as the read/write deploy key
+`Bitbucket kreditrisker-se mirror`. Bitbucket manages the SSH host fingerprint
+for `github.com`; the displayed RSA fingerprint was checked against GitHub's
+published fingerprint. The private key stays in Bitbucket. Normal updates need only:
+
+```bash
+git push origin main
+```
+
+Check the Bitbucket pipeline result if GitHub or Vercel does not update. If the
+sync fails, the last successful Vercel deployment stays available. The existing
+local checkout retains a `github` remote for recovery; direct GitHub pushes are
+not part of the normal workflow.
+
+Every push to the GitHub copy builds a Vercel preview with its own URL
+(`vercel.json` runs `npm run build:vercel`). It renders the committed sample:
+
+- `data/sample/staticparams.txt`: currently one real company, S M Entreprenad
+  Aktiebolag. Expand the sample to cover sparse data, stale data, negative equity,
+  bankruptcy, K2/K3, broken fiscal years, long names and group accounts.
 - `data/sample/api-cache/<fid>.json`: their cached API responses
 
 so previews need no API access. To refresh the sample: run `npm run fetch`
@@ -112,7 +145,7 @@ millions and are stored in kronor. Absent variables become `missing`
 | netSales | `ns` |
 | operatingProfit | `ebit` |
 | financialNet | `fundu_financial_income_and_expenses` |
-| profitAfterFinancialItems | `cr_pre_tax_profit`, `pre_tax_profit` (the latter is after bokslutsdispositioner and group contributions) |
+| profitAfterFinancialItems | `cr_pre_tax_profit` only (`pre_tax_profit` is after bokslutsdispositioner and group contributions, so it is not a fallback) |
 | netProfit | `cr_net_earnings`, `net_earnings` |
 | personnelCosts | `fundu_personnel_expenses`, `cr_employee_expenses` (sign flipped) |
 | totalAssets | `bs_total_assets` |
@@ -141,3 +174,41 @@ Still open:
 2. **Kommun for the companies whose annual report names no seat**, or a town
    instead of a kommun. SCB's company register (kommunSate) would cover all, but
    needs an API key.
+
+Missing municipality data does not block company indexing or rankings. The company
+is simply absent from municipality hubs. SNI `0000` is left unclassified; those
+profiles are generated but remain below the current index threshold.
+
+Missing API values stay `saknas`: an absent variable does not prove that the
+annual report reported zero or omitted the item. Growth and year-over-year KPI
+changes are shown only between consecutive fiscal periods.
+
+When updating an existing production dataset to these quality/calculation rules,
+run a full rebuild (`COMPANIES=all`): an incremental batch retains old index rows and
+profile HTML for companies outside the batch.
+
+## First sample review (2026-10-09)
+
+The committed `data/sample/api-cache/52.json` maps S M Entreprenad Aktiebolag
+(556193-9215) to the fiscal period 2025-07-01–2026-06-30. The source has
+net sales SEK 427,568,195, operating profit SEK 43,049,755 and 52 employees.
+Computed growth is 20.9 %, soliditet 48.1 % and kassalikviditet 176 %.
+These agree with the preview; this checks the API-to-page mapping, not the
+original annual report.
+
+Follow-up data checks:
+
+- Inspect the other imported companies, including missing municipality,
+  SNI `0000`, bankruptcy and deregistration, sparse data and broken fiscal years.
+- Confirm nonempty `MENETTELY_PVM` and `LOPETTAMIS_PVM` formats with real responses.
+  The mapper accepts ISO dates. Deregistration currently takes precedence over an
+  ongoing procedure; `LOPETTAMISSYY` is not displayed on the profile.
+- The unsupported 2017 taxonomy must be handled in the upstream importer. Do not
+  treat a missing imported year as zero or compare across that gap as annual growth.
+- Confirm whether an absent balance-sheet line is a reported zero before changing
+  its display. Missing long-term liabilities in this sample are still `saknas`.
+- Accounting framework and filing date remain unavailable. Fiscal-period dates,
+  Swedish SNI labels, registration date, legal form and active status are mapped.
+
+The backend's inherited ASP `DEFAULTID` and `calculate_adjusted_credit_score`
+setting concern the Swedish backend, not this site's static page mapper.

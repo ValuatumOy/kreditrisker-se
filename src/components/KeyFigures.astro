@@ -3,7 +3,7 @@
 // its value state (missing / zero / negative / incomparable).
 import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
 import { compactSek, count, percent, type Display } from '../lib/format.ts'
-import { computeMetrics } from '../lib/metrics.ts'
+import { computeMetrics, periodsConsecutive } from '../lib/metrics.ts'
 import Val from './Val.astro'
 
 interface Props {
@@ -16,12 +16,12 @@ const m = computeMetrics(p, prior)
 const mPrior = prior ? computeMetrics(prior, periods[2]) : undefined
 
 const pctDelta = (a: Value, b?: Value): string | null => {
-    if (!b || a.status !== 'reported' || b.status !== 'reported' || b.value <= 0 || p.months !== 12 || prior?.months !== 12) return null
+    if (!b || a.status !== 'reported' || b.status !== 'reported' || m.revenueGrowth.status !== 'derived') return null
     const d = a.value / b.value - 1
     return `${d >= 0 ? '+' : '−'}${Math.abs(d * 100).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`
 }
 const ppDelta = (a: Value, b?: Value): string | null => {
-    if (!b || a.status !== 'derived' || b.status !== 'derived') return null
+    if (!b || a.status !== 'derived' || b.status !== 'derived' || !periodsConsecutive(p, prior)) return null
     const d = (a.value - b.value) * 100
     return `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} p.e.`
 }

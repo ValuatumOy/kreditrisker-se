@@ -49,7 +49,7 @@ The newest period's end is compared with `SE_DATA_AS_OF` (defaults to the build 
 A profile is indexed only if all of these hold:
 - it's not synthetic
 - its status is known
-- it has a municipality and a primary SNI
+- it has a primary SNI (municipality is optional)
 - it has at least one period that isn't stale
 - the newest period reports at least **5 of 7** core items: net sales, operating result, net profit, total assets, equity, current liabilities, employees
 - the global switch is on
