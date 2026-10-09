@@ -151,14 +151,14 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                                 <figure class="fig">
                                     <div class="fig__head">
                                         <span class="fig__no">{nextFig()}</span>
-                                        <span class="fig__title">Nettoomsättning <span class="fig__sub">– senaste fem åren</span></span>
+                                        <span class="fig__title">Nettoomsättning <span class="fig__sub">– {salesSeries.length} räkenskapsår</span></span>
                                     </div>
                                     <LineChart title={`Nettoomsättning, ${r.name}`} points={salesSeries} height={210} animate={false} />
                                 </figure>
                                 <figure class="fig">
                                     <div class="fig__head">
                                         <span class="fig__no">{nextFig()}</span>
-                                        <span class="fig__title">Rörelseresultat <span class="fig__sub">– senaste fem åren</span></span>
+                                        <span class="fig__title">Rörelseresultat <span class="fig__sub">– {ebitSeries.length} räkenskapsår</span></span>
                                     </div>
                                     <BarChart title={`Rörelseresultat, ${r.name}`} points={ebitSeries} />
                                 </figure>

@@ -212,3 +212,56 @@ Follow-up data checks:
 
 The backend's inherited ASP `DEFAULTID` and `calculate_adjusted_credit_score`
 setting concern the Swedish backend, not this site's static page mapper.
+
+## CloudFront company-page review (2026-10-09)
+
+Reviewed the 51 profiles listed on
+https://d3po43lod2ykoc.cloudfront.net/senast-uppdaterade/ and 111 distinct link
+targets from their profiles. All returned HTTP 200; referenced anchors existed.
+KPI values agreed with the financial tables. Growth, margins, equity ratio and
+quick ratio were consistent with the displayed inputs, allowing for rounding to
+tkr and whole percentages. This checks internal consistency of the published
+pages. Apart from the committed S M Entreprenad sample, raw API bundles were
+not available locally; the original annual reports were not verified.
+
+- 26 profiles lack soliditet solely because `Obeskattade reserver` is missing.
+- 24 profiles lack kassalikviditet solely because `Varulager` is missing.
+- Five lack net sales: Aros Städ, EC Intressenter, Restaurang Zhang Kungshallen,
+  Luni Metall and Vännäs Plåt. Their summaries omit sales and growth.
+- 19 lack municipality; their profiles and industry links still work.
+- All displayed periods are 12 months. Histories contain two to five periods;
+  chart captions now state the actual count instead of always claiming five.
+- In 23 periods across 14 companies, operating profit plus the displayed
+  `Finansnetto` does not equal profit after financial items, beyond the possible
+  1.5 tkr rounding difference. Brightec Group 2024 shows 1,581 + 6 versus 8,587
+  tkr, a 7,000 tkr difference. Inspect `fundu_financial_income_and_expenses`,
+  `ebit` and `cr_pre_tax_profit` against the original annual report; the financial
+  net variable may omit investment results, but this is not yet confirmed.
+  Do not force the rows to balance by deriving a replacement before checking
+  the source variables' definitions.
+- All profiles remain `noindex,follow`; no Swedish risk grades or report orders
+  are enabled in this snapshot.
+
+Before changing missing values to zero, ask the importer team whether absent
+`cr_appropriations_total` and inventory variables represent omitted zero-valued
+XBRL facts, unavailable data, or unsupported source tags. Obtain examples with
+the original filing to distinguish these cases. Also verify raw `ns` for the
+five sales omissions. Extreme percentages, such as Dag Nelker's operating
+margin of −2,345.5 %, are compatible with the displayed small sales and loss;
+they are not evidence of a calculation defect by themselves.
+
+The mapper currently accepts EUR as well as SEK, while pages and absolute-value
+rankings assume SEK. Confirm currencies in the live bundles; the published HTML
+does not expose the source currency. If EUR models exist, their amount labels
+and cross-company amount comparisons need a separate correction before launch.
+
+UI checks used the actual profile component in a temporary local harness:
+two-year and five-year histories, negative results, keyboard year selection and
+Escape, touch selection, and clipboard success and permission-denied feedback.
+Widths 320, 560, 720, 1080, 1100 and 1280 px had no page overflow. At 320 px with
+200 % text and reduced-motion/transparency/high-contrast preferences, the page
+also stayed within its viewport. Five-year line-chart edge targets measured
+35.5 px before the fix and 47 px after; tooltip anchors stay on their data points.
+The harness was removed. Existing tests: 53 passing. Sample production build:
+34 pages, successful. A separate Astro type check was not run because
+`@astrojs/check` is not installed. No AWS/Jenkins deployment was started.

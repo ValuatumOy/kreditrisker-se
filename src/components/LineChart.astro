@@ -45,7 +45,7 @@ const smooth = (run: { i: number; v: number }[]) =>
 const lastIdx = vals.map((v, i) => (v === null ? -1 : i)).filter((i) => i >= 0).at(-1)
 const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).join(', ')
 // Hover/tap read-out (src/scripts/charts.ts): one hit column per year.
-const colW = points.length > 1 ? (W - 2 * padX) / (points.length - 1) : W
+const colW = W / Math.max(points.length, 1)
 const anchorY = (i: number) => (vals[i] === null ? top + plotH / 2 : y(vals[i]!)) / height
 ---
 
@@ -119,9 +119,9 @@ const anchorY = (i: number) => (vals[i] === null ? top + plotH / 2 : y(vals[i]!)
                     data-text={d.text}
                     data-x={x(i) / W}
                     data-y={anchorY(i)}
-                    x={Math.max(0, x(i) - colW / 2)}
+                    x={i * colW}
                     y="0"
-                    width={Math.min(W, x(i) + colW / 2) - Math.max(0, x(i) - colW / 2)}
+                    width={colW}
                     height={height}
                     tabindex="0"
                     role="button"

@@ -20,7 +20,7 @@ const day = (iso: string) => date(new Date(iso).toLocaleDateString('sv-SE', { ti
     noindex={rows.length === 0 || site.synthetic}
 >
     <p class="rule small">
-        <b>Urval:</b> de {RECENT_LIMIT} senast uppdaterade profilerna. Bara profiler som klarar <a href="/metod/#index">kvalitetströskeln</a> tas med.
+        <b>Urval:</b> upp till {RECENT_LIMIT} senast uppdaterade profiler. Bara profiler som klarar <a href="/metod/#index">kvalitetströskeln</a> tas med.
     </p>
     {
         rows.length === 0 ? (
