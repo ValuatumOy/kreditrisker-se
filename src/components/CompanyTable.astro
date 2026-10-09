@@ -12,8 +12,10 @@ interface Props {
     source: string
     show?: 'kommun' | 'bransch'
     rank?: { value: string }[]
+    /** An extra first data column, e.g. the update date on "Senast uppdaterade". */
+    extra?: { label: string; values: string[] }
 }
-const { companies, no, title, source, show = 'kommun', rank } = Astro.props
+const { companies, no, title, source, show = 'kommun', rank, extra } = Astro.props
 // Index rows keep plain numbers; absent means the newest report lacks the item.
 const val = (n?: number): Value => (n === undefined ? { status: 'missing', reason: 'not_in_source' } : { status: 'derived', value: n, formula: 'index', inputs: [] })
 ---
@@ -25,6 +27,7 @@ const val = (n?: number): Value => (n === undefined ? { status: 'missing', reaso
             <thead>
                 <tr>
                     {rank && <th scope="col" class="ct__rank">#</th>}
+                    {extra && <th scope="col" class="ct__txt">{extra.label}</th>}
                     <th scope="col">Företag</th>
                     <th scope="col" class="ct__txt">{show === 'kommun' ? 'Kommun' : 'Bransch'}</th>
                     {rank && <th scope="col">Värde</th>}
@@ -40,6 +43,7 @@ const val = (n?: number): Value => (n === undefined ? { status: 'missing', reaso
                         return (
                             <tr>
                                 {rank && <td class="ct__rank num">{i + 1}</td>}
+                                {extra && <td class="num ct__txt">{extra.values[i]}</td>}
                                 <th scope="row">
                                     <a href={c.p}>{c.n}</a>
                                     {c.st !== 'active' && c.st !== 'unknown' && <span class="tag tag--alert ct__tag">{STATUS_TEXT[c.st]}</span>}

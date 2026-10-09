@@ -1,5 +1,5 @@
-// Static-params TSV, as written by build/get_static_params (same format as
-// the Danish site): fid, slug, name, sni, orgnr. One company per line.
+// Static-params TSV, as written by build/get_static_params: fid, slug, name, sni, orgnr
+// (as on the Danish site), then the model's last save time (epoch ms). One company per line.
 
 import fs from 'node:fs'
 import { parseOrgnr } from '../orgnr.ts'
@@ -8,6 +8,8 @@ export interface Param {
     fid: string
     name: string
     orgnr?: string
+    /** When the model was last saved in Valuatum (ISO), absent in files without the column. */
+    updatedAt?: string
 }
 
 export function readParams(file: string): Param[] {
@@ -20,7 +22,10 @@ export function readParams(file: string): Param[] {
         .filter((c) => !c[4]?.trim().endsWith('K')) // group accounts ("K" codes) are not separate pages, as on the Finnish site
         .map((c) => {
             const o = c[4] && parseOrgnr(c[4])
-            return { fid: c[0], name: c[2] ?? '', orgnr: o && o.ok ? (o.orgnr as string) : undefined }
+            const ms = Number(c[5])
+            const p: Param = { fid: c[0], name: c[2] ?? '', orgnr: o && o.ok ? (o.orgnr as string) : undefined }
+            if (ms > 0) p.updatedAt = new Date(ms).toISOString()
+            return p
         })
 }
 
@@ -49,7 +54,9 @@ export function batchMode(companies: string): BatchMode {
 export function selectBatch(allLines: string[], changedLines: string[], mode: BatchMode, companies: string): string[] {
     const rows = allLines.filter((l) => l.trim())
     if (mode === 'all') return rows
-    const picked = new Set(mode === 'changed' ? changedLines.filter((l) => l.trim()) : [])
+    // By fid, not by line: the save-time column can differ between the two queries.
+    const fid = (l: string) => l.split('\t')[0]
+    const picked = new Set(mode === 'changed' ? changedLines.filter((l) => l.trim()).map(fid) : [])
     const missing: string[] = []
     for (const token of companies.split(/[\s,;]+/).filter(Boolean)) {
         const o = parseOrgnr(token.replace(/K$/i, ''))
@@ -57,8 +64,8 @@ export function selectBatch(allLines: string[], changedLines: string[], mode: Ba
             ? rows.filter((l) => l.split('\t')[4]?.replace(/\D/g, '') === o.orgnr)
             : rows.filter((l) => l.split('\t')[0] === token)
         if (!hits.length) missing.push(token)
-        hits.forEach((l) => picked.add(l))
+        hits.forEach((l) => picked.add(fid(l)))
     }
     if (missing.length) throw new Error(`not in the directory (staticparams.txt): ${missing.join(', ')}`)
-    return rows.filter((l) => picked.has(l))
+    return rows.filter((l) => picked.has(fid(l)))
 }

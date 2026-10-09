@@ -13,15 +13,16 @@ import (
 )
 
 // Companies come from the followed models of the Swedish XBRL user accounts
-// (Denmark used XBRLDenmark / XBRLDenmarkIFRS). Same columns as the Danish
-// tool; the last one (S.ISIN) holds the company code, i.e. the orgnr.
+// (Denmark used XBRLDenmark / XBRLDenmarkIFRS). Columns as in the Danish tool
+// (S.ISIN holds the company code, i.e. the orgnr), plus F.VERSION: when the
+// model was last saved (epoch ms), for the "Senast uppdaterade" page.
 func sqlFor(accounts []string, updatedSince *int64) string {
 	quoted := make([]string, len(accounts))
 	for i, a := range accounts {
 		quoted[i] = "'" + strings.ReplaceAll(a, "'", "") + "'"
 	}
 	q := fmt.Sprintf(`
-select F.FOLLOWEDMODELID, C.NAME, I.NACE, S.ISIN from FOLLOWEDMODEL F
+select F.FOLLOWEDMODELID, C.NAME, I.NACE, S.ISIN, F.VERSION from FOLLOWEDMODEL F
 join COMPANY C on F.COMPANYID = C.COMPANYID
 join INDUSTRY I on C.INDUSTRYID = I.INDUSTRYID
 join STOCKRATE S on S.STOCKRATEID = C.TICKERAID
@@ -61,11 +62,11 @@ func getAllStaticParams(conn *sql.DB, accounts []string, fids []string) ([]strin
 	paramsBatch := make([]string, 0)
 
 	for rows.Next() {
-		var fid, name, nace, isin string
-		if err := rows.Scan(&fid, &name, &nace, &isin); err != nil {
+		var fid, name, nace, isin, version string
+		if err := rows.Scan(&fid, &name, &nace, &isin, &version); err != nil {
 			return nil, nil, err
 		}
-		row := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\n", fid, slugify(name), name, nace, isin)
+		row := fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\n", fid, slugify(name), name, nace, isin, version)
 		paramsAll = append(paramsAll, row)
 		if len(fids) > 0 && slices.Contains(fids, fid) {
 			paramsBatch = append(paramsBatch, row)
@@ -89,11 +90,11 @@ func getUpdatedStaticParams(conn *sql.DB, accounts []string, includeUpdatedSince
 
 	params := make([]string, 0)
 	for rows.Next() {
-		var fid, name, nace, isin string
-		if err := rows.Scan(&fid, &name, &nace, &isin); err != nil {
+		var fid, name, nace, isin, version string
+		if err := rows.Scan(&fid, &name, &nace, &isin, &version); err != nil {
 			return nil, err
 		}
-		params = append(params, fmt.Sprintf("%s\t%s\t%s\t%s\t%s\n", fid, slugify(name), name, nace, isin))
+		params = append(params, fmt.Sprintf("%s\t%s\t%s\t%s\t%s\t%s\n", fid, slugify(name), name, nace, isin, version))
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

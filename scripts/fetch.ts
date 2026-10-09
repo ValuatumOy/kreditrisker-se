@@ -62,6 +62,16 @@ async function main() {
         }
     })
 
+    // Last save time for every company in the directory, not just the batch (the
+    // "Senast uppdaterade" page sorts the whole index by it).
+    if (all) {
+        const saved = new Map(all.flatMap((p) => (p.orgnr && p.updatedAt ? [[p.orgnr, p.updatedAt] as const] : [])))
+        for (const r of rows.values()) {
+            const up = saved.get(r.o)
+            if (up) r.up = up
+        }
+    }
+
     const removed: string[] = []
     if (keep)
         for (const o of rows.keys())

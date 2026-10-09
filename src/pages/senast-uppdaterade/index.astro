@@ -1,0 +1,47 @@
+---
+import Page from '../../layouts/Page.astro'
+import CompanyTable from '../../components/CompanyTable.astro'
+import { getSite } from '../../lib/store.ts'
+import { RECENT_LIMIT, recentlyUpdated } from '../../lib/publish.ts'
+import { date } from '../../lib/format.ts'
+
+const site = getSite()
+const rows = recentlyUpdated(site.rows)
+// up is UTC; the date shown is the Swedish calendar day (sv-SE formats as YYYY-MM-DD).
+const day = (iso: string) => date(new Date(iso).toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' }))
+---
+
+<Page
+    title="Senast uppdaterade företag"
+    h1="Senast uppdaterade"
+    description="Svenska företag vars bokslut och nyckeltal senast har uppdaterats, nyaste först."
+    path="/senast-uppdaterade/"
+    lede="Företagen vars uppgifter senast har uppdaterats från Bolagsverket, nyaste först. Listan förnyas varje natt."
+    noindex={rows.length === 0 || site.synthetic}
+>
+    <p class="rule small">
+        <b>Urval:</b> de {RECENT_LIMIT} senast uppdaterade profilerna. Bara profiler som klarar <a href="/metod/#index">kvalitetströskeln</a> tas med.
+    </p>
+    {
+        rows.length === 0 ? (
+            <p class="muted">Inga uppdaterade företag ännu.</p>
+        ) : (
+            <CompanyTable
+                companies={rows}
+                extra={{ label: 'Uppdaterad', values: rows.map((r) => day(r.up!)) }}
+                no="Tabell 1"
+                title="Senast uppdaterade företag"
+                source={`${site.synthetic ? 'Syntetiska testdata' : 'Bolagsverket, digitala årsredovisningar'}; uppdateringsdatum enligt Valuatums databas.`}
+                show="bransch"
+            />
+        )
+    }
+</Page>
+
+<style>
+    .rule {
+        max-width: 70ch;
+        color: var(--ink-2);
+        margin-bottom: 32px;
+    }
+</style>
