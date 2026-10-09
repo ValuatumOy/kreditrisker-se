@@ -6,9 +6,6 @@
 //                                 companies missing from it are dropped)
 //   SE_INDEX_IN                   index state from the previous build (optional,
 //                                 defaults to data/build/index.jsonl)
-//   SE_BUILD_UNBUILT=N            also build up to N companies from the full list
-//                                 that have no page yet (the initial mass build,
-//                                 in nightly chunks)
 //
 // TSV columns, as written by build/get_static_params: fid, slug, name, sni, orgnr.
 // Writes data/build/pages.jsonl, index.jsonl (also the next build's state),
@@ -38,11 +35,6 @@ async function main() {
     const keep = all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))
     const indexIn = process.env.SE_INDEX_IN ?? path.join(BUILD_DIR, 'index.jsonl')
     const rows = new Map(readJsonl<IndexRow>(indexIn).map((r) => [r.o, r]))
-    const unbuilt = Number(process.env.SE_BUILD_UNBUILT ?? 0)
-    if (all && unbuilt > 0) {
-        const inBatch = new Set(batch.map((p) => p.fid))
-        batch.push(...all.filter((p) => p.orgnr && !rows.has(p.orgnr) && !inBatch.has(p.fid)).slice(0, unbuilt))
-    }
     const importedAt = new Date().toISOString()
     const batchId = `api-${importedAt.slice(0, 10)}`
 

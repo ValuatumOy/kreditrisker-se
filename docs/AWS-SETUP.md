@@ -50,8 +50,8 @@ distribution, state URI and site origin are read from the
 (it reaches sweden-db) and the API token is the Secret text credential
 `kreditrisker-se-api-token`. Set `CLOUDSEARCH_DOC_ENDPOINT` in the Jenkinsfile
 once the CloudSearch domain exists; until then the search stage is skipped.
-First load: `COMPANIES=all` (with `SEARCH_FULL=true` once search exists), or
-nightly runs with `BUILD_UNBUILT=20000` until every company has a page.
+First load: `COMPANIES=all` (it also re-uploads every company to search once
+the search domain exists).
 
 ## 5. Report checkout (only when reports are launched)
 
