@@ -3,7 +3,7 @@
 
 import { SITE } from '../config/site.ts'
 import { GUIDES } from '../content/guides.ts'
-import { MIN_RANKING_ENTRIES, type Site } from './publish.ts'
+import { MIN_RANKING_ENTRIES, recentlyUpdated, type Site } from './publish.ts'
 import { isIndexable } from './seo.ts'
 
 export const COMPANIES_PER_SITEMAP = 40_000
@@ -25,6 +25,7 @@ export function hubUrls(site: Site): SitemapUrl[] {
     for (const h of site.industries) if (h.indexable) out.push({ path: `/branscher/${h.slug}/` })
     for (const h of site.municipalities) if (h.indexable) out.push({ path: `/kommuner/${h.slug}/` })
     const rankings = site.rankings.filter((r) => r.entries.length >= MIN_RANKING_ENTRIES)
+    if (recentlyUpdated(site.rows).length) out.push({ path: '/senast-uppdaterade/' })
     if (rankings.length) out.push({ path: '/topplistor/' })
     for (const r of rankings) out.push({ path: `/topplistor/${r.slug}/` })
     return out.filter(() => isIndexable(false, site.synthetic))

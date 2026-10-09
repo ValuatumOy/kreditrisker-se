@@ -10,6 +10,7 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
 import { batchMode, readParams, selectBatch } from '../src/lib/valuatum/params.ts'
+import { recentlyUpdated, type IndexRow } from '../src/lib/publish.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
 import { computeMetrics, numeric } from '../src/lib/metrics.ts'
@@ -95,6 +96,15 @@ test('static params: orgnr parsed, group-account K codes skipped', () => {
     const f = path.join(dir, 'p.txt')
     fs.writeFileSync(f, '900001\ttestbolaget\tTestbolaget Norrland AB\t47599\t556987-6542\n900002\ttestbolaget\tTestbolaget Norrland AB\t47599\t5569876542K\n')
     assert.deepEqual(readParams(f), [{ fid: '900001', name: 'Testbolaget Norrland AB', orgnr: '5569876542' }])
+    fs.writeFileSync(f, '900001\ttestbolaget\tTestbolaget Norrland AB\t47599\t556987-6542\t1791500000000\n')
+    assert.equal(readParams(f)[0].updatedAt, new Date(1791500000000).toISOString(), 'sixth column: model save time')
+})
+
+test('senast uppdaterade: threshold-passing rows with a save time, newest first', () => {
+    const row = (o: string, up: string | undefined, q = true) => ({ o, n: o, p: `/foretag/${o}/x/`, rf: [], st: 'active', fr: 'current', ix: q, q, syn: false, im: '2026-10-09', ...(up ? { up } : {}) }) as IndexRow
+    const rows = [row('a', '2026-10-01T10:00:00.000Z'), row('b', '2026-10-08T10:00:00.000Z'), row('c', undefined), row('d', '2026-10-09T10:00:00.000Z', false)]
+    assert.deepEqual(recentlyUpdated(rows).map((r) => r.o), ['b', 'a'])
+    assert.equal(recentlyUpdated(rows, 1).length, 1)
 })
 
 test('fetch stage: batch pages, merged index, removed companies dropped, renames redirect', () => {
@@ -135,6 +145,8 @@ test('batch selection: modes, orgnr with or without hyphen, fids, group rows, un
     assert.deepEqual(selectBatch(all, [all[3]], 'changed', ''), [all[3]])
     assert.deepEqual(selectBatch(all, [all[3]], 'changed', '3'), all.slice(2), 'changed plus listed, directory order')
     assert.throws(() => selectBatch(all, [], 'listed', '5560659475 99'), /5560659475, 99/)
+    const saved = all.map((l, i) => `${l}\t${1791500000000 + i}`)
+    assert.deepEqual(selectBatch(saved, [saved[3].replace(/\d+$/, '1791599999999')], 'changed', ''), [saved[3]], 'changed rows match by fid even if the save time moved')
     assert.equal(batchMode(' \n'), 'changed', 'empty COMPANIES is the nightly run')
     assert.equal(batchMode(' ALL '), 'all')
     assert.equal(batchMode('556448-0282'), 'listed')

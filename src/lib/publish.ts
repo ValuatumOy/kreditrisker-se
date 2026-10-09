@@ -51,6 +51,15 @@ export interface IndexRow {
     rg?: number
     /** import date, for sitemap lastmod */
     im: string
+    /** when the company's data was last saved in Valuatum (ISO), from get_static_params */
+    up?: string
+}
+
+export const RECENT_LIMIT = 100
+
+/** "Senast uppdaterade": profiles that pass the index threshold, newest save first. */
+export function recentlyUpdated(rows: IndexRow[], limit = RECENT_LIMIT): IndexRow[] {
+    return rows.filter((r) => r.up && r.q).sort((a, b) => b.up!.localeCompare(a.up!) || a.n.localeCompare(b.n, 'sv')).slice(0, limit)
 }
 
 export function toRow(c: PublishedCompany): IndexRow {
