@@ -20,7 +20,7 @@ const fid = company.record.status.source.documentId?.match(/^fid:(\d+)$/)?.[1]
 const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}&produkt=${p === 'basic' ? 'bas' : 'ai'}${fid ? `&fid=${fid}` : ''}`
 ---
 
-<aside class="rp dark grain" aria-labelledby="rp-title" data-spotlight>
+<aside class="rp dark grain" aria-labelledby="rp-title">
     <h2 id="rp-title" class="rp__title">Rapport om {company.record.name}</h2>
     <ul class="rp__list">
         {
@@ -67,6 +67,7 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
     .rp {
         position: relative;
         overflow: hidden;
+        overflow-wrap: anywhere;
         padding: 22px 22px 18px;
         border-radius: 14px;
         background:
@@ -76,19 +77,13 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         border: 1px solid rgb(255 255 255 / 0.08);
         box-shadow: 0 40px 80px -40px rgb(10 20 38 / 0.6);
     }
-    .rp::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(300px circle at var(--mx, -400px) var(--my, -400px), rgb(159 212 176 / 0.12), transparent 60%);
-        pointer-events: none;
-    }
     .rp__title {
         font-family: var(--sans);
         font-size: 1rem;
         font-weight: 600;
         letter-spacing: 0;
         line-height: 1.35;
+        overflow-wrap: anywhere;
     }
     .rp__list {
         list-style: none;
@@ -96,6 +91,8 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         padding: 0;
     }
     .rp__item {
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr);
         padding: 16px;
         margin-bottom: 8px;
         border-radius: 8px;
@@ -105,8 +102,16 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         gap: 10px;
         justify-items: start;
     }
+    .rp :global(.tag) {
+        height: auto;
+        min-height: 1.375rem;
+        padding-block: 0.35em;
+        white-space: normal;
+        line-height: 1.4;
+    }
     .rp__row {
         display: flex;
+        flex-wrap: wrap;
         justify-content: space-between;
         align-items: center;
         gap: 10px;
@@ -139,5 +144,15 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         padding-top: 12px;
         border-top: 1px solid var(--rule);
         color: var(--ink-3);
+    }
+    .rp :global(.btn) { min-height: 2.75rem; }
+    .rp__foot a {
+        display: inline-flex;
+        align-items: center;
+        min-height: 2.75rem;
+    }
+    @media (prefers-contrast: more) {
+        .rp, .rp__item { border-color: var(--ice-2); }
+        .rp__desc, .rp__state { color: var(--ice); }
     }
 </style>

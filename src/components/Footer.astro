@@ -46,9 +46,10 @@ const cols = [
     }
     .foot__grid {
         display: grid;
-        grid-template-columns: 1.6fr repeat(3, 1fr);
+        grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr));
         gap: 40px 24px;
         padding-bottom: 64px;
+        overflow-wrap: anywhere;
     }
     .foot .foot__name {
         display: inline-flex;
@@ -114,7 +115,7 @@ const cols = [
     }
     @media (max-width: 860px) {
         .foot__grid {
-            grid-template-columns: 1fr 1fr;
+            grid-template-columns: repeat(auto-fit, minmax(min(100%, 8rem), 1fr));
         }
         .foot__brand {
             grid-column: 1 / -1;

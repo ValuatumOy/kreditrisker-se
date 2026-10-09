@@ -31,7 +31,7 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
 ---
 
 <div class="chart" data-chart>
-<svg class="bars" viewBox={`0 0 ${W} ${height}`} role="img" aria-label={`${title}. ${summary}`}>
+<svg class="bars" viewBox={`0 0 ${W} ${height}`} role="group" aria-label={`${title}. ${summary}`}>
     <defs>
         <linearGradient id={`${uid}-bar`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc9ab" /><stop offset="1" stop-color="#d8e7dc" /></linearGradient>
         <linearGradient id={`${uid}-last`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d5c45" /><stop offset="1" stop-color="#4f8a6c" /></linearGradient>
@@ -95,13 +95,14 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
                     width={band}
                     height={height}
                     tabindex="0"
+                    role="button"
                     aria-label={`${p.label}: ${d.text}`}
                 />
             )
         })
     }
 </svg>
-<div class="chart__tip" hidden></div>
+<div class="chart__tip" aria-hidden="true" hidden></div>
 </div>
 
 <script>
@@ -128,12 +129,12 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
         background: var(--sheet);
         box-shadow: 0 14px 30px -18px rgb(15 33 26 / 0.5);
         transform: translate(-50%, calc(-100% - 10px));
-        pointer-events: none;
         white-space: nowrap;
         font-size: 0.78rem;
         color: var(--ink-3);
         line-height: 1.3;
     }
+    .chart__tip[hidden] { display: none; }
     .chart__tip :global(strong) {
         font-size: 1rem;
         font-weight: 500;
@@ -193,17 +194,6 @@ const summary = points.map((p) => `${p.label}: ${compactSek(p.value).text}`).joi
         }
         .bars__gaplabel {
             font-size: 17px;
-        }
-    }
-    @media (prefers-reduced-motion: no-preference) {
-        .bars__bar rect {
-            animation: grow 900ms var(--ease-out) both;
-            animation-delay: calc(var(--i) * 70ms);
-        }
-    }
-    @keyframes grow {
-        from {
-            transform: scaleY(0);
         }
     }
 </style>

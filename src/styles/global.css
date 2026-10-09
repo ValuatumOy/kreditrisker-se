@@ -353,6 +353,11 @@ table {
 .btn:hover {
     translate: 0 -1px;
 }
+.btn:active {
+    translate: 0 0;
+    filter: brightness(0.9);
+    transition: none;
+}
 .dark .btn {
     background: #f3f6f2;
     color: var(--night);

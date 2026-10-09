@@ -88,18 +88,21 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                 <Crumbs items={crumbs} />
                 <header class="co__head">
                     <div class="co__titlerow">
-                        <h1 class="reveal" style="--d:1">{r.name}</h1>
+                        <h1>{r.name}</h1>
                     </div>
-                    <div class="co__ids reveal" style="--d:2">
-                        <button class="co__orgnr num" type="button" data-copy={formatOrgnr(r.orgnr)} aria-label={`Kopiera organisationsnummer ${formatOrgnr(r.orgnr)}`}>
-                            <span>{formatOrgnr(r.orgnr)}</span>
-                            <Icon name="copy" />
-                        </button>
+                    <div class="co__ids">
+                        <div class="co__copy">
+                            <button class="co__orgnr num" type="button" data-copy={formatOrgnr(r.orgnr)} aria-label={`Kopiera organisationsnummer ${formatOrgnr(r.orgnr)}`}>
+                                <span>{formatOrgnr(r.orgnr)}</span>
+                                <Icon name="copy" />
+                            </button>
+                            <span class="co__copystatus small" role="status" data-copy-status></span>
+                        </div>
                         {[LEGAL_FORM_TEXT[r.legalForm], r.municipality && kommunName(r.municipality.name), sni && `SNI ${sni.code}`]
                             .filter(Boolean)
                             .map((t) => <span class="co__id">{t}</span>)}
                     </div>
-                    <div class="co__tags reveal" style="--d:3">
+                    <div class="co__tags">
                         <span class:list={['tag', statusTone]}>
                             {STATUS_TEXT[r.status.code]}
                             {r.status.since && ` sedan ${date(r.status.since)}`}
@@ -133,19 +136,12 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
             </NightBand>
             <div class="shell co">
                 <section class="co__lead" aria-labelledby="sammanfattning">
-                    <div class="fig co__summary reveal">
+                    <div class="fig co__summary">
                         <h2 id="sammanfattning" class="co__summaryh">Sammanfattning</h2>
                         <p>{summary[0]}</p>
                         {latest && summary.length > 1 && <p>{summary.slice(1).join(' ')}</p>}
                     </div>
                 </section>
-
-                <div class="co__rail">
-                    <ReportPanel company={c} />
-                    <p class="co__fix small">
-                        Ser något fel ut? <a href="/om/#rattelse">Begär rättelse</a>
-                    </p>
-                </div>
 
                 <div class="co__main">
                     {salesSeries.length > 1 && (
@@ -157,7 +153,7 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                                         <span class="fig__no">{nextFig()}</span>
                                         <span class="fig__title">Nettoomsättning <span class="fig__sub">– senaste fem åren</span></span>
                                     </div>
-                                    <LineChart title={`Nettoomsättning, ${r.name}`} points={salesSeries} height={210} />
+                                    <LineChart title={`Nettoomsättning, ${r.name}`} points={salesSeries} height={210} animate={false} />
                                 </figure>
                                 <figure class="fig">
                                     <div class="fig__head">
@@ -168,7 +164,7 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                                 </figure>
                             </div>
                             <p class="fig__src">
-                                <b>Källa:</b> {SOURCE_TEXT[latest.source.source]}. Belopp avrundade till tkr eller Mkr; räkenskapsår {calendarYears ? 'jan–dec' : 'enligt tabellhuvudet i Tabell 2'}.
+                                <b>Källa:</b> {SOURCE_TEXT[latest.source.source]}. Belopp avrundade till tkr eller Mkr; räkenskapsår {calendarYears ? 'jan–dec' : 'enligt tabellhuvudet under Bokslut'}.
                                 {(hasGap(salesSeries) || hasGap(ebitSeries)) && ' Streckade fält: uppgiften saknas för året' + (missingYears.length ? ', inget bokslut har lämnats in' : '') + '.'}
                             </p>
                         </section>
@@ -265,6 +261,12 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                         </section>
                     )}
                 </div>
+                <div class="co__rail">
+                    <ReportPanel company={c} />
+                    <p class="co__fix small">
+                        Ser något fel ut? <a href="/om/#rattelse">Begär rättelse</a>
+                    </p>
+                </div>
             </div>
         </Base>
     )
@@ -272,13 +274,17 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
 
 <script>
     for (const b of document.querySelectorAll<HTMLButtonElement>('[data-copy]')) {
+        const status = b.parentElement!.querySelector<HTMLElement>('[data-copy-status]')!
+        let reset: ReturnType<typeof setTimeout>
         b.addEventListener('click', async () => {
+            clearTimeout(reset)
             try {
                 await navigator.clipboard.writeText(b.dataset.copy!)
-                b.classList.add('is-copied')
-                b.setAttribute('aria-label', 'Kopierat')
-                setTimeout(() => b.classList.remove('is-copied'), 1600)
-            } catch {}
+                status.textContent = 'Kopierat'
+            } catch {
+                status.textContent = 'Kunde inte kopiera. Markera numret och kopiera manuellt.'
+            }
+            reset = setTimeout(() => (status.textContent = ''), 5000)
         })
     }
 </script>
@@ -294,9 +300,10 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
     }
     .co__head h1 {
         font-size: clamp(2.2rem, 1.2rem + 3.6vw, 4.2rem);
-        font-weight: 300;
+        font-weight: 450;
         color: #fff;
         max-width: 22ch;
+        overflow-wrap: anywhere;
     }
     .co__ids {
         display: flex;
@@ -322,7 +329,8 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        padding: 5px 12px;
+        min-height: 2.75rem;
+        padding: 0.4em 0.75em;
         border: 1px solid rgb(255 255 255 / 0.16);
         border-radius: 4px;
         background: rgb(255 255 255 / 0.06);
@@ -335,19 +343,50 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
     .co__orgnr:hover {
         background: rgb(255 255 255 / 0.12);
     }
+    .co__orgnr:active {
+        background: rgb(255 255 255 / 0.2);
+        transition: none;
+    }
+    .co__copy { position: relative; }
+    .co__copystatus {
+        position: absolute;
+        top: calc(100% + 0.3rem);
+        left: 0;
+        z-index: 3;
+        width: max-content;
+        max-width: min(18rem, calc(100vw - 4rem));
+        color: var(--ice);
+        background: var(--night-2);
+        border: 1px solid var(--ice-3);
+        border-radius: var(--radius);
+        padding: 0.4em 0.7em;
+    }
+    .co__copystatus:empty {
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        border: 0;
+        overflow: hidden;
+        clip-path: inset(50%);
+    }
     .co__orgnr :global(svg) {
         width: 14px;
         height: 14px;
         color: var(--ice-3);
-    }
-    .co__orgnr.is-copied :global(svg) {
-        color: var(--green);
     }
     .co__tags {
         display: flex;
         flex-wrap: wrap;
         gap: 8px;
         margin-top: 16px;
+    }
+    .co__tags :global(.tag) {
+        height: auto;
+        min-height: 1.375rem;
+        padding-block: 0.35em;
+        white-space: normal;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
     }
     .co__kpihead {
         display: flex;
@@ -383,6 +422,7 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
     }
     .co__lead {
         grid-area: lead;
+        min-width: 0;
     }
     .co__summary {
         display: grid;
@@ -405,6 +445,7 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         grid-area: rail;
         position: sticky;
         top: 92px;
+        min-width: 0;
     }
     .co__fix {
         margin-top: 12px;
@@ -425,18 +466,25 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
     }
     .co__charts {
         display: grid;
-        grid-template-columns: 1.3fr 1fr;
+        grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
         gap: 16px;
+    }
+    .co__charts :global(.fig__head) {
+        flex-wrap: wrap;
+    }
+    .co__charts :global(.fig__title) {
+        overflow-wrap: anywhere;
     }
     .co__facts {
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         margin: 0;
         background: var(--sheet);
         border: 1px solid var(--rule);
         border-radius: var(--radius-lg);
         box-shadow: var(--card-shadow);
         overflow: hidden;
+        overflow-wrap: anywhere;
     }
     .co__facts > div {
         padding: 16px 20px;
@@ -477,8 +525,9 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         margin: 0 0 14px;
         padding: 0;
         display: grid;
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         gap: 10px;
+        overflow-wrap: anywhere;
     }
     .co__related li {
         display: grid;
@@ -503,7 +552,7 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
     @media (max-width: 1080px) {
         .co {
             grid-template-columns: minmax(0, 1fr);
-            grid-template-areas: 'lead' 'rail' 'main';
+            grid-template-areas: 'lead' 'main' 'rail';
         }
         .co__rail {
             position: static;
@@ -514,13 +563,23 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
         .co__charts,
         .co__facts,
         .co__related {
-            grid-template-columns: 1fr;
+            grid-template-columns: minmax(0, 1fr);
         }
         .co__facts > div:nth-child(odd):not(.co__wide) {
             border-right: 0;
         }
         .co__titlerow {
             gap: 14px;
+        }
+    }
+    @media (prefers-contrast: more) {
+        .co__orgnr { background: var(--night-2); border-color: var(--ice-2); }
+    }
+    @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
+        .co__empty {
+            background: var(--night-2);
+            backdrop-filter: none;
+            -webkit-backdrop-filter: none;
         }
     }
 </style>

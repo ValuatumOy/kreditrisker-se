@@ -25,10 +25,32 @@ for (const chart of document.querySelectorAll<HTMLElement>('[data-chart]')) {
         tip.hidden = true
         cols.forEach((el) => el.classList.remove('is-active'))
     }
-    for (const hit of chart.querySelectorAll<SVGElement>('.hit')) {
-        hit.addEventListener('pointerenter', () => show(hit))
+    const hits = [...chart.querySelectorAll<SVGElement>('.hit')]
+    for (const [i, hit] of hits.entries()) {
+        hit.addEventListener('pointerenter', (event) => {
+            if (event.pointerType === 'mouse') show(hit)
+        })
+        hit.addEventListener('click', () => show(hit))
         hit.addEventListener('focus', () => show(hit))
         hit.addEventListener('blur', hide)
+        hit.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                show(hit)
+            }
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                event.preventDefault()
+                hits[Math.max(0, Math.min(hits.length - 1, i + (event.key === 'ArrowRight' ? 1 : -1)))].focus()
+            }
+        })
     }
-    chart.addEventListener('pointerleave', hide)
+    chart.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') hide()
+    })
+    chart.addEventListener('pointerleave', (event) => {
+        if (event.pointerType === 'mouse' && !hits.includes(document.activeElement as SVGElement)) hide()
+    })
+    document.addEventListener('pointerdown', (event) => {
+        if (!chart.contains(event.target as Node)) hide()
+    })
 }
