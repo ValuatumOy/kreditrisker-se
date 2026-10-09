@@ -66,7 +66,26 @@ data is committed; the Vercel site is a test environment, not the public site.
 
 ## 3. Production (Jenkins → S3 + CloudFront)
 
-`jenkins/kreditrisker-se.groovy`, nightly like the Danish job:
+`jenkins/kreditrisker-se.groovy`, nightly like the Danish job. To publish pages,
+open the job, type the organisationsnummer into COMPANIES and press Build; every
+other parameter already defaults to a production run.
+
+Setup, once (nothing in the Jenkinsfile needs editing):
+
+- AWS: `cd aws-infra && npx cdk deploy KreditriskerSiteStackProd --exclusively`
+  (deployed 2026-10-09; site on its CloudFront domain until kreditrisker.se is
+  in Route 53). The job reads bucket, distribution, state URI and site origin
+  from the stack outputs; the stack grants the agent role `sweden-process-role`
+  access to them.
+- Jenkins job: Pipeline script from SCM, the Bitbucket repo, branch `*/main`,
+  script path `jenkins/kreditrisker-se.groovy`, the same Bitbucket credential
+  as the other Valuatum jobs.
+- Jenkins credential `kreditrisker-se-api-token` (Secret text): the
+  sweden.valuatum.com API token.
+- Agent label `sweden-build` (profinder-environment `jenkins/new-environment.sh`):
+  it reaches sweden-db. The job installs Node 22 in its workspace if the agent
+  has none.
+
 
 1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
    then `scripts/select-batch.ts` picks the batch from `COMPANIES` (no file upload; empty = changed, `all` = every company)
