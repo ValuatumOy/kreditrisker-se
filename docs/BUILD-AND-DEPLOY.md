@@ -127,8 +127,8 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
    save the new index state, invalidate CloudFront
 
-The first full build: run with `BUILD_UNBUILT=20000` nightly (or larger) until
-every company has a page; each run adds that many unbuilt companies to the batch.
+The first full build, and any full rebuild: `COMPANIES=all`. It also re-uploads
+every company to search.
 
 Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
 the full directory set `PUBLIC_SE_SEARCH_ENDPOINT` to a search API returning

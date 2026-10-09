@@ -6,7 +6,7 @@
 // run, so "Build with Parameters" -> type the org numbers -> Build is enough:
 //   build or rebuild companies  COMPANIES=556448-0282, 5565675906
 //   nightly (scheduled)         COMPANIES empty: companies updated since SINCE
-//   everything                  COMPANIES=all (SEARCH_FULL on the first time)
+//   everything                  COMPANIES=all (also re-uploads every company to search)
 //
 // Differences from the Danish job:
 //  - a Fetch stage (scripts/fetch.ts) pulls the batch from the Swedish REST API
@@ -14,7 +14,6 @@
 //  - the directory index (data/build/index.jsonl) is carried between runs in
 //    STATE_URI, so hubs, rankings and sitemaps always cover every company;
 //  - companies that left the list are deleted from the bucket;
-//  - BUILD_UNBUILT builds the initial pages in nightly chunks.
 // The helper binaries are committed in build/bin/ (agents have no Go): after
 // changing build/get_static_params, run `npm run build:scripts` and commit them.
 // Testing does not go through this job: see docs/BUILD-AND-DEPLOY.md.
@@ -37,9 +36,8 @@ pipeline {
 Empty: the nightly run (companies updated since SINCE). "all": every company.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
-        string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet (first load in nightly chunks).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
-        booleanParam(name: 'SEARCH_FULL', defaultValue: false, description: 'Re-upload every company to CloudSearch (first load)')
+        booleanParam(name: 'UPDATE_CLOUDSEARCH', defaultValue: true, description: 'Update the site search (CloudSearch) with the built companies; COMPANIES=all re-uploads every company. Skipped until the Swedish search domain exists.')
     }
 
     environment {
@@ -112,7 +110,7 @@ The fields below are already set for a production run; leave them as they are.''
                 sh '''#!/bin/bash
                     set -e
                     aws s3 cp "$STATE_URI" "$SE_INDEX_IN" || echo "No previous index state; starting empty."
-                    SE_BUILD_UNBUILT="$BUILD_UNBUILT" npm run fetch
+                    npm run fetch
                 '''
             }
         }
@@ -140,11 +138,12 @@ The fields below are already set for a production run; leave them as they are.''
 
         stage('Update search') {
             // Skipped until the Swedish CloudSearch domain exists (scripts/create-cloudsearch-domain.sh).
-            when { expression { params.DEPLOY && env.CLOUDSEARCH_DOC_ENDPOINT } }
+            when { expression { params.DEPLOY && params.UPDATE_CLOUDSEARCH && env.CLOUDSEARCH_DOC_ENDPOINT } }
             steps {
                 sh '''#!/bin/bash
                     set -e
-                    node scripts/search-docs.ts $( [ "$SEARCH_FULL" = "true" ] && echo --full )
+                    full=$( [ "$(echo "$COMPANIES" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" = "all" ] && echo --full || true )
+                    node scripts/search-docs.ts $full
                     for f in data/build/search/batch-*.json; do
                         [ -f "$f" ] || continue
                         aws cloudsearchdomain upload-documents --endpoint-url "https://$CLOUDSEARCH_DOC_ENDPOINT" \
