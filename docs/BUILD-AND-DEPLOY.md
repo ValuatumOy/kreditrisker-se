@@ -56,27 +56,27 @@ Vercel is currently connected to the GitHub copy. Login works again, and the
 deployment of commit `a55c354` was verified Ready on 2026-10-09. The project is
 on the Hobby plan: Vercel's [private-repository rules](https://vercel.com/docs/git#using-hobby-teams)
 require Pro for direct deployment from a private Bitbucket workspace repository.
-`bitbucket-pipelines.yml` prepares one-way synchronization from Bitbucket to
+`bitbucket-pipelines.yml` runs one-way synchronization from Bitbucket to
 GitHub: each branch push updates the same GitHub branch, and tag pushes copy the
 same tag. GitHub then triggers Vercel as before. Branch/tag deletions are not
 mirrored, and force-pushes are not used. Make code changes in Bitbucket; if GitHub
 has diverged, the sync fails instead of overwriting those commits.
 
-Before enabling Pipelines, generate its repository SSH key in Bitbucket's
-Pipelines > SSH Keys settings. Add only its public key to
-`ValuatumOy/kreditrisker-se` in GitHub as a deploy key with write access, and add
-`github.com` to the pipeline's known hosts. The private key remains managed by
-Bitbucket. Then enable Pipelines and verify one branch push and the resulting
-Vercel deployment. Until that setup is complete, update the GitHub copy explicitly:
+Pipelines was enabled on 2026-10-09. Its SSH key is managed in Bitbucket's
+Pipelines > SSH Keys settings; the public key is registered only on
+`ValuatumOy/kreditrisker-se` as the read/write deploy key
+`Bitbucket kreditrisker-se mirror`. `github.com` is in the pipeline's known hosts
+with the RSA fingerprint verified against GitHub's published fingerprint. The
+private key stays in Bitbucket. Normal updates need only:
 
 ```bash
 git push origin main
-git push github main
 ```
 
-The existing local checkout has the `github` remote; a fresh Bitbucket clone can
-add it with `git remote add github https://github.com/ValuatumOy/kreditrisker-se.git`.
-Pushes made only to Bitbucket do not currently redeploy the Vercel test site.
+Check the Bitbucket pipeline result if GitHub or Vercel does not update. If the
+sync fails, the last successful Vercel deployment stays available. The existing
+local checkout retains a `github` remote for recovery; direct GitHub pushes are
+not part of the normal workflow.
 
 Every push to the GitHub copy builds a Vercel preview with its own URL
 (`vercel.json` runs `npm run build:vercel`). It renders the committed sample:

@@ -2,7 +2,7 @@
 
 This is a standalone Astro 7 static site for Swedish company profiles and, later, Basic and AI credit-risk reports from Valuatum. It has its own repository, data, tests and deployment, separate from the Finnish and Danish sites.
 
-**Repository:** [valuatum/kreditrisker-se on Bitbucket](https://bitbucket.org/valuatum/kreditrisker-se/), branch `main`. Migrated from GitHub on 2026-10-09 with both branches and their complete Git history. GitHub remains available during the Vercel transition; pull-request discussions remain there.
+**Repository:** [valuatum/kreditrisker-se on Bitbucket](https://bitbucket.org/valuatum/kreditrisker-se/), branch `main`. Migrated from GitHub on 2026-10-09 with both branches and their complete Git history. Bitbucket Pipelines copies branch and tag updates to GitHub for Vercel previews. Make code changes in Bitbucket; the original GitHub pull-request discussions remain on GitHub.
 
 **Status:** Vercel previews use one real Swedish company cached in `data/sample/`. The default local dataset contains synthetic fixtures. All pages are noindex and nothing is for sale. AWS/Jenkins deployment still needs configuration.
 
