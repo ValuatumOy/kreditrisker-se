@@ -48,6 +48,8 @@ new SiteStack(app, 'KreditriskerSiteStackProd', {
     certificate: cert?.certificate,
     searchEndpoint: ctx('searchEndpointProd'),
     checkoutApiDomain: ctx('checkoutApiProd'),
+    // Jenkins agent sweden-build (profinder-environment jenkins/new-environment.sh): the role that can reach sweden-db
+    buildRoleName: 'sweden-process-role',
 })
 
 for (const environmentName of ['Test', 'Prod'] as const) {
