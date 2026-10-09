@@ -2,11 +2,11 @@
 // Danish jobs: list every company, build pages only for those that changed,
 // copy the result on top of the S3 bucket behind CloudFront.
 //
-// Simpler to run than the Finnish job: no file upload. Which pages to build is
-// chosen with MODE, and single companies are typed into COMPANIES:
-//   nightly                 MODE=changed (default), COMPANIES empty
-//   rebuild some companies  MODE=listed, COMPANIES=556448-0282, 5565675906
-//   first load / everything MODE=all (with SEARCH_FULL on the first time)
+// One field to fill: COMPANIES. Every other parameter defaults to a production
+// run, so "Build with Parameters" -> type the org numbers -> Build is enough:
+//   build or rebuild companies  COMPANIES=556448-0282, 5565675906
+//   nightly (scheduled)         COMPANIES empty: companies updated since SINCE
+//   everything                  COMPANIES=all (SEARCH_FULL on the first time)
 //
 // Differences from the Danish job:
 //  - a Fetch stage (scripts/fetch.ts) pulls the batch from the Swedish REST API
@@ -23,12 +23,11 @@ pipeline {
     agent { label 'REPLACE_ME_AGENT_LABEL' } // arm64, Node >= 22.12, AWS CLI
 
     parameters {
-        choice(name: 'MODE', choices: ['changed', 'listed', 'all'], description: '''changed: companies updated since SINCE (nightly run), plus any in COMPANIES.
-listed: only the companies in COMPANIES.
-all: every company in the directory.''')
-        text(name: 'COMPANIES', defaultValue: '', description: 'Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. The run stops if one is not in the directory.')
-        string(name: 'SINCE', defaultValue: '24 hours ago', description: 'MODE=changed: include companies updated since this time (linux date syntax).')
-        string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet.')
+        text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
+Empty: the nightly run (companies updated since SINCE). "all": every company.
+The fields below are already set for a production run; leave them as they are.''')
+        string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
+        string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet (first load in nightly chunks).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
         booleanParam(name: 'SEARCH_FULL', defaultValue: false, description: 'Re-upload every company to CloudSearch (first load)')
         string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Git branch')
@@ -56,8 +55,9 @@ all: every company in the directory.''')
     stages {
         stage('Preparation') {
             steps {
+                // Public repo: anonymous HTTPS clone, no Jenkins credential or deploy key needed.
                 checkout([$class: 'GitSCM', branches: [[name: "*/${params.GIT_BRANCH}"]],
-                    userRemoteConfigs: [[credentialsId: 'REPLACE_ME_GIT_CRED_ID', url: 'https://github.com/ValuatumOy/kreditrisker-se.git']]])
+                    userRemoteConfigs: [[url: 'https://github.com/ValuatumOy/kreditrisker-se.git']]])
                 sh 'npm ci'
             }
         }
@@ -68,7 +68,7 @@ all: every company in the directory.''')
                     set -e
                     rm -f "$BUILD_STATIC_PARAMS_FILE" "$BUILD_STATIC_PARAMS_FILE_ALL"
                     since_args=()
-                    if [ "$MODE" = "changed" ]; then
+                    if [ -z "$(echo "$COMPANIES" | tr -d '[:space:]')" ]; then
                         since_args=(--include-updated-since $(($(date -d "$SINCE" +%s) * 1000)))
                     fi
                     ./build/bin/get_static_params_arm64 \
@@ -114,7 +114,8 @@ all: every company in the directory.''')
         }
 
         stage('Update search') {
-            when { expression { params.DEPLOY } }
+            // Skipped until the Swedish CloudSearch domain exists (scripts/create-cloudsearch-domain.sh).
+            when { expression { params.DEPLOY && !env.CLOUDSEARCH_DOC_ENDPOINT.startsWith('REPLACE_ME') } }
             steps {
                 sh '''#!/bin/bash
                     set -e

@@ -10,8 +10,8 @@ Jenkins.
 
 ```
 get_static_params (Go, DB)      staticparams.txt        every company: fid, slug, name, SNI, orgnr
-                                staticparams_batch.txt  the batch: MODE=changed (updated since SINCE), listed or all,
-                                                        plus COMPANIES (scripts/select-batch.ts)
+                                staticparams_batch.txt  the batch: the companies in COMPANIES; if empty, those updated
+                                                        since SINCE; COMPANIES=all: every company (scripts/select-batch.ts)
         │
 scripts/fetch.ts                for each batch fid: POST /rest/modeldata + GET /rest/company/:id
         │                       → map (src/lib/valuatum/map.ts) → validate → publish
@@ -69,7 +69,7 @@ data is committed; the Vercel site is a test environment, not the public site.
 `jenkins/kreditrisker-se.groovy`, nightly like the Danish job:
 
 1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
-   then `scripts/select-batch.ts` picks the batch by `MODE` and `COMPANIES` (no file upload)
+   then `scripts/select-batch.ts` picks the batch from `COMPANIES` (no file upload; empty = changed, `all` = every company)
 2. Fetch (restores the index state from `STATE_URI`, a private S3 key)
 3. Build (`SE_DATA_SOURCE=build`)
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
