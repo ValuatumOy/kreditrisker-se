@@ -27,6 +27,16 @@ export function readParams(file: string): Param[] {
 export type BatchMode = 'changed' | 'listed' | 'all'
 
 /**
+ * The batch mode the Jenkins job's single COMPANIES field asks for: empty is the nightly run
+ * (changed), the word `all` rebuilds every company, anything else builds only the listed ones.
+ */
+export function batchMode(companies: string): BatchMode {
+    const c = companies.trim()
+    if (!c) return 'changed'
+    return c.toLowerCase() === 'all' ? 'all' : 'listed'
+}
+
+/**
  * The batch lines (static-params TSV rows) for a build, chosen from the full directory list:
  *   changed  the companies get_static_params found updated (its batch file) plus `companies`
  *   listed   only `companies`

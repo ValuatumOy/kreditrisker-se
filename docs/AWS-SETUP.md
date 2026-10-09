@@ -41,16 +41,17 @@ Test site runs on its `*.cloudfront.net` domain and always sends
 
 ## 4. Jenkins
 
-Use the Swedish job `SweCompanyDirecotry-ProdUpdate` with the pipeline from
-`jenkins/kreditrisker-se.groovy`. Configure its Git source as
-`git@bitbucket.org:valuatum/kreditrisker-se.git`, branch `main`, script path
-`jenkins/kreditrisker-se.groovy`. `REPLACE_ME_GIT_CRED_ID` needs the existing
-Jenkins Bitbucket SSH credential (username `git`). Fill the remaining
-`REPLACE_ME` values: agent label, API token credential, the outputs above and
-the CloudSearch document endpoint. The Swedish properties URI and REST URL
-are already set in the template. First run:
-`BUILD_UNBUILT=20000` and `SEARCH_FULL=true`; repeat nightly with
-`BUILD_UNBUILT` until every company has a page.
+Use the Swedish job `SweCompanyDirectory-ProdUpdate` as "Pipeline script from
+SCM": `git@bitbucket.org:valuatum/kreditrisker-se.git`, branch `*/main`, script
+path `jenkins/kreditrisker-se.groovy`, the existing Jenkins Bitbucket SSH
+credential (username `git`). Nothing in the Jenkinsfile needs editing: bucket,
+distribution, state URI and site origin are read from the
+`KreditriskerSiteStackProd` outputs at run time, the agent is `sweden-build`
+(it reaches sweden-db) and the API token is the Secret text credential
+`kreditrisker-se-api-token`. Set `CLOUDSEARCH_DOC_ENDPOINT` in the Jenkinsfile
+once the CloudSearch domain exists; until then the search stage is skipped.
+First load: `COMPANIES=all` (with `SEARCH_FULL=true` once search exists), or
+nightly runs with `BUILD_UNBUILT=20000` until every company has a page.
 
 ## 5. Report checkout (only when reports are launched)
 

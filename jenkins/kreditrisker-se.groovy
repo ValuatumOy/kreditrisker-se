@@ -2,11 +2,11 @@
 // Danish jobs: list every company, build pages only for those that changed,
 // copy the result on top of the S3 bucket behind CloudFront.
 //
-// Simpler to run than the Finnish job: no file upload. Which pages to build is
-// chosen with MODE, and single companies are typed into COMPANIES:
-//   nightly                 MODE=changed (default), COMPANIES empty
-//   rebuild some companies  MODE=listed, COMPANIES=556448-0282, 5565675906
-//   first load / everything MODE=all (with SEARCH_FULL on the first time)
+// One field to fill: COMPANIES. Every other parameter defaults to a production
+// run, so "Build with Parameters" -> type the org numbers -> Build is enough:
+//   build or rebuild companies  COMPANIES=556448-0282, 5565675906
+//   nightly (scheduled)         COMPANIES empty: companies updated since SINCE
+//   everything                  COMPANIES=all (SEARCH_FULL on the first time)
 //
 // Differences from the Danish job:
 //  - a Fetch stage (scripts/fetch.ts) pulls the batch from the Swedish REST API
@@ -18,37 +18,44 @@
 // The helper binaries are committed in build/bin/ (agents have no Go): after
 // changing build/get_static_params, run `npm run build:scripts` and commit them.
 // Testing does not go through this job: see docs/BUILD-AND-DEPLOY.md.
+//
+// Jenkins job setup (nothing in this file needs editing):
+//  - Pipeline script from SCM: git@bitbucket.org:valuatum/kreditrisker-se.git, branch */main,
+//    script path jenkins/kreditrisker-se.groovy, the same Bitbucket credential as the other jobs.
+//  - Secret text credential 'kreditrisker-se-api-token': API token of sweden.valuatum.com (KeePass).
+//  - Agent sweden-build: its role (sweden-process-role) reaches sweden-db and reads the Sweden
+//    config; KreditriskerSiteStackProd grants it the buckets, invalidation and the stack outputs.
+// Bucket, distribution, state and site origin are read from the stack outputs at run time.
 
 pipeline {
-    agent { label 'REPLACE_ME_AGENT_LABEL' } // arm64, Node >= 22.12, AWS CLI
+    agent { label 'sweden-build' }
+
+    options { disableConcurrentBuilds() } // the index state in STATE_URI is read and written by every run
 
     parameters {
-        choice(name: 'MODE', choices: ['changed', 'listed', 'all'], description: '''changed: companies updated since SINCE (nightly run), plus any in COMPANIES.
-listed: only the companies in COMPANIES.
-all: every company in the directory.''')
-        text(name: 'COMPANIES', defaultValue: '', description: 'Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. The run stops if one is not in the directory.')
-        string(name: 'SINCE', defaultValue: '24 hours ago', description: 'MODE=changed: include companies updated since this time (linux date syntax).')
-        string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet.')
+        text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
+Empty: the nightly run (companies updated since SINCE). "all": every company.
+The fields below are already set for a production run; leave them as they are.''')
+        string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
+        string(name: 'BUILD_UNBUILT', defaultValue: '0', description: 'Also build up to this many companies that have no page yet (first load in nightly chunks).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
         booleanParam(name: 'SEARCH_FULL', defaultValue: false, description: 'Re-upload every company to CloudSearch (first load)')
-        string(name: 'GIT_BRANCH', defaultValue: 'main', description: 'Git branch')
     }
 
     environment {
         AWS_REGION = 'eu-west-1'
-        BUILD_BUCKET = 'REPLACE_ME_SE_BUCKET'
-        CLOUDFRONT_DISTRIBUTION_ID = 'REPLACE_ME_SE_CLOUDFRONT_ID'
-        STATE_URI = 'REPLACE_ME_PRIVATE_STATE_URI' // SiteStack output StateUri (private bucket)
-        CLOUDSEARCH_DOC_ENDPOINT = 'REPLACE_ME_SE_CLOUDSEARCH_DOC_ENDPOINT' // scripts/create-cloudsearch-domain.sh
+        AWS_DEFAULT_REGION = 'eu-west-1'
+        SITE_STACK = 'KreditriskerSiteStackProd'
+        CLOUDSEARCH_DOC_ENDPOINT = '' // set once the Swedish CloudSearch domain exists (scripts/create-cloudsearch-domain.sh)
         STATIC_PARAMS_PROPERTIES = 's3://valu-produ/sweden/config/local_server.properties'
         SE_ACCOUNTS = 'Bolagsverket data import' // comma-separated USERACCOUNT nicknames
+        NODE_VERSION = '22.20.0' // used only when the agent has no Node >= 22.12
 
         BUILD_STATIC_PARAMS_FILE = 'staticparams_batch.txt'
         BUILD_STATIC_PARAMS_FILE_ALL = 'staticparams.txt'
         SE_INDEX_IN = 'prev-index.jsonl'
         PUBLIC_VALUATUM_API_BASE_URL = 'https://sweden.valuatum.com'
-        SECRET_VALUATUM_API_TOKEN = credentials('REPLACE_ME_SE_API_TOKEN_CRED_ID') // Secret text: token of user swecompanydirectory
-        SE_SITE_ORIGIN = 'https://www.kreditrisker.se'
+        SECRET_VALUATUM_API_TOKEN = credentials('kreditrisker-se-api-token')
         SE_INDEXING = '0' // launch gates 1-3 and 9 (docs/LAUNCH-GATES.md)
         PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> CloudSearch (aws-infra)
     }
@@ -56,9 +63,26 @@ all: every company in the directory.''')
     stages {
         stage('Preparation') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: "*/${params.GIT_BRANCH}"]],
-                    userRemoteConfigs: [[credentialsId: 'REPLACE_ME_GIT_CRED_ID', url: 'git@bitbucket.org:valuatum/kreditrisker-se.git']]])
-                sh 'npm ci'
+                checkout scm
+                script {
+                    def out = { key -> sh(returnStdout: true, script: "aws cloudformation describe-stacks --stack-name \"\$SITE_STACK\" --query \"Stacks[0].Outputs[?OutputKey=='${key}'].OutputValue\" --output text").trim() }
+                    env.BUILD_BUCKET = out('SiteBucketName')
+                    env.CLOUDFRONT_DISTRIBUTION_ID = out('DistributionId')
+                    env.STATE_URI = out('StateUri')
+                    env.SE_SITE_ORIGIN = out('SiteOrigin')
+                    echo "bucket ${env.BUILD_BUCKET}, distribution ${env.CLOUDFRONT_DISTRIBUTION_ID}, site ${env.SE_SITE_ORIGIN}"
+                }
+                sh '''#!/bin/bash
+                    set -e
+                    if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a==22&&b>=12)?0:1)' 2>/dev/null; then
+                        arch=$(uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')
+                        echo "No Node >= 22.12 on the agent; using node-v$NODE_VERSION-linux-$arch in the workspace"
+                        mkdir -p .node
+                        curl -fsSL "https://nodejs.org/dist/v$NODE_VERSION/node-v$NODE_VERSION-linux-$arch.tar.xz" | tar -xJ -C .node --strip-components=1
+                    fi
+                '''
+                script { if (fileExists('.node/bin/node')) { env.PATH = "${env.WORKSPACE}/.node/bin:${env.PATH}" } }
+                sh 'node --version && npm ci'
             }
         }
 
@@ -68,10 +92,11 @@ all: every company in the directory.''')
                     set -e
                     rm -f "$BUILD_STATIC_PARAMS_FILE" "$BUILD_STATIC_PARAMS_FILE_ALL"
                     since_args=()
-                    if [ "$MODE" = "changed" ]; then
+                    if [ -z "$(echo "$COMPANIES" | tr -d '[:space:]')" ]; then
                         since_args=(--include-updated-since $(($(date -d "$SINCE" +%s) * 1000)))
                     fi
-                    ./build/bin/get_static_params_arm64 \
+                    arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+                    ./build/bin/get_static_params_$arch \
                         --output-dir . \
                         --properties "$STATIC_PARAMS_PROPERTIES" \
                         --accounts "$SE_ACCOUNTS" \
@@ -114,7 +139,8 @@ all: every company in the directory.''')
         }
 
         stage('Update search') {
-            when { expression { params.DEPLOY } }
+            // Skipped until the Swedish CloudSearch domain exists (scripts/create-cloudsearch-domain.sh).
+            when { expression { params.DEPLOY && env.CLOUDSEARCH_DOC_ENDPOINT } }
             steps {
                 sh '''#!/bin/bash
                     set -e

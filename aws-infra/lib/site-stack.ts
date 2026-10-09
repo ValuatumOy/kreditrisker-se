@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib'
 import * as acm from 'aws-cdk-lib/aws-certificatemanager'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
+import * as iam from 'aws-cdk-lib/aws-iam'
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins'
 import * as route53 from 'aws-cdk-lib/aws-route53'
 import * as targets from 'aws-cdk-lib/aws-route53-targets'
@@ -20,6 +21,9 @@ export interface SiteStackProps extends cdk.StackProps {
     searchEndpoint?: string
     /** Report checkout HTTP API host (CheckoutStack output), for /api/* except search. */
     checkoutApiDomain?: string
+    /** IAM role of the Jenkins build agent (an existing role, not managed here): gets write access to both buckets,
+     *  CloudFront invalidation and read access to this stack's outputs, which the job reads instead of hardcoded ids. */
+    buildRoleName?: string
 }
 
 /**
@@ -136,9 +140,22 @@ export class SiteStack extends cdk.Stack {
             }
         }
 
+        if (props.buildRoleName) {
+            const buildRole = iam.Role.fromRoleName(this, 'BuildRole', props.buildRoleName)
+            siteBucket.grantReadWrite(buildRole)
+            siteBucket.grantDelete(buildRole)
+            stateBucket.grantReadWrite(buildRole)
+            distribution.grantCreateInvalidation(buildRole)
+            buildRole.addToPrincipalPolicy(new iam.PolicyStatement({ actions: ['cloudformation:DescribeStacks'], resources: [this.stackId] }))
+        }
+
         new cdk.CfnOutput(this, 'SiteBucketName', { value: siteBucket.bucketName, description: 'Jenkins BUILD_BUCKET' })
         new cdk.CfnOutput(this, 'DistributionId', { value: distribution.distributionId, description: 'Jenkins CLOUDFRONT_DISTRIBUTION_ID' })
         new cdk.CfnOutput(this, 'DistributionDomain', { value: distribution.distributionDomainName })
+        new cdk.CfnOutput(this, 'SiteOrigin', {
+            value: names ? `https://www.${props.domain}` : `https://${distribution.distributionDomainName}`,
+            description: 'Jenkins SE_SITE_ORIGIN (canonical URLs, sitemaps)',
+        })
         new cdk.CfnOutput(this, 'StateUri', { value: `s3://${stateBucket.bucketName}/index.jsonl`, description: 'Jenkins STATE_URI' })
     }
 }

@@ -9,7 +9,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
-import { readParams, selectBatch } from '../src/lib/valuatum/params.ts'
+import { batchMode, readParams, selectBatch } from '../src/lib/valuatum/params.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
 import { computeMetrics, numeric } from '../src/lib/metrics.ts'
@@ -135,4 +135,7 @@ test('batch selection: modes, orgnr with or without hyphen, fids, group rows, un
     assert.deepEqual(selectBatch(all, [all[3]], 'changed', ''), [all[3]])
     assert.deepEqual(selectBatch(all, [all[3]], 'changed', '3'), all.slice(2), 'changed plus listed, directory order')
     assert.throws(() => selectBatch(all, [], 'listed', '5560659475 99'), /5560659475, 99/)
+    assert.equal(batchMode(' \n'), 'changed', 'empty COMPANIES is the nightly run')
+    assert.equal(batchMode(' ALL '), 'all')
+    assert.equal(batchMode('556448-0282'), 'listed')
 })

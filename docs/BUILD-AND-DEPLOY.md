@@ -10,8 +10,8 @@ Jenkins.
 
 ```
 get_static_params (Go, DB)      staticparams.txt        every company: fid, slug, name, SNI, orgnr
-                                staticparams_batch.txt  the batch: MODE=changed (updated since SINCE), listed or all,
-                                                        plus COMPANIES (scripts/select-batch.ts)
+                                staticparams_batch.txt  the batch: the companies in COMPANIES; if empty, those updated
+                                                        since SINCE; COMPANIES=all: every company (scripts/select-batch.ts)
         │
 scripts/fetch.ts                for each batch fid: POST /rest/modeldata + GET /rest/company/:id
         │                       → map (src/lib/valuatum/map.ts) → validate → publish
@@ -99,10 +99,29 @@ data is committed; the Vercel site is a test environment, not the public site.
 
 ## 3. Production (Jenkins → S3 + CloudFront)
 
-`jenkins/kreditrisker-se.groovy`, nightly like the Danish job:
+`jenkins/kreditrisker-se.groovy`, nightly like the Danish job. To publish pages,
+open the job, type the organisationsnummer into COMPANIES and press Build; every
+other parameter already defaults to a production run.
+
+Setup, once (nothing in the Jenkinsfile needs editing):
+
+- AWS: `cd aws-infra && npx cdk deploy KreditriskerSiteStackProd --exclusively`
+  (deployed 2026-10-09; site on its CloudFront domain until kreditrisker.se is
+  in Route 53). The job reads bucket, distribution, state URI and site origin
+  from the stack outputs; the stack grants the agent role `sweden-process-role`
+  access to them.
+- Jenkins job: Pipeline script from SCM, the Bitbucket repo, branch `*/main`,
+  script path `jenkins/kreditrisker-se.groovy`, the same Bitbucket credential
+  as the other Valuatum jobs.
+- Jenkins credential `kreditrisker-se-api-token` (Secret text): the
+  sweden.valuatum.com API token.
+- Agent label `sweden-build` (profinder-environment `jenkins/new-environment.sh`):
+  it reaches sweden-db. The job installs Node 22 in its workspace if the agent
+  has none.
+
 
 1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
-   then `scripts/select-batch.ts` picks the batch by `MODE` and `COMPANIES` (no file upload)
+   then `scripts/select-batch.ts` picks the batch from `COMPANIES` (no file upload; empty = changed, `all` = every company)
 2. Fetch (restores the index state from `STATE_URI`, a private S3 key)
 3. Build (`SE_DATA_SOURCE=build`)
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
@@ -165,7 +184,7 @@ annual report reported zero or omitted the item. Growth and year-over-year KPI
 changes are shown only between consecutive fiscal periods.
 
 When updating an existing production dataset to these quality/calculation rules,
-run a full rebuild (`MODE=all`): an incremental batch retains old index rows and
+run a full rebuild (`COMPANIES=all`): an incremental batch retains old index rows and
 profile HTML for companies outside the batch.
 
 ## First sample review (2026-10-09)
