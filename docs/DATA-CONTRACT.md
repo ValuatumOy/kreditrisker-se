@@ -24,7 +24,7 @@ Every item is a `Value`. An omitted field or a raw number is **rejected**.
 | `incomparable` | `reason` | "ej jämförbar" |
 | `derived` | computed at build time only (medians); rejected on import | number |
 
-Import rule: if a *complete* balance sheet (its totals reconcile) has no untaxed-reserves or inventories line, the importer emits `reported 0`. An abridged or unparsable sheet emits `missing`.
+Import rule: the Valuatum backend stores no zeros, so a statement item absent from a period is `reported 0`, as on the CV pages. Key ratios the source leaves out stay `missing`.
 
 Total assets, inventories, cash, untaxed reserves and liabilities may not be negative. Results and equity may be.
 

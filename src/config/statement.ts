@@ -4,8 +4,8 @@
 // the Swedish translations are fixed in sweden-db, the labels live here, like
 // the Finnish site's src/config/financialStatementRows.ts.
 //
-// A row is hidden when it has no value in any shown year, unless `always` is
-// set. `sum` rows are subtotals and are printed in bold.
+// A row is hidden when it is 0 or missing in every shown year, unless `always`
+// is set. `sum` rows are subtotals and are printed in bold.
 
 import type { BalanceSheet, IncomeStatement } from '../lib/contract/types.ts'
 
@@ -42,7 +42,6 @@ export const BALANCE_ROWS: StatementRow<keyof BalanceSheet>[] = [
     { key: 'tangibleAssets', label: 'Materiella anläggningstillgångar' },
     { key: 'financialAssets', label: 'Finansiella anläggningstillgångar' },
     { key: 'deferredTaxAssets', label: 'Uppskjuten skattefordran' },
-    // Absent inventories and untaxed reserves are 0, so these two rows always show.
     { key: 'inventories', label: 'Varulager m.m.', always: true },
     { key: 'shortTermReceivables', label: 'Kortfristiga fordringar' },
     { key: 'shortTermInvestments', label: 'Kortfristiga placeringar' },

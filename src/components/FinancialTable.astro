@@ -4,7 +4,7 @@
 import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
 import { BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
 import { date, percent, periodLabel, SOURCE_TEXT, tkr, count, type Display } from '../lib/format.ts'
-import { FORMULAS, metricsOf, type MetricKey } from '../lib/metrics.ts'
+import { FORMULAS, metricsOf, numeric, type MetricKey } from '../lib/metrics.ts'
 import Val from './Val.astro'
 
 interface Props {
@@ -24,10 +24,10 @@ const sourceLine = uniform
 
 type Row = { label: string; cells: Display[]; sum?: boolean }
 const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label, cells: metrics.map((m) => percent(m[key], digits)) })
-// A row with no value in any shown year is left out, as on the CV pages.
+// A row that is 0 or missing in every shown year is left out, as on the CV pages.
 const rows = <K extends string>(defs: StatementRow<K>[], get: (p: FiscalPeriod, k: K) => Value): Row[] =>
     defs
-        .filter((d) => d.always || cols.some((p) => get(p, d.key).status !== 'missing'))
+        .filter((d) => d.always || cols.some((p) => (numeric(get(p, d.key)) ?? 0) !== 0))
         .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum }))
 
 const groups: { title: string; rows: Row[] }[] = [
@@ -96,7 +96,7 @@ const groups: { title: string; rows: Row[] }[] = [
     </div>
     <figcaption class="fig__src">
         <b>Källa:</b> {sourceLine}.
-        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. «saknas» betyder att posten inte finns i källan.
+        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. En post som inte finns i bokslutet är 0. «saknas» betyder att nyckeltalet inte finns i källan.
     </figcaption>
 </figure>
 

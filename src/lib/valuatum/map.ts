@@ -88,11 +88,6 @@ const EMPLOYEES = 'cr_employees_adjusted'
 const PERIOD_MONTHS = 'cr_fiscal_period_length'
 /** Period end as a number, e.g. 20251231. */
 const PERIOD_END = 'cr_fiscal_year_end'
-/**
- * The backend never stores zero values, so an absent item in a period that has a balance sheet
- * is 0 (the model's balance sheet balances without it). Checked in sweden-db on 2026-10-12.
- */
-const ZERO_WHEN_ABSENT = new Set<string>([BALANCE_VARS.untaxedReserves, BALANCE_VARS.inventories])
 /** Every variable the mapper reads; the API cache keeps only these. */
 export const USED_VARS = new Set<string>([
     ...Object.values(INCOME_VARS),
@@ -165,15 +160,16 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
     for (const y of years) {
         const row = md.dataMap[y]
         const get = (name: string): number | undefined => (typeof row[name] === 'number' && Number.isFinite(row[name]) ? (row[name] as number) : undefined)
-        const hasBalanceSheet = get(BALANCE_VARS.totalAssets) !== undefined
-        const value = (name: string, unit: number): Value => {
-            const v = get(name) ?? (hasBalanceSheet && ZERO_WHEN_ABSENT.has(name) ? 0 : undefined)
+        if ([...Object.values(INCOME_VARS), ...Object.values(BALANCE_VARS)].every((name) => get(name) === undefined)) continue
+        // The backend never stores zero values (checked in sweden-db on 2026-10-12), so an item
+        // absent from a period is 0, as the CV pages show it. Only the key ratios can be missing.
+        const value = (name: string, unit: number, zero: boolean): Value => {
+            const v = get(name) ?? (zero ? 0 : undefined)
             if (v === undefined) return { status: 'missing', reason: 'not_in_source' }
             return { status: 'reported', value: unit === 1 ? v : Math.round(v * unit), source: src }
         }
-        const values = <K extends string>(vars: Record<K, string>, unit: number) =>
-            Object.fromEntries(Object.entries<string>(vars).map(([k, name]) => [k, value(name, unit)])) as Record<K, Value>
-        if (get(INCOME_VARS.netSales) === undefined && !hasBalanceSheet) continue
+        const values = <K extends string>(vars: Record<K, string>, unit: number, zero: boolean) =>
+            Object.fromEntries(Object.entries<string>(vars).map(([k, name]) => [k, value(name, unit, zero)])) as Record<K, Value>
         const months = Math.round(get(PERIOD_MONTHS) ?? 12)
         // Without an end date the year is assumed to end in December.
         const endText = String(get(PERIOD_END) ?? '')
@@ -189,9 +185,9 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             consolidated: company.companyCode.endsWith('K'),
             framework: 'unknown',
             source: src,
-            income: values(INCOME_VARS, UNIT),
-            balance: values(BALANCE_VARS, UNIT),
-            ratios: values(RATIO_VARS, 1),
+            income: values(INCOME_VARS, UNIT, true),
+            balance: values(BALANCE_VARS, UNIT, true),
+            ratios: values(RATIO_VARS, 1, false),
             employees: employees === undefined ? { status: 'missing', reason: 'not_in_source' } : { status: 'reported', value: Math.round(employees), source: src },
         })
     }

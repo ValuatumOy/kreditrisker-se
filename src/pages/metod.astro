@@ -62,10 +62,13 @@ const toc = [
             <p>Kassalikviditeten visas i procent: 1,5 gånger de kortfristiga skulderna visas som 150 %.</p>
 
             <h2 id="varden">Saknade och avvikande värden</h2>
-            <p>Ett värde på sajten är alltid något av följande. Vi skriver aldrig noll när en uppgift saknas.</p>
+            <p>Ett värde på sajten är alltid något av följande.</p>
             <dl>
                 <dt>Rapporterat</dt>
-                <dd>Beloppet står i årsredovisningen. Noll och negativa belopp visas som de är; negativa med minustecken.</dd>
+                <dd>
+                    Beloppet står i årsredovisningen. Negativa belopp visas med minustecken. En post som inte finns i ett redovisat bokslut är noll och visas som 0, som i
+                    Valuatums bokslutsanalys. Rader som är 0 alla visade år visas inte.
+                </dd>
                 <dt>Saknas</dt>
                 <dd>{Object.values(MISSING_TEXT).join(' Eller: ')}</dd>
                 <dt>Ej jämförbar</dt>
@@ -87,7 +90,7 @@ const toc = [
                 <li>huvudbransch (SNI) finns; kommun är valfri,</li>
                 <li>det finns minst ett bokslut och det senaste är inte inaktuellt,</li>
                 <li>
-                    det senaste bokslutet redovisar minst {MIN_CORE_ITEMS} av dessa {CORE_ITEMS.length} poster: {CORE_ITEMS.map(([, k]) => CORE_LABEL[k]).join(', ')}.
+                    det senaste bokslutet redovisar minst {MIN_CORE_ITEMS} av dessa {CORE_ITEMS.length} poster med ett annat värde än 0: {CORE_ITEMS.map(([, k]) => CORE_LABEL[k]).join(', ')}.
                 </li>
             </ol>
             <p>
