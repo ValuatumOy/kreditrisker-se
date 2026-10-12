@@ -139,6 +139,7 @@ export const INCOME_FIELDS = [
     'otherOperatingIncome',
     'rawMaterialsAndGoods',
     'costOfGoodsSold',
+    'grossProfit',
     'sellingExpenses',
     'administrativeExpenses',
     'wagesAndSalaries',

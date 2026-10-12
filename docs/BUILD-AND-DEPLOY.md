@@ -158,11 +158,14 @@ cached companies, 204 years; `statementGaps` in `tests/helpers.ts`). Left out ar
   credit institutions under their total. Also `cr_cash_and_cash_eq_total` (= Kassa och
   bank), `cr_pre_tax_profit` (= the result after financial items) and
   `bs_additional_cash_result`, which the REST API does not return.
-- Bruttoresultat (`cr_gross_profit`): in function-format reports (Kostnad för sålda
-  varor) it leaves out the other operating income that the CV lists above it, and in 13
-  of 214 company-years it matches none of the rows above it.
 - The interest-bearing and non-interest-bearing liability analysis below the balance
   sheet, and the owner/minority split of the year's result after it.
+
+Bruttoresultat (`cr_gross_profit`) is shown only when it equals net sales plus the rows
+above it in every shown year (`addsUp` in `src/config/statement.ts`); that holds for 53
+of the 63 cached companies. In function-format reports (Kostnad för sålda varor) it leaves
+out the other operating income that the CV lists above it, and some filings give
+Bruttoresultat without the costs behind it, so the table would jump from net sales to it.
 
 Associates' share of the operating result (`cr_net_income_from_associates`) is listed
 above EBITDA: the CV shows it below depreciation, but EBITDA includes it. The

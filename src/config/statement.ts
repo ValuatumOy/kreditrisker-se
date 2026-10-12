@@ -8,11 +8,13 @@
 // is set. `sum` rows are subtotals, printed in bold; the rows without a flag
 // are their items, printed indented.
 // - Income statement: each subtotal is the previous subtotal plus the items
-//   between them; net sales starts the chain.
+//   between them; net sales starts the chain. An `ifItAddsUp` subtotal is shown
+//   only when it does so in every shown year (see addsUp).
 // - Balance sheet: each subtotal is the sum of the items right above it, and a
 //   `total` is the sum of the subtotals and `standalone` rows since the last total.
 
-import type { BalanceSheet, IncomeStatement } from '../lib/contract/types.ts'
+import type { BalanceSheet, FiscalPeriod, IncomeStatement } from '../lib/contract/types.ts'
+import { numeric } from '../lib/metrics.ts'
 
 export interface StatementRow<K extends string> {
     key: K
@@ -21,6 +23,7 @@ export interface StatementRow<K extends string> {
     total?: boolean
     standalone?: boolean
     always?: boolean
+    ifItAddsUp?: boolean
 }
 
 /** The part of a subtotal that the annual report does not break down. */
@@ -33,6 +36,9 @@ export const INCOME_ROWS: StatementRow<keyof IncomeStatement>[] = [
     { key: 'otherOperatingIncome', label: 'Övriga rörelseintäkter' },
     { key: 'rawMaterialsAndGoods', label: 'Råvaror, förnödenheter och handelsvaror' },
     { key: 'costOfGoodsSold', label: 'Kostnad för sålda varor' },
+    // Bolagsverket's Bruttoresultat. It leaves out the other operating income in function-format
+    // reports, and some filings give it without the costs behind it.
+    { key: 'grossProfit', label: 'Bruttoresultat', sum: true, ifItAddsUp: true },
     { key: 'sellingExpenses', label: 'Försäljningskostnader' },
     { key: 'administrativeExpenses', label: 'Administrationskostnader' },
     { key: 'wagesAndSalaries', label: 'Löner och andra ersättningar' },
@@ -143,3 +149,16 @@ export const BALANCE_ROWS: StatementRow<keyof BalanceSheet>[] = [
     { key: 'currentLiabilities', label: 'Summa kortfristiga skulder', sum: true, always: true },
     { key: 'totalEquityAndLiabilities', label: 'Summa eget kapital och skulder', sum: true, total: true, always: true },
 ]
+
+/** Whether an income-statement subtotal equals the previous subtotal plus the items between, to the krona tolerance of rounding. */
+export function addsUp(p: FiscalPeriod, key: keyof IncomeStatement): boolean {
+    const v = (k: keyof IncomeStatement) => numeric(p.income[k]) ?? 0
+    let chain = 0
+    for (const r of INCOME_ROWS) {
+        if (r.key === key) return Math.abs(chain - v(key)) <= 1500
+        if (r.key === 'netSales') chain = v(r.key)
+        else if (r.sum && !r.ifItAddsUp) chain = v(r.key)
+        else if (!r.sum) chain += v(r.key)
+    }
+    return false
+}

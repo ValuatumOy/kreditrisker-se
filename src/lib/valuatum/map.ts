@@ -28,9 +28,7 @@ const UNIT = 1e6
 // checked on 2026-10-12. Left out are the rows that no Bolagsverket linking rule fills
 // and that are empty for every Swedish company (leasing, extraordinary items ...), the
 // sub-rows that repeat their parent (depreciation, loans from credit institutions), and
-// the rows that do not add up with the items above them: Bruttoresultat, whose content
-// depends on the report format, and the result after extraordinary items, which equals
-// the result after financial items. The "unspecified" items are the part of a Bolagsverket
+// the result after extraordinary items, which equals the result after financial items. The "unspecified" items are the part of a Bolagsverket
 // subtotal the filing does not break down. In the income statement each subtotal is the
 // previous one plus the items between; associates' share of the result belongs above
 // EBITDA, although the CV lists it below depreciation.
@@ -44,6 +42,8 @@ export const INCOME_VARS = {
     otherOperatingIncome: 'cr_other_operating_income',
     rawMaterialsAndGoods: 'cr_purchases_during_fy',
     costOfGoodsSold: 'cr_costs_of_manufacturing',
+    // Its content depends on the report format, so it is shown only where it adds up (src/config/statement.ts).
+    grossProfit: 'cr_gross_profit',
     sellingExpenses: 'cr_costs_of_marketing',
     administrativeExpenses: 'cr_costs_of_management',
     wagesAndSalaries: 'cr_wages_and_salaries',

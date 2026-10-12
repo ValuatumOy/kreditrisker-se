@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { metricsOf, numeric } from '../src/lib/metrics.ts'
 import { compactSek, percent, tkr } from '../src/lib/format.ts'
-import { BALANCE_ROWS, INCOME_ROWS } from '../src/config/statement.ts'
+import { addsUp, BALANCE_ROWS, INCOME_ROWS } from '../src/config/statement.ts'
 import { BALANCE_VARS, INCOME_VARS, mapBundle, RATIO_VARS } from '../src/lib/valuatum/map.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
 import type { FiscalPeriod } from '../src/lib/contract/types.ts'
@@ -33,6 +33,24 @@ test('every Bokslut row has a CV variable and every statement field a row', () =
 
 test('real sample: the Bokslut rows add up to their subtotals', () => {
     for (const p of samplePeriods()) assert.deepEqual(statementGaps(p), [])
+})
+
+test('Bruttoresultat is shown only where it adds up with the rows above it', () => {
+    const [p] = samplePeriods()
+    assert.ok(addsUp(p, 'grossProfit'), 'cost-format report: net sales and the operating items above it')
+    const fn = structuredClone(p)
+    // A function-format report: other operating income comes after Bruttoresultat.
+    const src = { source: 'synthetic' as const, retrievedAt: '2026-10-12' }
+    Object.assign(fn.income, {
+        netSales: { status: 'reported', value: 1_000_000, source: src },
+        changeInInventories: { status: 'reported', value: 0, source: src },
+        ownWorkCapitalised: { status: 'reported', value: 0, source: src },
+        rawMaterialsAndGoods: { status: 'reported', value: 0, source: src },
+        otherOperatingIncome: { status: 'reported', value: 50_000, source: src },
+        costOfGoodsSold: { status: 'reported', value: -600_000, source: src },
+        grossProfit: { status: 'reported', value: 400_000, source: src },
+    })
+    assert.equal(addsUp(fn, 'grossProfit'), false)
 })
 
 test('sparse data: missing ratios show as saknas, never zero', () => {

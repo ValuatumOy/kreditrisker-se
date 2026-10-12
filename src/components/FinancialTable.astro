@@ -1,8 +1,8 @@
 ---
 // Multi-year income statement, balance sheet and ratios in tkr, newest year
 // first as in Swedish annual reports. Every cell keeps its value state.
-import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
-import { BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
+import type { FiscalPeriod, IncomeStatement, Value } from '../lib/contract/types.ts'
+import { addsUp, BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
 import { date, percent, periodLabel, SOURCE_TEXT, tkr, count, type Display } from '../lib/format.ts'
 import { FORMULAS, metricsOf, numeric, type MetricKey } from '../lib/metrics.ts'
 import Val from './Val.astro'
@@ -28,6 +28,7 @@ const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label
 const rows = <K extends string>(defs: StatementRow<K>[], get: (p: FiscalPeriod, k: K) => Value): Row[] =>
     defs
         .filter((d) => d.always || cols.some((p) => Math.round((numeric(get(p, d.key)) ?? 0) / 1000) !== 0))
+        .filter((d) => !d.ifItAddsUp || cols.every((p) => addsUp(p, d.key as keyof IncomeStatement)))
         .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum, item: !d.sum && !d.standalone }))
 
 const groups: { title: string; rows: Row[] }[] = [

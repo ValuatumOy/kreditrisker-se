@@ -23,6 +23,7 @@ export function statementGaps(p: FiscalPeriod): string[] {
     let chain = 0
     for (const r of INCOME_ROWS) {
         if (r.key === 'netSales') chain = inc(r.key)
+        else if (r.ifItAddsUp) continue // checked by addsUp, and hidden where it does not
         else if (r.sum) {
             check(chain, inc(r.key), r.key)
             chain = inc(r.key)
