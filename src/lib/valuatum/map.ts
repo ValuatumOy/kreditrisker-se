@@ -27,6 +27,8 @@ const UNIT = 1e6
 export const VARS = {
     netSales: ['ns'],
     operatingProfit: ['ebit'],
+    // Only a fallback: this sum leaves out results from group and associated companies and
+    // write-downs of financial assets, which cr_pre_tax_profit includes. See financialNet below.
     financialNet: ['fundu_financial_income_and_expenses'],
     // pre_tax_profit is after bokslutsdispositioner, so it cannot substitute this line.
     profitAfterFinancialItems: ['cr_pre_tax_profit'],
@@ -46,6 +48,11 @@ export const VARS = {
 const PERIOD_MONTHS = 'cr_fiscal_period_length'
 /** Period end as a number, e.g. 20251231. */
 const PERIOD_END = 'cr_fiscal_year_end'
+/**
+ * The backend never stores zero values, so an absent item in a period that has a balance sheet
+ * is 0 (the model's balance sheet balances without it). Checked in sweden-db on 2026-10-12.
+ */
+const ZERO_WHEN_ABSENT = new Set<readonly string[]>([VARS.untaxedReserves, VARS.inventories])
 /** Every variable the mapper reads; the API cache keeps only these. */
 export const USED_VARS = new Set<string>([...Object.values(VARS).flat(), PERIOD_MONTHS, PERIOD_END])
 
@@ -113,12 +120,21 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
         const get = (names: readonly string[]): number | undefined => {
             for (const n of names) if (typeof row[n] === 'number' && Number.isFinite(row[n])) return row[n] as number
         }
+        const hasBalanceSheet = get(VARS.totalAssets) !== undefined
         const amount = (names: readonly string[], opts: { abs?: boolean } = {}): Value => {
-            const v = get(names)
+            const v = get(names) ?? (hasBalanceSheet && ZERO_WHEN_ABSENT.has(names) ? 0 : undefined)
             if (v === undefined) return { status: 'missing', reason: 'not_in_source' }
             return { status: 'reported', value: Math.round((opts.abs ? Math.abs(v) : v) * UNIT), source: src }
         }
-        if (get(VARS.netSales) === undefined && get(VARS.totalAssets) === undefined) continue
+        // The model's profit after financial items is EBIT plus every financial item, so their
+        // difference is the whole Finansnetto and the income statement adds up in kronor.
+        const financialNet = (): Value => {
+            const ebit = amount(VARS.operatingProfit)
+            const ptp = amount(VARS.profitAfterFinancialItems)
+            if (ebit.status === 'reported' && ptp.status === 'reported') return { status: 'reported', value: ptp.value - ebit.value, source: src }
+            return amount(VARS.financialNet)
+        }
+        if (get(VARS.netSales) === undefined && !hasBalanceSheet) continue
         const months = Math.round(get([PERIOD_MONTHS]) ?? 12)
         // Without an end date the year is assumed to end in December.
         const endText = String(get([PERIOD_END]) ?? '')
@@ -137,7 +153,7 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             income: {
                 netSales: amount(VARS.netSales),
                 operatingProfit: amount(VARS.operatingProfit),
-                financialNet: amount(VARS.financialNet),
+                financialNet: financialNet(),
                 profitAfterFinancialItems: amount(VARS.profitAfterFinancialItems),
                 netProfit: amount(VARS.netProfit),
                 personnelCosts: amount(VARS.personnelCosts, { abs: true }),

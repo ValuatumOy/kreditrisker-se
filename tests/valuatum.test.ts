@@ -8,7 +8,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { mapBundle } from '../src/lib/valuatum/map.ts'
+import { mapBundle, VARS } from '../src/lib/valuatum/map.ts'
 import { batchMode, readParams, selectBatch } from '../src/lib/valuatum/params.ts'
 import { recentlyUpdated, type IndexRow } from '../src/lib/publish.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
@@ -34,8 +34,37 @@ test('maps a REST bundle to a valid record', () => {
     const p24 = r.periods[1]
     assert.deepEqual(p24.income.netSales, { status: 'reported', value: 5_902_461_000, source: r.status.source })
     assert.ok(p24.income.personnelCosts.status === 'reported' && p24.income.personnelCosts.value > 0, 'costs are stored as positive amounts')
-    assert.deepEqual(p24.balance.untaxedReserves, { status: 'missing', reason: 'not_in_source' }, 'absent items are missing, never 0')
+    assert.deepEqual(p24.balance.untaxedReserves, { status: 'reported', value: 0, source: r.status.source }, 'the backend stores no zeros: absent reserves next to a balance sheet are 0')
+    assert.deepEqual(p24.income.profitAfterFinancialItems, { status: 'missing', reason: 'not_in_source' }, 'other absent items stay missing')
     assert.equal(p24.months, 12)
+})
+
+test('Finansnetto is the whole gap between operating profit and profit after financial items', () => {
+    const b = bundle()
+    // Brightec Group 2024: 7.0 MSEK from group companies is outside fundu_financial_income_and_expenses.
+    Object.assign(b.modeldata.dataMap['2024'], { ebit: 1.581, fundu_financial_income_and_expenses: 0.006, cr_pre_tax_profit: 8.587 })
+    const res = mapBundle(b, opts)
+    assert.ok(res.ok)
+    const { income } = res.record.periods[1]
+    assert.deepEqual(income.financialNet, { status: 'reported', value: 7_006_000, source: res.record.status.source })
+    assert.equal(numeric(income.operatingProfit)! + numeric(income.financialNet)!, numeric(income.profitAfterFinancialItems))
+    assert.equal(numeric(res.record.periods[0].income.financialNet), 24_203_000, 'without profit after financial items the financial-items sum is used')
+})
+
+test('absent reserves and inventories are 0 only for periods with a balance sheet', () => {
+    const b = bundle()
+    Object.assign(b.modeldata.dataMap['2024'], { cr_ifrs_current_assets_total: 2, cr_current_liabilities_total: 1 })
+    for (const k of VARS.inventories) delete b.modeldata.dataMap['2024'][k]
+    const row = b.modeldata.dataMap['2023']
+    for (const k of Object.keys(row)) if (k.startsWith('bs_') || k === 'cr_inventory') delete row[k]
+    const res = mapBundle(b, opts)
+    assert.ok(res.ok)
+    const [, p24, p23] = res.record.periods
+    assert.equal(numeric(p24.balance.inventories), 0)
+    assert.equal(numeric(computeMetrics(p24).quickRatio), 2, 'kassalikviditet is shown')
+    assert.equal(p23.end, '2023-12-31')
+    assert.deepEqual(p23.balance.inventories, { status: 'missing', reason: 'not_in_source' })
+    assert.deepEqual(p23.balance.untaxedReserves, { status: 'missing', reason: 'not_in_source' })
 })
 
 test('rejects bundles that are not Swedish companies', () => {
