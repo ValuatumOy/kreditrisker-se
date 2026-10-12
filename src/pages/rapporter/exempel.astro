@@ -8,13 +8,13 @@ import Val from '../../components/Val.astro'
 import { getDemoSite } from '../../lib/store.ts'
 import { formatOrgnr } from '../../lib/orgnr.ts'
 import { compactSek, kommunName, percent, periodLabel } from '../../lib/format.ts'
-import { computeMetrics, FORMULAS, numeric, type MetricKey } from '../../lib/metrics.ts'
+import { metricsOf, FORMULAS, numeric, type MetricKey } from '../../lib/metrics.ts'
 
 const demo = getDemoSite()
 const c = demo.companies.find((x) => x.record.name.startsWith('Exempel Mjukvara'))!
 const r = c.record
 const [p, prior] = r.periods
-const m = computeMetrics(p, prior)
+const m = metricsOf(p)
 const peers = demo.companies.filter((x) => x !== c && x.record.sni[0]?.code === r.sni[0]?.code && x.record.periods[0])
 const median = (xs: number[]) => {
     const s = [...xs].sort((a, b) => a - b)
@@ -22,7 +22,7 @@ const median = (xs: number[]) => {
     return s.length ? (s.length % 2 ? s[h] : (s[h - 1] + s[h]) / 2) : undefined
 }
 const bench = (['operatingMargin', 'equityRatio', 'quickRatio'] as MetricKey[]).map((k) => {
-    const vals = peers.map((x) => numeric(computeMetrics(x.record.periods[0], x.record.periods[1])[k])).filter((v): v is number => v !== undefined)
+    const vals = peers.map((x) => numeric(metricsOf(x.record.periods[0])[k])).filter((v): v is number => v !== undefined)
     const med = median(vals)
     return { k, own: percent(m[k]), peer: med === undefined ? null : percent({ status: 'derived', value: med, formula: 'median', inputs: [] }), n: vals.length }
 })
@@ -110,7 +110,7 @@ const salesTo = compactSek(p.income.netSales).text
                 <h4>Lönsamhet</h4>
                 <p>
                     Nettoomsättningen har ökat från {salesFrom} räkenskapsåret {periodLabel(first)} till {salesTo} räkenskapsåret {periodLabel(p)}. Rörelsemarginalen var{' '}
-                    <Val d={percent(m.operatingMargin)} /> det senaste året, jämfört med <Val d={percent(computeMetrics(prior, r.periods[2]).operatingMargin)} /> året innan.
+                    <Val d={percent(m.operatingMargin)} /> det senaste året, jämfört med <Val d={percent(metricsOf(prior).operatingMargin)} /> året innan.
                 </p>
                 <h4>Soliditet och likviditet</h4>
                 <p>

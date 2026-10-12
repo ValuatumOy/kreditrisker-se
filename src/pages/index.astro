@@ -9,7 +9,7 @@ import Icon from '../components/Icon.astro'
 import { getDemoSite, getSite } from '../lib/store.ts'
 import { SITE, FLAGS } from '../config/site.ts'
 import { compactSek, percent } from '../lib/format.ts'
-import { FORMULAS, computeMetrics, numeric } from '../lib/metrics.ts'
+import { FORMULAS, metricsOf, numeric } from '../lib/metrics.ts'
 import { staticReportState } from '../lib/reports/availability.ts'
 import { STATE_LABEL } from '../lib/reports/labels.ts'
 import type { Value } from '../lib/contract/types.ts'
@@ -30,8 +30,8 @@ const typing = demo.companies.slice(0, 6).map((c) => c.record.name).concat(['002
 
 // Two small satellite cards next to the hero card (same synthetic company).
 const main = pick('Exempel Mjukvara').record
-const [p0, p1] = main.periods
-const m0 = computeMetrics(p0, p1)
+const p0 = main.periods[0]
+const m0 = metricsOf(p0)
 const salesSpark = [...main.periods].reverse().map((p) => numeric(p.income.netSales) ?? 0)
 const sparkMax = Math.max(...salesSpark)
 const eqPct = (numeric(m0.equityRatio) ?? 0) * 100
@@ -98,7 +98,7 @@ const statement =
                     <p class="sat__head"><span>Soliditet</span><span class="sat__tag">Exempel</span></p>
                     <p class="sat__v num" data-count={eqPct} data-decimals="1" data-suffix=" %">{percent(m0.equityRatio).text}</p>
                     <div class="sat__meter" aria-hidden="true"><i style={`--w:${eqPct}%`}></i></div>
-                    <p class="sat__foot">(Eget kapital + 79,4 % av obesk. res.) / tillgångar</p>
+                    <p class="sat__foot">(Eget kapital + obesk. res.) / (tillgångar − förskott)</p>
                 </div>
             </div>
         </div>

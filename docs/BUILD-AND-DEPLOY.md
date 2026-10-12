@@ -134,29 +134,39 @@ Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
 the full directory set `PUBLIC_SE_SEARCH_ENDPOINT` to a search API returning
 `SearchHit[]` (CloudSearch as on the Finnish site; not built yet).
 
-## Variable mapping (checked against sweden.valuatum.com, 2026-10-08)
+## Variable mapping (company view variables, 2026-10-12)
 
-`src/lib/valuatum/map.ts` maps REST variables to the contract. Amounts arrive in
-millions and are stored in kronor. Absent variables become `missing`
-(`not_in_source`), never 0.
+The Bokslut table and the key ratios use the variables of the Valuatum company
+view (CV) pages in sweden-db, so the site, the CV pages and the credit reports show
+the same figures. The variable names are in `src/lib/valuatum/map.ts` (one comment
+per contract field in `src/lib/contract/types.ts`), the row order and Swedish labels
+in `src/config/statement.ts`. The source tables:
 
-| Contract | Variable(s) |
+| Section | CV table (CVSVTABLE) |
 |---|---|
-| netSales | `ns` |
-| operatingProfit | `ebit` |
-| financialNet | `fundu_financial_income_and_expenses` |
-| profitAfterFinancialItems | `cr_pre_tax_profit` only (`pre_tax_profit` is after bokslutsdispositioner and group contributions, so it is not a fallback) |
-| netProfit | `cr_net_earnings`, `net_earnings` |
-| personnelCosts | `fundu_personnel_expenses`, `cr_employee_expenses` (sign flipped) |
-| totalAssets | `bs_total_assets` |
-| equity | `cr_shareholders_equity` |
-| untaxedReserves | `cr_appropriations_total` |
-| inventories | `cr_inventory`, `inventories` |
-| cash | `cr_cash_and_cash_eq_total`, `cr_cash_and_bank_deposits` |
-| currentAssets / currentLiabilities | `cr_ifrs_current_assets_total` (`cr_current_assets_total` leaves the receivables out) / `cr_current_liabilities_total` |
-| longTermLiabilities | `cr_non_current_liabilities_total` |
-| employees | `cr_employees` |
-| period length / end | `cr_fiscal_period_length` / `cr_fiscal_year_end` (e.g. 20250430, so broken fiscal years are right) |
+| Resultaträkning | 450 `income_statement_with_currency` |
+| Balansräkning, tillgångar | 447 `assets` |
+| Balansräkning, eget kapital och skulder | 11638 `equity_and_liabilities` |
+| Nyckeltal | 442 `cr_profitability`, 444 `cr_solvency`, 445 `cr_liquidity`; growth, personnel costs and employees from 17088 `cr_volume` |
+
+The table shows the subtotals and every row between them that a Bolagsverket linking
+rule can fill, so the rows add up (checked for all 56 cached companies, 204 years).
+CV rows that no Swedish linking rule fills (leasing interest, exchange differences,
+extraordinary items, discontinued operations …) are left out because they are always
+empty. A row with no value in any shown year is hidden, as on the CV pages; the
+subtotals, inventories, untaxed reserves and the liability totals always show.
+
+Amounts arrive in millions and are stored in kronor with the source's sign (costs
+negative). The key ratios are taken as they are; the site computes none of them, and
+the formulas on `/metod/` describe the CV definitions (sweden-db `DYNAMICVARIABLE`).
+Absent variables become `missing` (`not_in_source`), except absent inventories and
+untaxed reserves next to a balance sheet, which are 0 (the backend stores no zeros).
+Period length and end come from `cr_fiscal_period_length` and `cr_fiscal_year_end`
+(e.g. 20250430, so broken fiscal years are right).
+
+The API cache (`data/api-cache/`, `data/sample/api-cache/`) keeps only these
+variables. Files written before the change carry no `cacheVersion: 2` and are fetched
+again; with no API access (Vercel), refresh the committed sample first.
 
 Register data (`/rest/company`) comes from the Bolagsverket import
 (profinder-environment `parsing-worker-lambda`) under the Finnish COMPANYDATA keys:
@@ -180,8 +190,9 @@ is simply absent from municipality hubs. SNI `0000` is left unclassified; those
 profiles are generated but remain below the current index threshold.
 
 Missing API values stay `saknas`: an absent variable does not prove that the
-annual report reported zero or omitted the item. Growth and year-over-year KPI
-changes are shown only between consecutive fiscal periods.
+annual report reported zero or omitted the item. Year-over-year ratio changes in the
+key-figure cards are shown only between consecutive fiscal periods, and the growth
+ranking only compares two consecutive 12-month years.
 
 When updating an existing production dataset to these quality/calculation rules,
 run a full rebuild (`COMPANIES=all`): an incremental batch retains old index rows and
@@ -192,7 +203,8 @@ profile HTML for companies outside the batch.
 The committed `data/sample/api-cache/52.json` maps S M Entreprenad Aktiebolag
 (556193-9215) to the fiscal period 2025-07-01–2026-06-30. The source has
 net sales SEK 427,568,195, operating profit SEK 43,049,755 and 52 employees.
-Computed growth is 20.9 %, soliditet 48.1 % and kassalikviditet 176 %.
+Growth is 20.9 %, soliditet 48.1 % and kassalikviditet 176 % (the site's own
+formulas then; with the CV ratios since 2026-10-12: 20.9 %, 45.6 % and 213 %).
 These agree with the preview; this checks the API-to-page mapping, not the
 original annual report.
 

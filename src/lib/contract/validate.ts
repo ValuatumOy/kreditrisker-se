@@ -26,24 +26,45 @@ const INCOMPARABLE = new Set([
 ])
 const INCOME_FIELDS = [
     'netSales',
-    'operatingProfit',
-    'financialNet',
-    'profitAfterFinancialItems',
-    'netProfit',
     'personnelCosts',
+    'operatingProfit',
+    'incomeFromGroupCompanies',
+    'incomeFromAssociates',
+    'incomeFromOtherFinancialAssets',
+    'interestIncome',
+    'otherFinancialIncome',
+    'financialAssetWriteDowns',
+    'interestExpenses',
+    'otherFinancialExpenses',
+    'profitAfterFinancialItems',
+    'changeInAcceleratedDepreciation',
+    'changeInUntaxedReserves',
+    'groupContributions',
+    'incomeTaxes',
+    'minorityShareOfProfit',
+    'netProfit',
 ] as const
 const BALANCE_FIELDS = [
+    'intangibleAssets',
+    'tangibleAssets',
+    'financialAssets',
+    'deferredTaxAssets',
+    'inventories',
+    'shortTermReceivables',
+    'shortTermInvestments',
+    'cash',
     'totalAssets',
     'equity',
+    'minorityInterest',
     'untaxedReserves',
-    'inventories',
-    'cash',
-    'currentAssets',
-    'currentLiabilities',
+    'provisions',
     'longTermLiabilities',
+    'currentLiabilities',
+    'totalEquityAndLiabilities',
 ] as const
+const RATIO_FIELDS = ['revenueGrowth', 'operatingMargin', 'profitMargin', 'equityRatio', 'quickRatio', 'returnOnEquity'] as const
 // Items that cannot be negative in a correctly parsed statement.
-const NON_NEGATIVE = new Set(['totalAssets', 'inventories', 'cash', 'currentAssets', 'currentLiabilities', 'longTermLiabilities', 'untaxedReserves'])
+const NON_NEGATIVE = new Set(['totalAssets', 'inventories', 'cash', 'currentLiabilities', 'longTermLiabilities', 'untaxedReserves'])
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -104,8 +125,10 @@ function checkPeriod(p: unknown, path: string, errors: string[], synthetic: bool
     checkSource(p.source, `${path}.source`, errors, synthetic)
     const income = isObj(p.income) ? p.income : {}
     const balance = isObj(p.balance) ? p.balance : {}
+    const ratios = isObj(p.ratios) ? p.ratios : {}
     for (const f of INCOME_FIELDS) checkValue(income[f], `${path}.income.${f}`, errors, synthetic, f)
     for (const f of BALANCE_FIELDS) checkValue(balance[f], `${path}.balance.${f}`, errors, synthetic, f)
+    for (const f of RATIO_FIELDS) checkValue(ratios[f], `${path}.ratios.${f}`, errors, synthetic, f)
     checkValue(p.employees, `${path}.employees`, errors, synthetic, 'employees')
 }
 

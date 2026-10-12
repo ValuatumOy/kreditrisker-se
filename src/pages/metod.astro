@@ -1,6 +1,6 @@
 ---
 import Page from '../layouts/Page.astro'
-import { FORMULAS, UNTAXED_RESERVE_EQUITY_SHARE } from '../lib/metrics.ts'
+import { FORMULAS } from '../lib/metrics.ts'
 import { CORE_ITEMS, MIN_CORE_ITEMS } from '../lib/quality.ts'
 import { CURRENT_MONTHS, STALE_MONTHS } from '../lib/freshness.ts'
 import { MIN_HUB_COMPANIES, MIN_RANKING_ENTRIES } from '../lib/publish.ts'
@@ -30,7 +30,7 @@ const toc = [
     h1="Så räknar och visar vi"
     description="Formler för nyckeltal, hur saknade värden hanteras, hur aktualitet bedöms och vilka profiler som indexeras."
     path="/metod/"
-    lede="Allt vi räknar fram ur bokslut följer formlerna nedan. Reglerna gäller alla företag lika och ändras bara med ny versionsbeteckning."
+    lede="Nyckeltalen följer formlerna nedan, samma som i Valuatums kreditrapporter. Reglerna gäller alla företag lika."
 >
     <div class="doc">
         <nav class="doc__toc small" aria-label="Innehåll">
@@ -39,7 +39,7 @@ const toc = [
         </nav>
         <div class="prose doc__body">
             <h2 id="nyckeltal">Nyckeltal och formler</h2>
-            <p>Beloppen hämtas ur företagets årsredovisning. Nyckeltalen räknar vi själva. Varje värde på sajten bär formelns beteckning, så att en ändrad formel syns.</p>
+            <p>Beloppen hämtas ur företagets årsredovisning. Nyckeltalen räknas i Valuatums bokslutsanalys ur samma belopp och visas här som de är, så att de stämmer med kreditrapporterna. Beteckningen är variabelns namn hos Valuatum.</p>
             <div class="table-wrap" tabindex="0" role="region" aria-label="Formler">
                 <table class="data f">
                     <thead><tr><th scope="col">Nyckeltal</th><th scope="col">Formel</th><th scope="col">Beteckning</th></tr></thead>
@@ -59,24 +59,19 @@ const toc = [
                     </tbody>
                 </table>
             </div>
-            <p>
-                I soliditeten räknas {Math.round(UNTAXED_RESERVE_EQUITY_SHARE * 1000) / 10} % av de obeskattade reserverna som eget kapital. Resten motsvarar den latenta skatten
-                med dagens bolagsskatt på 20,6 %.
-            </p>
+            <p>Kassalikviditeten visas i procent: 1,5 gånger de kortfristiga skulderna visas som 150 %.</p>
 
             <h2 id="varden">Saknade och avvikande värden</h2>
             <p>Ett värde på sajten är alltid något av följande. Vi skriver aldrig noll när en uppgift saknas.</p>
             <dl>
                 <dt>Rapporterat</dt>
                 <dd>Beloppet står i årsredovisningen. Noll och negativa belopp visas som de är; negativa med minustecken.</dd>
-                <dt>Beräknat</dt>
-                <dd>Ett nyckeltal räknat med formlerna ovan ur rapporterade belopp.</dd>
                 <dt>Saknas</dt>
                 <dd>{Object.values(MISSING_TEXT).join(' Eller: ')}</dd>
                 <dt>Ej jämförbar</dt>
                 <dd>{Object.values(INCOMPARABLE_TEXT).join(' Eller: ')}</dd>
             </dl>
-            <p>Saknas en uppgift som ett nyckeltal behöver, saknas också nyckeltalet.</p>
+            <p>Saknas ett nyckeltal i källan, står det som saknas.</p>
 
             <h2 id="aktualitet">Hur aktuella uppgifterna är</h2>
             <p>

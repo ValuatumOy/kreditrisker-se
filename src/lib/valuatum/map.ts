@@ -15,7 +15,7 @@
 // with the Swedish name in name.sv ("24.330 Tillverkning av ..."). sweden-db's 5-digit industry level
 // is SNI 2025 since 2026-10-08.
 
-import type { CompanyRecord, CompanyStatusCode, FiscalPeriod, LegalFormCode, SourceRef, Value } from '../contract/types.ts'
+import { SCHEMA_VERSION, type BalanceSheet, type CompanyRecord, type CompanyStatusCode, type FiscalPeriod, type IncomeStatement, type KeyRatios, type LegalFormCode, type SourceRef, type Value } from '../contract/types.ts'
 import { KOMMUNER } from '../../config/kommuner.ts'
 import { parseOrgnr } from '../orgnr.ts'
 import type { Bundle } from './api.ts'
@@ -23,26 +23,68 @@ import type { Bundle } from './api.ts'
 /** modeldata amounts are in millions of the model currency. */
 const UNIT = 1e6
 
-/** Contract field -> REST variable names, first present wins. */
-export const VARS = {
-    netSales: ['ns'],
-    operatingProfit: ['ebit'],
-    financialNet: ['fundu_financial_income_and_expenses'],
-    // pre_tax_profit is after bokslutsdispositioner, so it cannot substitute this line.
-    profitAfterFinancialItems: ['cr_pre_tax_profit'],
-    netProfit: ['cr_net_earnings', 'net_earnings'],
-    personnelCosts: ['fundu_personnel_expenses', 'cr_employee_expenses'],
-    totalAssets: ['bs_total_assets'],
-    equity: ['cr_shareholders_equity'],
-    untaxedReserves: ['cr_appropriations_total'],
-    inventories: ['cr_inventory', 'inventories'],
-    cash: ['cr_cash_and_cash_eq_total', 'cr_cash_and_bank_deposits'],
-    // cr_current_assets_total leaves the receivables out; the IFRS total is the whole sum.
-    currentAssets: ['cr_ifrs_current_assets_total'],
-    currentLiabilities: ['cr_current_liabilities_total'],
-    longTermLiabilities: ['cr_non_current_liabilities_total'],
-    employees: ['cr_employees'],
-} as const
+// The statement items are rows of the company view (CV) tables in sweden-db:
+// income statement (CVSVTABLE 450), assets (447) and equity and liabilities (11638),
+// checked on 2026-10-12. Rows between the subtotals that no Bolagsverket linking rule
+// fills (leasing interest, exchange differences, extraordinary items ...) are left out:
+// they are always empty for Swedish companies, so the shown rows still add up.
+// The key ratios are the CV overview tables 442, 444 and 445 and personnel costs
+// and employees the volume table 17088.
+
+/** Contract field -> REST variable name. */
+export const INCOME_VARS = {
+    netSales: 'ns',
+    personnelCosts: 'cr_employee_expenses',
+    operatingProfit: 'ebit',
+    incomeFromGroupCompanies: 'cr_income_from_group_members',
+    incomeFromAssociates: 'cr_income_from_associates',
+    incomeFromOtherFinancialAssets: 'cr_income_from_non_current_investments',
+    interestIncome: 'cr_interest_income',
+    otherFinancialIncome: 'cr_other_financial_income',
+    financialAssetWriteDowns: 'cr_amortization_financial_assets',
+    interestExpenses: 'cr_interest_expenses',
+    otherFinancialExpenses: 'cr_other_financial_expenses',
+    // Before the extraordinary items, which Swedish annual reports no longer have.
+    profitAfterFinancialItems: 'cr_pre_tax_profit_less_eo',
+    changeInAcceleratedDepreciation: 'cr_change_in_accelerated_depreciations',
+    changeInUntaxedReserves: 'cr_change_in_untaxed_reserves',
+    groupContributions: 'cr_group_contributions',
+    incomeTaxes: 'cr_income_taxes',
+    minorityShareOfProfit: 'cr_minorities',
+    netProfit: 'cr_net_earnings',
+} as const satisfies Record<keyof IncomeStatement, string>
+
+export const BALANCE_VARS = {
+    intangibleAssets: 'cr_intangible_assets_total',
+    tangibleAssets: 'cr_tangibles_assets_total',
+    financialAssets: 'cr_investments_total',
+    // Of the CV's long-term receivables only the deferred tax asset is linked for Sweden.
+    deferredTaxAssets: 'cr_long_term_receivables_total',
+    // "Inventories total" in the CV, Bolagsverket's Varulager m.m.
+    inventories: 'cr_current_assets_total',
+    shortTermReceivables: 'cr_short_term_receivables_total',
+    shortTermInvestments: 'cr_cash_equivalents_total',
+    cash: 'cr_cash_and_bank_deposits',
+    totalAssets: 'bs_total_assets',
+    equity: 'cr_shareholders_equity',
+    minorityInterest: 'minorities',
+    untaxedReserves: 'cr_appropriations_total',
+    provisions: 'cr_provisions',
+    longTermLiabilities: 'cr_non_current_liabilities_total',
+    currentLiabilities: 'cr_current_liabilities_total',
+    totalEquityAndLiabilities: 'bs_total_liab',
+} as const satisfies Record<keyof BalanceSheet, string>
+
+export const RATIO_VARS = {
+    revenueGrowth: 'ns_growth',
+    operatingMargin: 'ebit_percent',
+    profitMargin: 'cr_pre_tax_profit_less_eo_percent',
+    equityRatio: 'cr_equity_ratio',
+    quickRatio: 'cr_quick_ratio',
+    returnOnEquity: 'cr_roe_percent_corrected',
+} as const satisfies Record<keyof KeyRatios, string>
+
+const EMPLOYEES = 'cr_employees_adjusted'
 const PERIOD_MONTHS = 'cr_fiscal_period_length'
 /** Period end as a number, e.g. 20251231. */
 const PERIOD_END = 'cr_fiscal_year_end'
@@ -50,9 +92,16 @@ const PERIOD_END = 'cr_fiscal_year_end'
  * The backend never stores zero values, so an absent item in a period that has a balance sheet
  * is 0 (the model's balance sheet balances without it). Checked in sweden-db on 2026-10-12.
  */
-const ZERO_WHEN_ABSENT = new Set<readonly string[]>([VARS.untaxedReserves, VARS.inventories])
+const ZERO_WHEN_ABSENT = new Set<string>([BALANCE_VARS.untaxedReserves, BALANCE_VARS.inventories])
 /** Every variable the mapper reads; the API cache keeps only these. */
-export const USED_VARS = new Set<string>([...Object.values(VARS).flat(), PERIOD_MONTHS, PERIOD_END])
+export const USED_VARS = new Set<string>([
+    ...Object.values(INCOME_VARS),
+    ...Object.values(BALANCE_VARS),
+    ...Object.values(RATIO_VARS),
+    EMPLOYEES,
+    PERIOD_MONTHS,
+    PERIOD_END,
+])
 
 /** Bolagsverket organisationsform code (YHTIOMUOTO) -> contract code. */
 const LEGAL_FORMS: Record<string, LegalFormCode> = {
@@ -115,23 +164,23 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
     const periods: FiscalPeriod[] = []
     for (const y of years) {
         const row = md.dataMap[y]
-        const get = (names: readonly string[]): number | undefined => {
-            for (const n of names) if (typeof row[n] === 'number' && Number.isFinite(row[n])) return row[n] as number
-        }
-        const hasBalanceSheet = get(VARS.totalAssets) !== undefined
-        const amount = (names: readonly string[], opts: { abs?: boolean } = {}): Value => {
-            const v = get(names) ?? (hasBalanceSheet && ZERO_WHEN_ABSENT.has(names) ? 0 : undefined)
+        const get = (name: string): number | undefined => (typeof row[name] === 'number' && Number.isFinite(row[name]) ? (row[name] as number) : undefined)
+        const hasBalanceSheet = get(BALANCE_VARS.totalAssets) !== undefined
+        const value = (name: string, unit: number): Value => {
+            const v = get(name) ?? (hasBalanceSheet && ZERO_WHEN_ABSENT.has(name) ? 0 : undefined)
             if (v === undefined) return { status: 'missing', reason: 'not_in_source' }
-            return { status: 'reported', value: Math.round((opts.abs ? Math.abs(v) : v) * UNIT), source: src }
+            return { status: 'reported', value: unit === 1 ? v : Math.round(v * unit), source: src }
         }
-        if (get(VARS.netSales) === undefined && !hasBalanceSheet) continue
-        const months = Math.round(get([PERIOD_MONTHS]) ?? 12)
+        const values = <K extends string>(vars: Record<K, string>, unit: number) =>
+            Object.fromEntries(Object.entries<string>(vars).map(([k, name]) => [k, value(name, unit)])) as Record<K, Value>
+        if (get(INCOME_VARS.netSales) === undefined && !hasBalanceSheet) continue
+        const months = Math.round(get(PERIOD_MONTHS) ?? 12)
         // Without an end date the year is assumed to end in December.
-        const endText = String(get([PERIOD_END]) ?? '')
+        const endText = String(get(PERIOD_END) ?? '')
         const end = /^\d{8}$/.test(endText) ? `${endText.slice(0, 4)}-${endText.slice(4, 6)}-${endText.slice(6)}` : `${y}-12-31`
         const endDate = new Date(end + 'T00:00:00Z')
         const startDate = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() - months + 1, 1))
-        const employees = get(VARS.employees)
+        const employees = get(EMPLOYEES)
         periods.push({
             start: startDate.toISOString().slice(0, 10),
             end,
@@ -140,24 +189,9 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             consolidated: company.companyCode.endsWith('K'),
             framework: 'unknown',
             source: src,
-            income: {
-                netSales: amount(VARS.netSales),
-                operatingProfit: amount(VARS.operatingProfit),
-                financialNet: amount(VARS.financialNet),
-                profitAfterFinancialItems: amount(VARS.profitAfterFinancialItems),
-                netProfit: amount(VARS.netProfit),
-                personnelCosts: amount(VARS.personnelCosts, { abs: true }),
-            },
-            balance: {
-                totalAssets: amount(VARS.totalAssets),
-                equity: amount(VARS.equity),
-                untaxedReserves: amount(VARS.untaxedReserves),
-                inventories: amount(VARS.inventories),
-                cash: amount(VARS.cash),
-                currentAssets: amount(VARS.currentAssets),
-                currentLiabilities: amount(VARS.currentLiabilities),
-                longTermLiabilities: amount(VARS.longTermLiabilities),
-            },
+            income: values(INCOME_VARS, UNIT),
+            balance: values(BALANCE_VARS, UNIT),
+            ratios: values(RATIO_VARS, 1),
             employees: employees === undefined ? { status: 'missing', reason: 'not_in_source' } : { status: 'reported', value: Math.round(employees), source: src },
         })
     }
@@ -167,7 +201,7 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
     const sniNode = company.industryTree?.nace === company.industryCode ? company.industryTree : undefined
     const sniLabel = sniNode?.name?.sv?.replace(/^[\d.]+\s+/, '')
     const record: CompanyRecord = {
-        schemaVersion: 1,
+        schemaVersion: SCHEMA_VERSION,
         orgnr: parsed.orgnr,
         synthetic: false,
         name: company.companyName.trim(),

@@ -5,7 +5,7 @@
 import type { PublishedCompany, Value } from '../lib/contract/types.ts'
 import { compactSek, count, FRESHNESS_TEXT, kommunName, percent, periodLabel, type Display } from '../lib/format.ts'
 import { formatOrgnr } from '../lib/orgnr.ts'
-import { computeMetrics } from '../lib/metrics.ts'
+import { metricsOf, numeric } from '../lib/metrics.ts'
 import LineChart from './LineChart.astro'
 import { SITE } from '../config/site.ts'
 
@@ -23,10 +23,13 @@ const sek = (v: Value): Cell['count'] => {
     if (a >= 1e3) return { to: Math.round(v.value / 1e3), decimals: 0, suffix: ' tkr' }
     return undefined
 }
-const pct = (v: Value, decimals = 1): Cell['count'] => (v.status === 'derived' ? { to: v.value * 100, decimals, suffix: ' %' } : undefined)
+const pct = (v: Value, decimals = 1): Cell['count'] => {
+    const n = numeric(v)
+    return n === undefined ? undefined : { to: n * 100, decimals, suffix: ' %' }
+}
 const cellsFor = (c: PublishedCompany): Cell[] => {
-    const [p, prior] = c.record.periods
-    const m = computeMetrics(p, prior)
+    const [p] = c.record.periods
+    const m = metricsOf(p)
     return [
         { label: 'Nettoomsättning', d: compactSek(p.income.netSales), count: sek(p.income.netSales) },
         { label: 'Rörelseresultat', d: compactSek(p.income.operatingProfit), count: sek(p.income.operatingProfit) },

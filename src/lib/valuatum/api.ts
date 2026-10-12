@@ -43,7 +43,11 @@ export interface ApiCompany {
     companyData?: Record<string, string | undefined>
 }
 
+/** Bumped whenever USED_VARS changes, so older cache files are fetched again. */
+export const CACHE_VERSION = 2
+
 export interface Bundle {
+    cacheVersion?: number
     fid: string
     retrievedAt: string
     modeldata: ModelData
@@ -85,7 +89,10 @@ function trim(md: ModelData): ModelData {
 /** Returns null when the model has no financial statements. */
 export async function fetchBundle(fid: string): Promise<Bundle | null> {
     const file = path.join(cacheDir(), `${fid}.json`)
-    if (process.env.SE_API_REFRESH !== '1' && fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8'))
+    if (process.env.SE_API_REFRESH !== '1' && fs.existsSync(file)) {
+        const cached: Bundle = JSON.parse(fs.readFileSync(file, 'utf8'))
+        if (cached.cacheVersion === CACHE_VERSION) return cached
+    }
     const res = await call<Record<string, ModelData>>('/rest/modeldata', {
         method: 'POST',
         body: JSON.stringify({ fids: [Number(fid)], varPoses: [], includeHistoryData: true, includeEstimates: false }),
@@ -94,6 +101,7 @@ export async function fetchBundle(fid: string): Promise<Bundle | null> {
     if (!md || !Object.keys(md.dataMap ?? {}).length) return null
     const companies = await call<ApiCompany[]>(`/rest/company/${md.companyId}?includecorresponding=true`)
     const bundle: Bundle = {
+        cacheVersion: CACHE_VERSION,
         fid,
         retrievedAt: new Date().toISOString().slice(0, 10),
         modeldata: trim(md),

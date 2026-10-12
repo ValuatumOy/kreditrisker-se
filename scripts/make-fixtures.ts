@@ -47,10 +47,17 @@ function period(f: Fig): FiscalPeriod {
     const startD = new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() - months + 1, 1))
     const fin = f.fin ?? -0.01 * f.sales
     const pafi = f.ebit + fin
-    const net = pafi - (pafi > 0 ? (f.tax ?? 0.206) * pafi : 0)
+    const tax = pafi > 0 ? -(f.tax ?? 0.206) * pafi : 0
+    const net = pafi + tax
     const o = new Set(f.omit ?? [])
-    const val = (k: string, n: number | undefined) => (o.has(k) || n === undefined ? miss() : v(n))
+    // The source stores no zeros: an item that is 0 is absent.
+    const val = (k: string, n: number | undefined) => (o.has(k) || n === undefined || Math.round(n) === 0 ? miss() : v(n))
     const ca = f.ca ?? f.assets * 0.55
+    const inv = f.inv ?? 0
+    const cash = f.cash ?? ca * 0.4
+    const ur = f.ur ?? 0
+    const cl = f.cl ?? f.assets * (0.3 + ((f.year % 3) - 1) * 0.035)
+    const balanced = (k: string, n: number) => (o.has(k) ? miss() : v(n))
     return {
         start: startD.toISOString().slice(0, 10),
         end,
@@ -61,25 +68,70 @@ function period(f: Fig): FiscalPeriod {
         filedAt: new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() + 5, 15)).toISOString().slice(0, 10),
         source: { ...SRC, documentId: `SYN-${f.year}` },
         income: {
-            netSales: val('sales', f.sales),
+            netSales: o.has('sales') ? miss() : v(f.sales),
+            personnelCosts: val('staff', -(f.staff ?? (f.emp ? f.emp * 560_000 : 0))),
             operatingProfit: val('ebit', f.ebit),
-            financialNet: val('fin', fin),
+            incomeFromGroupCompanies: miss(),
+            incomeFromAssociates: miss(),
+            incomeFromOtherFinancialAssets: miss(),
+            interestIncome: val('fin', fin > 0 ? fin : undefined),
+            otherFinancialIncome: miss(),
+            financialAssetWriteDowns: miss(),
+            interestExpenses: val('fin', fin < 0 ? fin : undefined),
+            otherFinancialExpenses: miss(),
             profitAfterFinancialItems: val('pafi', pafi),
+            changeInAcceleratedDepreciation: miss(),
+            changeInUntaxedReserves: miss(),
+            groupContributions: miss(),
+            incomeTaxes: val('pafi', tax),
+            minorityShareOfProfit: miss(),
             netProfit: val('net', net),
-            personnelCosts: val('staff', f.staff ?? (f.emp ? f.emp * 560_000 : undefined)),
         },
         balance: {
+            intangibleAssets: miss(),
+            tangibleAssets: val('ca', f.assets - ca),
+            financialAssets: miss(),
+            deferredTaxAssets: miss(),
+            inventories: balanced('inv', inv),
+            shortTermReceivables: val('ca', ca - inv - cash),
+            shortTermInvestments: miss(),
+            cash: val('cash', cash),
             totalAssets: val('assets', f.assets),
             equity: val('equity', f.equity),
-            untaxedReserves: val('ur', f.ur ?? 0),
-            inventories: val('inv', f.inv ?? 0),
-            cash: val('cash', f.cash ?? ca * 0.4),
-            currentAssets: val('ca', ca),
-            currentLiabilities: val('cl', f.cl ?? f.assets * (0.3 + ((f.year % 3) - 1) * 0.035)),
-            longTermLiabilities: val('ltl', f.ltl ?? Math.max(0, f.assets - f.equity - (f.cl ?? f.assets * (0.3 + ((f.year % 3) - 1) * 0.035)))),
+            minorityInterest: miss(),
+            untaxedReserves: balanced('ur', ur),
+            provisions: miss(),
+            longTermLiabilities: val('ltl', f.ltl ?? Math.max(0, f.assets - f.equity - ur - cl)),
+            currentLiabilities: val('cl', cl),
+            totalEquityAndLiabilities: val('assets', f.assets),
         },
-        employees: val('emp', f.emp),
+        ratios: { revenueGrowth: miss(), operatingMargin: miss(), profitMargin: miss(), equityRatio: miss(), quickRatio: miss(), returnOnEquity: miss() },
+        employees: o.has('emp') || f.emp === undefined ? miss() : v(f.emp),
     }
+}
+
+// Key ratios the way the Valuatum CV variables define them (src/lib/metrics.ts), so the
+// fixtures look like real REST data. A missing input or a base of zero leaves the ratio missing.
+function withRatios(periods: FiscalPeriod[]): FiscalPeriod[] {
+    const n = (x: Value) => (x.status === 'reported' ? x.value : undefined)
+    const div = (a?: number, b?: number): Value => (a === undefined || !b ? miss() : { status: 'reported', value: a / b, source: SRC })
+    return periods.map((p, i) => {
+        const prior = periods[i + 1]
+        const { income: inc, balance: bal } = p
+        const sales = n(inc.netSales)
+        const eq = n(bal.equity)
+        const eqPrior = prior && n(prior.balance.equity)
+        const liquid = n(bal.shortTermReceivables) === undefined && n(bal.cash) === undefined ? undefined : (n(bal.shortTermReceivables) ?? 0) + (n(bal.cash) ?? 0)
+        p.ratios = {
+            revenueGrowth: sales !== undefined && prior && n(prior.income.netSales) ? div(sales - n(prior.income.netSales)!, n(prior.income.netSales)) : miss(),
+            operatingMargin: sales && sales > 0 ? div(n(inc.operatingProfit), sales) : miss(),
+            profitMargin: sales && sales > 0 ? div(n(inc.profitAfterFinancialItems), sales) : miss(),
+            equityRatio: eq === undefined ? miss() : div(eq + (n(bal.untaxedReserves) ?? 0), n(bal.totalAssets)),
+            quickRatio: div(liquid, n(bal.currentLiabilities)),
+            returnOnEquity: eq === undefined || eqPrior === undefined ? miss() : div(n(inc.netProfit), (eq + eqPrior) / 2),
+        }
+        return p
+    })
 }
 
 const KOMMUN = {
@@ -114,7 +166,7 @@ function company(
 ): CompanyRecord {
     const { figs, ...rest } = extra
     return {
-        schemaVersion: 1,
+        schemaVersion: 2,
         orgnr: orgnr(n) as CompanyRecord['orgnr'],
         synthetic: true,
         name,
@@ -123,7 +175,7 @@ function company(
         status: { code: 'active', source: SRC },
         registeredAt: '2009-03-02',
         sni: [],
-        periods: (figs ?? []).map(period),
+        periods: withRatios((figs ?? []).map(period)),
         provenance: { batchId: 'fixture', importedAt: '2026-09-01T00:00:00Z', sources: [SRC] },
         ...rest,
     }

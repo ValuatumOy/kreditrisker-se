@@ -1,4 +1,5 @@
 {
+ "cacheVersion": 2,
  "fid": "900001",
  "retrievedAt": "2026-10-02",
  "modeldata": {
@@ -17,7 +18,7 @@
     "net_earnings": 1471.0,
     "ebit": 1471.0,
     "cr_fiscal_period_length": 12.0,
-    "cr_employees": 1707.0
+    "cr_employees_adjusted": 1707.0
    },
    "2021": {
     "cr_shareholders_equity": 2224.203,
@@ -28,7 +29,7 @@
     "net_earnings": 1533.932,
     "ebit": 1533.932,
     "cr_fiscal_period_length": 12.0,
-    "cr_employees": 2040.0
+    "cr_employees_adjusted": 2040.0
    },
    "2022": {
     "cr_shareholders_equity": 2333.979,
@@ -38,8 +39,8 @@
     "ebit": 1659.073,
     "pre_tax_profit": 1659.073,
     "cr_fiscal_period_length": 12.0,
-    "cr_employees": 2145.0,
-    "ns": 5978.188
+    "ns": 5978.188,
+    "cr_employees_adjusted": 2145.0
    },
    "2023": {
     "cr_shareholders_equity": 2113.788,
@@ -49,46 +50,50 @@
     "ebit": 1405.495,
     "pre_tax_profit": 1405.495,
     "cr_fiscal_period_length": 12.0,
-    "cr_employees": 2035.0,
-    "ns": 5925.711
+    "ns": 5925.711,
+    "cr_employees_adjusted": 2035.0
    },
    "2024": {
     "cr_cash_and_bank_deposits": 10.515,
     "cr_shareholders_equity": 2432.183,
     "cr_net_earnings": 1406.184,
     "bs_total_assets": 3509.921,
-    "fundu_financial_income_and_expenses": 19.186,
-    "inventories": 1292.362,
     "pre_tax_profit": 1802.8,
     "ns": 5902.461,
     "net_earnings": 1406.184,
     "ebit": 1783.614,
     "cr_current_liabilities_total": 1077.738,
-    "cr_cash_and_cash_eq_total": 10.515,
     "cr_fiscal_period_length": 12.0,
-    "cr_employees": 2163.0,
-    "cr_inventory": 1292.362,
-    "fundu_personnel_expenses": -1170.298,
-    "cr_ifrs_current_assets_total": 1292.362
+    "cr_current_assets_total": 1292.362,
+    "cr_employee_expenses": -1170.298,
+    "cr_interest_income": 19.186,
+    "cr_employees_adjusted": 2163.0,
+    "ns_growth": -0.00393617,
+    "ebit_percent": 0.30218156,
+    "cr_equity_ratio": 0.69294692,
+    "cr_quick_ratio": 1.21893211,
+    "cr_roe_percent_corrected": 0.61702118
    },
    "2025": {
     "cr_cash_and_bank_deposits": 76.233,
     "cr_shareholders_equity": 3469.889,
     "cr_net_earnings": 2443.89,
     "bs_total_assets": 4841.166,
-    "fundu_financial_income_and_expenses": 24.203,
-    "inventories": 1382.014,
     "pre_tax_profit": 3133.192,
     "ns": 6518.822,
     "net_earnings": 2443.89,
     "ebit": 3108.989,
     "cr_current_liabilities_total": 1371.277,
-    "cr_cash_and_cash_eq_total": 76.233,
     "cr_fiscal_period_length": 12.0,
-    "cr_employees": 2271.0,
-    "cr_inventory": 1382.014,
-    "fundu_personnel_expenses": -1391.195,
-    "cr_ifrs_current_assets_total": 1382.014
+    "cr_current_assets_total": 1382.014,
+    "cr_employee_expenses": -1391.195,
+    "cr_interest_income": 24.203,
+    "cr_employees_adjusted": 2271.0,
+    "ns_growth": 0.10442474,
+    "ebit_percent": 0.47692933,
+    "cr_equity_ratio": 0.71674913,
+    "cr_quick_ratio": 1.06617701,
+    "cr_roe_percent_corrected": 0.82815305
    }
   }
  },
