@@ -1,8 +1,8 @@
 ---
 // Multi-year income statement, balance sheet and ratios in tkr, newest year
 // first as in Swedish annual reports. Every cell keeps its value state.
-import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
-import { BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
+import type { FiscalPeriod, IncomeStatement, Value } from '../lib/contract/types.ts'
+import { addsUp, BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
 import { date, percent, periodLabel, SOURCE_TEXT, tkr, count, type Display } from '../lib/format.ts'
 import { FORMULAS, metricsOf, numeric, type MetricKey } from '../lib/metrics.ts'
 import Val from './Val.astro'
@@ -22,13 +22,14 @@ const sourceLine = uniform
     ? `${SOURCE_TEXT[cols[0].source.source]}, ${cols[0].consolidated ? 'koncernens ' : ''}årsredovisningar för ${cols.length === 1 ? periodLabel(cols[0]) : `${periodLabel(cols.at(-1)!)}–${periodLabel(cols[0])}`}${cols[0].framework !== 'unknown' ? ` (${cols[0].framework})` : ''}${filed.length ? `, registrerade ${filed.length > 1 ? `${date(filed[0])}–${date(filed.at(-1)!)}` : date(filed[0])}` : ''}${cols.some((p) => p.months !== 12) ? '. Räkenskapsår som inte är 12 månader är markerade i tabellhuvudet' : ''}`
     : cols.map((p) => `${periodLabel(p)}: ${SOURCE_TEXT[p.source.source]}, period ${date(p.start)}–${date(p.end)}${p.framework !== 'unknown' ? `, ${p.framework}` : ''}${p.filedAt ? `, registrerad ${date(p.filedAt)}` : ''}`).join('; ')
 
-type Row = { label: string; cells: Display[]; sum?: boolean }
+type Row = { label: string; cells: Display[]; sum?: boolean; item?: boolean }
 const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label, cells: metrics.map((m) => percent(m[key], digits)) })
-// A row that is 0 or missing in every shown year is left out, as on the CV pages.
+// A row that shows 0 or is missing in every shown year is left out, as on the CV pages.
 const rows = <K extends string>(defs: StatementRow<K>[], get: (p: FiscalPeriod, k: K) => Value): Row[] =>
     defs
-        .filter((d) => d.always || cols.some((p) => (numeric(get(p, d.key)) ?? 0) !== 0))
-        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum }))
+        .filter((d) => d.always || cols.some((p) => Math.round((numeric(get(p, d.key)) ?? 0) / 1000) !== 0))
+        .filter((d) => !d.ifItAddsUp || cols.every((p) => addsUp(p, d.key as keyof IncomeStatement)))
+        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum, item: !d.sum && !d.standalone }))
 
 const groups: { title: string; rows: Row[] }[] = [
     { title: 'Resultaträkning, tkr', rows: rows(INCOME_ROWS, (p, k) => p.income[k]) },
@@ -80,7 +81,7 @@ const groups: { title: string; rows: Row[] }[] = [
                             </th>
                         </tr>
                         {g.rows.map((r) => (
-                            <tr class:list={{ sum: r.sum }}>
+                            <tr class:list={{ sum: r.sum, item: r.item }}>
                                 <th scope="row">{r.label}</th>
                                 {r.cells.map((d) => (
                                     <td>
@@ -117,5 +118,8 @@ const groups: { title: string; rows: Row[] }[] = [
     }
     .ft td {
         min-width: 6.5rem;
+    }
+    .ft tr.item th {
+        padding-left: 1.25rem;
     }
 </style>

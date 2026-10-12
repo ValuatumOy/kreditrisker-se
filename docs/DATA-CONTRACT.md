@@ -12,7 +12,7 @@ The source of truth is `src/lib/contract/types.ts`, validated by `src/lib/contra
 
 ## Financial statements
 
-`periods[]`, newest first, no duplicates. Each period has `start`, `end`, `months` (1–18), `currency`, `consolidated`, `framework` (K2/K3/IFRS/unknown), `filedAt?`, `source`, `income{…}`, `balance{…}`, `ratios{…}` and `employees`. Amounts are in kronor, with the source's sign (costs negative). The fields are the rows of the Valuatum company view pages; `src/lib/contract/types.ts` names the variable of each.
+`periods[]`, newest first, no duplicates. Each period has `start`, `end`, `months` (1–18), `currency`, `consolidated`, `framework` (K2/K3/IFRS/unknown), `filedAt?`, `source`, `income{…}`, `balance{…}`, `ratios{…}` and `employees`. Amounts are in kronor, with the source's sign (costs negative). The fields (`INCOME_FIELDS`, `BALANCE_FIELDS` in `src/lib/contract/types.ts`) are the rows of the Valuatum company view pages; `src/lib/valuatum/map.ts` names the variable of each.
 
 Every item is a `Value`. An omitted field or a raw number is **rejected**.
 

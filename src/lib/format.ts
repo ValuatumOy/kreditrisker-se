@@ -44,8 +44,9 @@ const sign = (n: number): DisplayState => (n === 0 ? 'zero' : n < 0 ? 'negative'
 export function tkr(v: Value): Display {
     const a = absent(v)
     if (a) return a
-    const n = (v as { value: number }).value
-    return { text: nf(0).format(Math.round(n / 1000)), state: sign(n) }
+    // || 0 turns -0 into 0, so a few hundred kronor below zero do not print as "−0".
+    const k = Math.round((v as { value: number }).value / 1000) || 0
+    return { text: nf(0).format(k), state: sign(k) }
 }
 
 /** Compact amount for headlines: "30,2 Mkr", "412 tkr", "0 kr". */
