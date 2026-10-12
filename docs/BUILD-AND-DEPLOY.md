@@ -265,3 +265,20 @@ also stayed within its viewport. Five-year line-chart edge targets measured
 The harness was removed. Existing tests: 53 passing. Sample production build:
 34 pages, successful. A separate Astro type check was not run because
 `@astrojs/check` is not installed. No AWS/Jenkins deployment was started.
+
+### Answers to the data checks (2026-10-12)
+
+Checked in sweden-db (ASP 1, 64 models, all SEK) and the CreditRiskFinland formulas:
+
+- `fundu_financial_income_and_expenses` sums only eight financial items. `cr_pre_tax_profit`
+  also includes results from group companies (`ResultatAndelarKoncernforetag`), results from
+  associated companies, and write-downs of financial assets. These items explain every one of the
+  26 gaps across 16 models; Brightec 2024 is 7.0 MSEK from group companies. The mapper now shows
+  Finansnetto as `cr_pre_tax_profit − ebit`. The old sum is only a fallback.
+- The backend never stores zero values (none among the 137,588 CURRENTDATA rows), and every
+  model balance sheet balances. An absent `cr_appropriations_total` or inventory value in a
+  period with a balance sheet is therefore 0, and the mapper reports it as 0. Soliditet and
+  kassalikviditet now show for these companies.
+- Missing net sales are correct. Luni Metall and Vännäs Plåt file abbreviated income statements
+  without a `Nettoomsattning` fact; their bruttoresultat is in other operating income. Aros Städ,
+  Restaurang Zhang Kungshallen and EC Intressenter have no sales.
