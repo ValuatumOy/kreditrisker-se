@@ -34,7 +34,8 @@ Then open `/bestall/?orgnr=0020001012&produkt=ai`. An e-mail containing "fail" s
 ```
 src/config/site.ts        name, origin, flags (env-driven), verified prices; refuses unsafe combos
 src/lib/contract/         typed data contract + runtime validator (orgnr-keyed)
-src/lib/metrics.ts        versioned nyckeltal formulas; missing/zero/negative/incomparable handling
+src/lib/metrics.ts        nyckeltal: the CV ratio variables as delivered, with their definitions for /metod/
+src/config/statement.ts   Bokslut rows (CV variables) and their Swedish labels
 src/lib/freshness.ts      current / aging / stale / none
 src/lib/quality.ts        documented index threshold
 src/lib/pipeline.ts       stage (validate, dedupe, diff) -> publish immutable release; rollback

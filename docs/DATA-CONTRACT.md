@@ -1,4 +1,4 @@
-# Swedish company-data contract (schema v1)
+# Swedish company-data contract (schema v2)
 
 The source of truth is `src/lib/contract/types.ts`, validated by `src/lib/contract/validate.ts`. The import accepts one JSON object per company (JSON Lines or a JSON array), keyed by `orgnr`.
 
@@ -12,7 +12,7 @@ The source of truth is `src/lib/contract/types.ts`, validated by `src/lib/contra
 
 ## Financial statements
 
-`periods[]`, newest first, no duplicates. Each period has `start`, `end`, `months` (1–18), `currency`, `consolidated`, `framework` (K2/K3/IFRS/unknown), `filedAt?`, `source`, `income{…}`, `balance{…}` and `employees`. Amounts are in kronor.
+`periods[]`, newest first, no duplicates. Each period has `start`, `end`, `months` (1–18), `currency`, `consolidated`, `framework` (K2/K3/IFRS/unknown), `filedAt?`, `source`, `income{…}`, `balance{…}`, `ratios{…}` and `employees`. Amounts are in kronor, with the source's sign (costs negative). The fields are the rows of the Valuatum company view pages; `src/lib/contract/types.ts` names the variable of each.
 
 Every item is a `Value`. An omitted field or a raw number is **rejected**.
 
@@ -22,15 +22,15 @@ Every item is a `Value`. An omitted field or a raw number is **rejected**.
 | `missing` | `reason`: not_filed, not_in_source, not_digitised, parse_failed, withheld | "saknas" + reason tooltip |
 | `not_applicable` | `note` | "ej tillämpligt" |
 | `incomparable` | `reason` | "ej jämförbar" |
-| `derived` | computed at build time only; rejected on import | number + formula id |
+| `derived` | computed at build time only (medians); rejected on import | number |
 
-Import rule: if a *complete* balance sheet (its totals reconcile) has no untaxed-reserves line, the importer emits `reported 0`. An abridged or unparsable sheet emits `missing`.
+Import rule: if a *complete* balance sheet (its totals reconcile) has no untaxed-reserves or inventories line, the importer emits `reported 0`. An abridged or unparsable sheet emits `missing`.
 
-Assets, inventories, cash, current assets and liabilities may not be negative. Operating result, net profit and equity may be.
+Total assets, inventories, cash, untaxed reserves and liabilities may not be negative. Results and equity may be.
 
-## Derived metrics (`src/lib/metrics.ts`)
+## Key ratios (`ratios`, `src/lib/metrics.ts`)
 
-These are versioned formula ids (`soliditet.v1` …). A missing input makes the metric missing. A denominator of zero or less makes it `incomparable`. Growth requires two consecutive 12-month periods with the same consolidation and framework.
+Omsättningstillväxt, rörelsemarginal, vinstmarginal, soliditet, kassalikviditet and avkastning på eget kapital are the Valuatum company view ratio variables (`ns_growth`, `ebit_percent`, `cr_pre_tax_profit_less_eo_percent`, `cr_equity_ratio`, `cr_quick_ratio`, `cr_roe_percent_corrected`), imported as `reported` values: fractions, kassalikviditet as a ratio (1.5 = 150 %). The site computes none of them; a ratio the source leaves out is `missing`.
 
 ## Freshness (`src/lib/freshness.ts`)
 

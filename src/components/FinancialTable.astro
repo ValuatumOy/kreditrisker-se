@@ -2,8 +2,9 @@
 // Multi-year income statement, balance sheet and ratios in tkr, newest year
 // first as in Swedish annual reports. Every cell keeps its value state.
 import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
+import { BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
 import { date, percent, periodLabel, SOURCE_TEXT, tkr, count, type Display } from '../lib/format.ts'
-import { computeMetrics, FORMULAS, type MetricKey } from '../lib/metrics.ts'
+import { FORMULAS, metricsOf, type MetricKey } from '../lib/metrics.ts'
 import Val from './Val.astro'
 
 interface Props {
@@ -12,7 +13,7 @@ interface Props {
 }
 const { periods, no } = Astro.props
 const cols = periods.slice(0, 5)
-const metrics = cols.map((p, i) => computeMetrics(p, periods[i + 1]))
+const metrics = cols.map(metricsOf)
 
 // Collapse identical sources into one sentence; list per year only when they differ.
 const uniform = cols.every((p) => p.source.source === cols[0].source.source && p.framework === cols[0].framework && p.consolidated === cols[0].consolidated)
@@ -22,34 +23,16 @@ const sourceLine = uniform
     : cols.map((p) => `${periodLabel(p)}: ${SOURCE_TEXT[p.source.source]}, period ${date(p.start)}–${date(p.end)}${p.framework !== 'unknown' ? `, ${p.framework}` : ''}${p.filedAt ? `, registrerad ${date(p.filedAt)}` : ''}`).join('; ')
 
 type Row = { label: string; cells: Display[]; sum?: boolean }
-const amount = (label: string, get: (p: FiscalPeriod) => Value, sum = false): Row => ({ label, cells: cols.map((p) => tkr(get(p))), sum })
 const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label, cells: metrics.map((m) => percent(m[key], digits)) })
+// A row with no value in any shown year is left out, as on the CV pages.
+const rows = <K extends string>(defs: StatementRow<K>[], get: (p: FiscalPeriod, k: K) => Value): Row[] =>
+    defs
+        .filter((d) => d.always || cols.some((p) => get(p, d.key).status !== 'missing'))
+        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum }))
 
 const groups: { title: string; rows: Row[] }[] = [
-    {
-        title: 'Resultaträkning, tkr',
-        rows: [
-            amount('Nettoomsättning', (p) => p.income.netSales),
-            amount('Personalkostnader', (p) => p.income.personnelCosts),
-            amount('Rörelseresultat', (p) => p.income.operatingProfit, true),
-            amount('Finansnetto', (p) => p.income.financialNet),
-            amount('Resultat efter finansiella poster', (p) => p.income.profitAfterFinancialItems, true),
-            amount('Årets resultat', (p) => p.income.netProfit, true),
-        ],
-    },
-    {
-        title: 'Balansräkning, tkr',
-        rows: [
-            amount('Varulager', (p) => p.balance.inventories),
-            amount('Kassa och bank', (p) => p.balance.cash),
-            amount('Summa omsättningstillgångar', (p) => p.balance.currentAssets),
-            amount('Summa tillgångar', (p) => p.balance.totalAssets, true),
-            amount('Eget kapital', (p) => p.balance.equity),
-            amount('Obeskattade reserver', (p) => p.balance.untaxedReserves),
-            amount('Långfristiga skulder', (p) => p.balance.longTermLiabilities),
-            amount('Kortfristiga skulder', (p) => p.balance.currentLiabilities),
-        ],
-    },
+    { title: 'Resultaträkning, tkr', rows: rows(INCOME_ROWS, (p, k) => p.income[k]) },
+    { title: 'Balansräkning, tkr', rows: rows(BALANCE_ROWS, (p, k) => p.balance[k]) },
     {
         title: 'Nyckeltal',
         rows: [
@@ -113,7 +96,7 @@ const groups: { title: string; rows: Row[] }[] = [
     </div>
     <figcaption class="fig__src">
         <b>Källa:</b> {sourceLine}.
-        Nyckeltalen är beräknade av oss, se <a href="/metod/#nyckeltal">formler</a>. «saknas» betyder att posten inte finns i källan.
+        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. «saknas» betyder att posten inte finns i källan.
     </figcaption>
 </figure>
 

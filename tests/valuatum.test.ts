@@ -8,12 +8,12 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { mapBundle, VARS } from '../src/lib/valuatum/map.ts'
+import { BALANCE_VARS, mapBundle } from '../src/lib/valuatum/map.ts'
 import { batchMode, readParams, selectBatch } from '../src/lib/valuatum/params.ts'
 import { recentlyUpdated, type IndexRow } from '../src/lib/publish.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
-import { computeMetrics, numeric } from '../src/lib/metrics.ts'
+import { metricsOf, numeric } from '../src/lib/metrics.ts'
 import { percent } from '../src/lib/format.ts'
 
 const ROOT = path.join(import.meta.dirname, '..')
@@ -33,7 +33,7 @@ test('maps a REST bundle to a valid record', () => {
     assert.deepEqual(r.periods.map((p) => p.end), ['2025-12-31', '2024-12-31', '2023-12-31', '2022-12-31', '2021-12-31', '2020-12-31'])
     const p24 = r.periods[1]
     assert.deepEqual(p24.income.netSales, { status: 'reported', value: 5_902_461_000, source: r.status.source })
-    assert.ok(p24.income.personnelCosts.status === 'reported' && p24.income.personnelCosts.value > 0, 'costs are stored as positive amounts')
+    assert.ok(p24.income.personnelCosts.status === 'reported' && p24.income.personnelCosts.value < 0, 'costs keep the negative sign of the source')
     assert.deepEqual(p24.balance.untaxedReserves, { status: 'reported', value: 0, source: r.status.source }, 'the backend stores no zeros: absent reserves next to a balance sheet are 0')
     assert.deepEqual(p24.income.profitAfterFinancialItems, { status: 'missing', reason: 'not_in_source' }, 'other absent items stay missing')
     assert.equal(p24.months, 12)
@@ -41,15 +41,13 @@ test('maps a REST bundle to a valid record', () => {
 
 test('absent reserves and inventories are 0 only for periods with a balance sheet', () => {
     const b = bundle()
-    Object.assign(b.modeldata.dataMap['2024'], { cr_ifrs_current_assets_total: 2, cr_current_liabilities_total: 1 })
-    for (const k of VARS.inventories) delete b.modeldata.dataMap['2024'][k]
+    delete b.modeldata.dataMap['2024'][BALANCE_VARS.inventories]
     const row = b.modeldata.dataMap['2023']
-    for (const k of Object.keys(row)) if (k.startsWith('bs_') || k === 'cr_inventory') delete row[k]
+    for (const k of Object.keys(row)) if (k.startsWith('bs_') || k === BALANCE_VARS.inventories) delete row[k]
     const res = mapBundle(b, opts)
     assert.ok(res.ok)
     const [, p24, p23] = res.record.periods
     assert.equal(numeric(p24.balance.inventories), 0)
-    assert.equal(numeric(computeMetrics(p24).quickRatio), 2, 'kassalikviditet is shown')
     assert.equal(p23.end, '2023-12-31')
     assert.deepEqual(p23.balance.inventories, { status: 'missing', reason: 'not_in_source' })
     assert.deepEqual(p23.balance.untaxedReserves, { status: 'missing', reason: 'not_in_source' })
@@ -64,7 +62,7 @@ test('rejects bundles that are not Swedish companies', () => {
     assert.equal(mapBundle(c, opts).ok, false)
 })
 
-test('real Swedish sample: fiscal dates, SEK units and displayed ratios', () => {
+test('real Swedish sample: fiscal dates, SEK units and the CV ratios', () => {
     const sample: Bundle = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'sample', 'api-cache', '52.json'), 'utf8'))
     const res = mapBundle(sample, opts)
     assert.ok(res.ok)
@@ -75,24 +73,24 @@ test('real Swedish sample: fiscal dates, SEK units and displayed ratios', () => 
     assert.equal(numeric(p.income.netSales), 427_568_195)
     assert.equal(numeric(p.income.operatingProfit), 43_049_755)
     assert.equal(numeric(p.employees), 52)
-    const m = computeMetrics(p, prior)
+    const m = metricsOf(p)
     assert.equal(percent(m.revenueGrowth).text, '20,9 %')
-    assert.equal(percent(m.equityRatio).text, '48,1 %')
-    assert.equal(percent(m.quickRatio, 0).text, '176 %')
+    assert.equal(percent(m.equityRatio).text, '45,6 %')
+    assert.equal(percent(m.quickRatio, 0).text, '213 %')
+    assert.equal(numeric(prior.income.netSales), 353_606_490)
     assert.deepEqual(p.balance.longTermLiabilities, { status: 'missing', reason: 'not_in_source' })
     const p21 = res.record.periods.find((p) => p.end === '2022-06-30')!
     assert.equal(numeric(p21.income.profitAfterFinancialItems), 20_872_689)
-    assert.equal(sample.modeldata.dataMap['2021'].pre_tax_profit, -0.127311)
 })
 
 test('after-financial-items result never falls back to a result after appropriations', () => {
     const b = bundle()
-    b.modeldata.dataMap['2025'].pre_tax_profit = 1
-    delete b.modeldata.dataMap['2025'].cr_pre_tax_profit
+    Object.assign(b.modeldata.dataMap['2025'], { pre_tax_profit: 1, cr_pre_tax_profit: 1 })
+    delete b.modeldata.dataMap['2025'].cr_pre_tax_profit_less_eo
     const res = mapBundle(b, opts)
     assert.ok(res.ok)
     assert.deepEqual(res.record.periods[0].income.profitAfterFinancialItems, { status: 'missing', reason: 'not_in_source' })
-    assert.equal(computeMetrics(res.record.periods[0]).profitMargin.status, 'missing')
+    assert.equal(metricsOf(res.record.periods[0]).profitMargin.status, 'missing')
 })
 
 test('register metadata: absent municipality, unallocated SNI and hyphenated orgnr are accepted', () => {

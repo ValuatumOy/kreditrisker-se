@@ -3,7 +3,7 @@
 
 import type { PublishedCompany } from './contract/types.ts'
 import { compactSek, count, kommunName, LEGAL_FORM_TEXT, percent, periodLabel, STATUS_TEXT } from './format.ts'
-import { computeMetrics } from './metrics.ts'
+import { metricsOf } from './metrics.ts'
 
 export function summarize(c: PublishedCompany): string[] {
     const r = c.record
@@ -14,12 +14,12 @@ export function summarize(c: PublishedCompany): string[] {
     out.push(`${r.name} är ${form === 'aktiebolag' || form === 'handelsbolag' || form === 'kommanditbolag' ? 'ett' : 'en'} ${form}${where}${what}.`)
     if (r.status.code !== 'active' && r.status.code !== 'unknown') out.push(`Registrerad status: ${STATUS_TEXT[r.status.code].toLowerCase()}.`)
 
-    const [p, prior] = r.periods
+    const [p] = r.periods
     if (!p) {
         out.push('Företaget har inget inlämnat bokslut i källan ännu.')
         return out
     }
-    const m = computeMetrics(p, prior)
+    const m = metricsOf(p)
     const year = periodLabel(p)
     const sales = compactSek(p.income.netSales)
     const ebit = compactSek(p.income.operatingProfit)

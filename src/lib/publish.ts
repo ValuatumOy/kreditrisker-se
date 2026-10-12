@@ -4,7 +4,7 @@
 import { FLAGS, SITE } from '../config/site.ts'
 import type { CompanyRecord, CompanyStatusCode, Freshness, Municipality, PublishedCompany, SniCode } from './contract/types.ts'
 import { freshnessOf } from './freshness.ts'
-import { computeMetrics, numeric, type MetricKey } from './metrics.ts'
+import { metricsOf, numeric, periodsConsecutive, type MetricKey } from './metrics.ts'
 import type { Release } from './pipeline.ts'
 import { assessQuality } from './quality.ts'
 import { slugify } from './slug.ts'
@@ -70,14 +70,15 @@ export function toRow(c: PublishedCompany): IndexRow {
     if (r.municipality) row.k = r.municipality
     if (r.sni[0]) row.s = r.sni[0]
     if (p) {
-        const m = computeMetrics(p, prior)
+        const m = metricsOf(p)
         row.per = { start: p.start, end: p.end, months: p.months, ...(p.filedAt ? { filedAt: p.filedAt } : {}) }
         row.ns = numeric(p.income.netSales)
         row.nsp = numeric(prior?.income.netSales)
         row.emp = numeric(p.employees)
         row.om = numeric(m.operatingMargin)
         row.er = numeric(m.equityRatio)
-        row.rg = numeric(m.revenueGrowth)
+        // The growth list compares two directly consecutive 12-month years only.
+        if (p.months === 12 && prior?.months === 12 && periodsConsecutive(p, prior)) row.rg = numeric(m.revenueGrowth)
     }
     return JSON.parse(JSON.stringify(row)) // drop undefined keys
 }
@@ -171,7 +172,7 @@ const RANKINGS: Omit<Ranking, 'entries'>[] = [
         slug: 'hogst-soliditet',
         title: 'Högst soliditet',
         metric: 'equityRatio',
-        description: 'Störst andel justerat eget kapital av totala tillgångar.',
+        description: 'Störst andel eget kapital och obeskattade reserver av balansomslutningen.',
         rule: 'Senaste bokslut, minst 5 Mkr i nettoomsättning, så att vilande bolag inte dominerar listan.',
     },
     {

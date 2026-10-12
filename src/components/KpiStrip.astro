@@ -2,32 +2,33 @@
 // Newest-year key figures and prior-year change, shown at their actual values.
 import type { FiscalPeriod, Value } from '../lib/contract/types.ts'
 import { compactSek, count, percent, type Display } from '../lib/format.ts'
-import { computeMetrics, periodsConsecutive } from '../lib/metrics.ts'
+import { metricsOf, numeric, periodsConsecutive } from '../lib/metrics.ts'
 
 interface Props {
     periods: FiscalPeriod[]
 }
 const { periods } = Astro.props
 const [p, prior] = periods
-const m = computeMetrics(p, prior)
-const mPrior = prior ? computeMetrics(prior, periods[2]) : undefined
+const m = metricsOf(p)
+const mPrior = prior ? metricsOf(prior) : undefined
 
-const delta = (a: Value, b: Value | undefined, kind: 'pct' | 'pp'): { text: string; up: boolean } | null => {
-    if (!b || !periodsConsecutive(p, prior)) return null
-    if (kind === 'pct') {
-        if (a.status !== 'reported' || b.status !== 'reported' || m.revenueGrowth.status !== 'derived') return null
-        const d = (a.value / b.value - 1) * 100
-        return { text: `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} %`, up: d >= 0 }
-    }
-    if (a.status !== 'derived' || b.status !== 'derived') return null
-    const d = (a.value - b.value) * 100
-    return { text: `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} p.e.`, up: d >= 0 }
+const fmt = (d: number, unit: string) => ({ text: `${d >= 0 ? '+' : '−'}${Math.abs(d).toLocaleString('sv-SE', { maximumFractionDigits: 1, minimumFractionDigits: 1 })} ${unit}`, up: d >= 0 })
+// Sales change is the CV's omsättningstillväxt; ratio changes need the directly preceding year.
+const growth = (g: Value): { text: string; up: boolean } | null => {
+    const d = numeric(g)
+    return d === undefined ? null : fmt(d * 100, '%')
 }
-const cells: { label: string; d: Display; delta: ReturnType<typeof delta> }[] = [
-    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), delta: delta(p.income.netSales, prior?.income.netSales, 'pct') },
+const ppDelta = (a: Value, b: Value | undefined): { text: string; up: boolean } | null => {
+    const x = numeric(a)
+    const y = numeric(b)
+    if (x === undefined || y === undefined || !periodsConsecutive(p, prior)) return null
+    return fmt((x - y) * 100, 'p.e.')
+}
+const cells: { label: string; d: Display; delta: ReturnType<typeof growth> }[] = [
+    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), delta: growth(m.revenueGrowth) },
     { label: 'Rörelseresultat', d: compactSek(p.income.operatingProfit), delta: null },
     { label: 'Årets resultat', d: compactSek(p.income.netProfit), delta: null },
-    { label: 'Soliditet', d: percent(m.equityRatio), delta: delta(m.equityRatio, mPrior?.equityRatio, 'pp') },
+    { label: 'Soliditet', d: percent(m.equityRatio), delta: ppDelta(m.equityRatio, mPrior?.equityRatio) },
     { label: 'Kassalikviditet', d: percent(m.quickRatio, 0), delta: null },
     { label: 'Anställda', d: count(p.employees), delta: null },
 ]

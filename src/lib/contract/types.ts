@@ -1,13 +1,15 @@
-// Swedish company-data contract, schema version 1.
+// Swedish company-data contract, schema version 2.
 //
 // One CompanyRecord per organisationsnummer. Every figure is a Value: it is
 // either reported by a named source, derived by a named formula from other
 // values, or explicitly absent with a reason. Absence is never encoded as 0.
+// The statement items and key ratios are the rows of the Valuatum company
+// view (CV) pages; the comment on each field names its CV variable.
 // See docs/DATA-CONTRACT.md for field semantics and the import rules.
 
 import type { Orgnr } from '../orgnr.ts'
 
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 // ---------------------------------------------------------------- sources
 
@@ -55,7 +57,7 @@ export interface ReportedValue<T> {
 export interface DerivedValue {
     status: 'derived'
     value: number
-    /** Formula id from src/lib/metrics.ts, e.g. "soliditet.v1". */
+    /** What the value was computed with, e.g. "median" for an industry median. */
     formula: string
     /** Field paths the value was computed from. */
     inputs: string[]
@@ -124,26 +126,61 @@ export type Currency = 'SEK' | 'EUR'
 
 export type AccountingFramework = 'K2' | 'K3' | 'IFRS' | 'unknown'
 
-/** Amounts are in whole currency units (kronor), not thousands. */
+/**
+ * Amounts are in whole currency units (kronor), not thousands, with the sign
+ * the source gives them: costs and other deductions are negative.
+ */
 export interface IncomeStatement {
-    netSales: Value // Nettoomsättning
-    operatingProfit: Value // Rörelseresultat
-    financialNet: Value // Finansnetto
-    profitAfterFinancialItems: Value // Resultat efter finansiella poster
-    netProfit: Value // Årets resultat
-    personnelCosts: Value // Personalkostnader
+    netSales: Value // ns
+    personnelCosts: Value // cr_employee_expenses
+    operatingProfit: Value // ebit
+    incomeFromGroupCompanies: Value // cr_income_from_group_members
+    incomeFromAssociates: Value // cr_income_from_associates
+    incomeFromOtherFinancialAssets: Value // cr_income_from_non_current_investments
+    interestIncome: Value // cr_interest_income
+    otherFinancialIncome: Value // cr_other_financial_income
+    financialAssetWriteDowns: Value // cr_amortization_financial_assets
+    interestExpenses: Value // cr_interest_expenses
+    otherFinancialExpenses: Value // cr_other_financial_expenses
+    profitAfterFinancialItems: Value // cr_pre_tax_profit_less_eo
+    changeInAcceleratedDepreciation: Value // cr_change_in_accelerated_depreciations
+    changeInUntaxedReserves: Value // cr_change_in_untaxed_reserves
+    groupContributions: Value // cr_group_contributions
+    incomeTaxes: Value // cr_income_taxes
+    minorityShareOfProfit: Value // cr_minorities
+    netProfit: Value // cr_net_earnings
 }
 
 export interface BalanceSheet {
-    totalAssets: Value // Summa tillgångar
-    equity: Value // Eget kapital
-    untaxedReserves: Value // Obeskattade reserver
-    inventories: Value // Varulager
-    cash: Value // Kassa och bank
-    currentAssets: Value // Summa omsättningstillgångar
-    currentLiabilities: Value // Kortfristiga skulder
-    longTermLiabilities: Value // Långfristiga skulder
+    intangibleAssets: Value // cr_intangible_assets_total
+    tangibleAssets: Value // cr_tangibles_assets_total
+    financialAssets: Value // cr_investments_total
+    deferredTaxAssets: Value // cr_long_term_receivables_total
+    inventories: Value // cr_current_assets_total
+    shortTermReceivables: Value // cr_short_term_receivables_total
+    shortTermInvestments: Value // cr_cash_equivalents_total
+    cash: Value // cr_cash_and_bank_deposits
+    totalAssets: Value // bs_total_assets
+    equity: Value // cr_shareholders_equity
+    minorityInterest: Value // minorities
+    untaxedReserves: Value // cr_appropriations_total
+    provisions: Value // cr_provisions
+    longTermLiabilities: Value // cr_non_current_liabilities_total
+    currentLiabilities: Value // cr_current_liabilities_total
+    totalEquityAndLiabilities: Value // bs_total_liab
 }
+
+/** Key ratios as fractions (0.25 = 25 %); kassalikviditet is a ratio (1.5 = 150 %). */
+export interface KeyRatios {
+    revenueGrowth: Value // ns_growth
+    operatingMargin: Value // ebit_percent
+    profitMargin: Value // cr_pre_tax_profit_less_eo_percent
+    equityRatio: Value // cr_equity_ratio
+    quickRatio: Value // cr_quick_ratio
+    returnOnEquity: Value // cr_roe_percent_corrected
+}
+
+export type RatioKey = keyof KeyRatios
 
 export interface FiscalPeriod {
     /** ISO dates, inclusive. */
@@ -159,7 +196,8 @@ export interface FiscalPeriod {
     source: SourceRef
     income: IncomeStatement
     balance: BalanceSheet
-    employees: Value // Medelantal anställda
+    ratios: KeyRatios
+    employees: Value // cr_employees_adjusted
 }
 
 /** Output of a credit model. Displayed only when validated for Sweden. */
