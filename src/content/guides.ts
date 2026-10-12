@@ -28,7 +28,7 @@ export const GUIDES: Guide[] = [
             { h: 'Noter och revisionsberättelse' },
             { p: 'Noterna förklarar posterna och redovisningsprinciperna. Mindre aktiebolag kan sakna revisor; har bolaget en revisor finns revisionsberättelsen sist. En revisionsberättelse med anmärkning är värd att läsa noga.' },
             { h: 'K2 och K3' },
-            { p: 'Mindre företag följer ofta det förenklade regelverket K2, som ger en kortare årsredovisning med färre poster. Därför saknas vissa uppgifter för små bolag, och därför skriver vi «saknas» i stället för att gissa.' },
+            { p: 'Mindre företag följer ofta det förenklade regelverket K2, som ger en kortare årsredovisning med färre poster. Därför visas färre rader för små bolag: en post som inte finns i bokslutet är 0, och rader som är 0 alla år visas inte.' },
             { src: 'Källa: Bolagsverket, bolagsverket.se, om årsredovisning för aktiebolag.' },
         ],
     },

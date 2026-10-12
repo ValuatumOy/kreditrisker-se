@@ -8,7 +8,7 @@ import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { BALANCE_VARS, mapBundle } from '../src/lib/valuatum/map.ts'
+import { BALANCE_VARS, INCOME_VARS, mapBundle, RATIO_VARS } from '../src/lib/valuatum/map.ts'
 import { batchMode, readParams, selectBatch } from '../src/lib/valuatum/params.ts'
 import { recentlyUpdated, type IndexRow } from '../src/lib/publish.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
@@ -35,22 +35,25 @@ test('maps a REST bundle to a valid record', () => {
     assert.deepEqual(p24.income.netSales, { status: 'reported', value: 5_902_461_000, source: r.status.source })
     assert.ok(p24.income.personnelCosts.status === 'reported' && p24.income.personnelCosts.value < 0, 'costs keep the negative sign of the source')
     assert.deepEqual(p24.balance.untaxedReserves, { status: 'reported', value: 0, source: r.status.source }, 'the backend stores no zeros: absent reserves next to a balance sheet are 0')
-    assert.deepEqual(p24.income.profitAfterFinancialItems, { status: 'missing', reason: 'not_in_source' }, 'other absent items stay missing')
+    assert.equal(numeric(p24.income.profitAfterFinancialItems), 0, 'so is every other absent item')
     assert.equal(p24.months, 12)
 })
 
-test('absent reserves and inventories are 0 only for periods with a balance sheet', () => {
+test('absent items are 0 in every period that has data; absent ratios stay missing', () => {
     const b = bundle()
     delete b.modeldata.dataMap['2024'][BALANCE_VARS.inventories]
-    const row = b.modeldata.dataMap['2023']
-    for (const k of Object.keys(row)) if (k.startsWith('bs_') || k === BALANCE_VARS.inventories) delete row[k]
+    delete b.modeldata.dataMap['2024'][INCOME_VARS.netSales]
+    delete b.modeldata.dataMap['2024'][RATIO_VARS.equityRatio]
+    const row22 = b.modeldata.dataMap['2022']
+    for (const name of Object.values(INCOME_VARS)) delete row22[name]
     const res = mapBundle(b, opts)
     assert.ok(res.ok)
-    const [, p24, p23] = res.record.periods
+    const [, p24, , p22] = res.record.periods
     assert.equal(numeric(p24.balance.inventories), 0)
-    assert.equal(p23.end, '2023-12-31')
-    assert.deepEqual(p23.balance.inventories, { status: 'missing', reason: 'not_in_source' })
-    assert.deepEqual(p23.balance.untaxedReserves, { status: 'missing', reason: 'not_in_source' })
+    assert.equal(numeric(p24.income.netSales), 0)
+    assert.deepEqual(p24.ratios.equityRatio, { status: 'missing', reason: 'not_in_source' })
+    assert.equal(p22.end, '2022-12-31')
+    assert.equal(numeric(p22.income.netProfit), 0, 'a balance-only year has a zero income statement, as on the CV page')
 })
 
 test('rejects bundles that are not Swedish companies', () => {
@@ -78,7 +81,7 @@ test('real Swedish sample: fiscal dates, SEK units and the CV ratios', () => {
     assert.equal(percent(m.equityRatio).text, '45,6 %')
     assert.equal(percent(m.quickRatio, 0).text, '213 %')
     assert.equal(numeric(prior.income.netSales), 353_606_490)
-    assert.deepEqual(p.balance.longTermLiabilities, { status: 'missing', reason: 'not_in_source' })
+    assert.equal(numeric(p.balance.longTermLiabilities), 0, 'absent from the balance sheet, so 0 as on the CV page')
     const p21 = res.record.periods.find((p) => p.end === '2022-06-30')!
     assert.equal(numeric(p21.income.profitAfterFinancialItems), 20_872_689)
 })
@@ -89,7 +92,7 @@ test('after-financial-items result never falls back to a result after appropriat
     delete b.modeldata.dataMap['2025'].cr_pre_tax_profit_less_eo
     const res = mapBundle(b, opts)
     assert.ok(res.ok)
-    assert.deepEqual(res.record.periods[0].income.profitAfterFinancialItems, { status: 'missing', reason: 'not_in_source' })
+    assert.equal(numeric(res.record.periods[0].income.profitAfterFinancialItems), 0, 'absent, so 0, never the result after appropriations')
     assert.equal(metricsOf(res.record.periods[0]).profitMargin.status, 'missing')
 })
 

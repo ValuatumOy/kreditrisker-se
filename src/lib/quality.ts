@@ -9,11 +9,12 @@
 //   2. registration status is known
 //   3. a primary SNI code is present
 //   4. at least one fiscal period exists and the newest is not stale
-//   5. the newest period reports at least MIN_CORE_ITEMS of the CORE_ITEMS
+//   5. the newest period reports at least MIN_CORE_ITEMS of the CORE_ITEMS as
+//      non-zero values (the backend stores no zeros, so a 0 is an absent item)
 // Everything else gets <meta name="robots" content="noindex,follow"> and is
 // left out of the sitemaps. The global INDEXING flag overrides to noindex.
 
-import type { CompanyRecord, Freshness, QualityVerdict } from './contract/types.ts'
+import type { CompanyRecord, Freshness, QualityVerdict, Value } from './contract/types.ts'
 
 export const CORE_ITEMS = [
     ['income', 'netSales'],
@@ -32,8 +33,8 @@ export function coreItemsReported(record: CompanyRecord): number {
     if (!p) return 0
     let n = 0
     for (const [group, key] of CORE_ITEMS) {
-        const v = group === 'employees' ? p.employees : (p[group] as unknown as Record<string, { status: string }>)[key]
-        if (v?.status === 'reported') n++
+        const v = group === 'employees' ? p.employees : (p[group] as unknown as Record<string, Value>)[key]
+        if (v?.status === 'reported' && v.value !== 0) n++
     }
     return n
 }

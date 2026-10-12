@@ -153,14 +153,14 @@ The table shows the subtotals and every row between them that a Bolagsverket lin
 rule can fill, so the rows add up (checked for all 56 cached companies, 204 years).
 CV rows that no Swedish linking rule fills (leasing interest, exchange differences,
 extraordinary items, discontinued operations …) are left out because they are always
-empty. A row with no value in any shown year is hidden, as on the CV pages; the
-subtotals, inventories, untaxed reserves and the liability totals always show.
+empty. A row that is 0 or missing in every shown year is hidden, as on the CV pages;
+the subtotals, inventories, untaxed reserves and the liability totals always show.
 
 Amounts arrive in millions and are stored in kronor with the source's sign (costs
 negative). The key ratios are taken as they are; the site computes none of them, and
 the formulas on `/metod/` describe the CV definitions (sweden-db `DYNAMICVARIABLE`).
-Absent variables become `missing` (`not_in_source`), except absent inventories and
-untaxed reserves next to a balance sheet, which are 0 (the backend stores no zeros).
+The backend stores no zeros, so a statement item absent from a period is 0, as on the CV
+pages. Only key ratios the source leaves out are `missing` (`not_in_source`).
 Period length and end come from `cr_fiscal_period_length` and `cr_fiscal_year_end`
 (e.g. 20250430, so broken fiscal years are right).
 
@@ -189,8 +189,7 @@ Missing municipality data does not block company indexing or rankings. The compa
 is simply absent from municipality hubs. SNI `0000` is left unclassified; those
 profiles are generated but remain below the current index threshold.
 
-Missing API values stay `saknas`: an absent variable does not prove that the
-annual report reported zero or omitted the item. Year-over-year ratio changes in the
+Year-over-year ratio changes in the
 key-figure cards are shown only between consecutive fiscal periods, and the growth
 ranking only compares two consecutive 12-month years.
 
@@ -217,8 +216,6 @@ Follow-up data checks:
   ongoing procedure; `LOPETTAMISSYY` is not displayed on the profile.
 - The unsupported 2017 taxonomy must be handled in the upstream importer. Do not
   treat a missing imported year as zero or compare across that gap as annual growth.
-- Confirm whether an absent balance-sheet line is a reported zero before changing
-  its display. Missing long-term liabilities in this sample are still `saknas`.
 - Accounting framework and filing date remain unavailable. Fiscal-period dates,
   Swedish SNI labels, registration date, legal form and active status are mapped.
 
@@ -287,7 +284,8 @@ Checked in sweden-db (ASP 1, 64 models, all SEK):
 - The backend never stores zero values (none among the 137,588 CURRENTDATA rows), and every
   model balance sheet balances. An absent `cr_appropriations_total` or inventory value in a
   period with a balance sheet is therefore 0, and the mapper reports it as 0. Soliditet and
-  kassalikviditet now show for these companies.
+  kassalikviditet now show for these companies. Since the CV variable change, every absent
+  statement item of a period is 0, as the CV pages show it.
 - Missing net sales are correct. Luni Metall and Vännäs Plåt file abbreviated income statements
   without a `Nettoomsattning` fact; their bruttoresultat is in other operating income. Aros Städ,
   Restaurang Zhang Kungshallen and EC Intressenter have no sales.
