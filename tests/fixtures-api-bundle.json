@@ -1,5 +1,5 @@
 {
- "cacheVersion": 2,
+ "cacheVersion": 3,
  "fid": "900001",
  "retrievedAt": "2026-10-02",
  "modeldata": {
@@ -65,7 +65,7 @@
     "cr_current_liabilities_total": 1077.738,
     "cr_fiscal_period_length": 12.0,
     "cr_current_assets_total": 1292.362,
-    "cr_employee_expenses": -1170.298,
+    "cr_wages_and_salaries": -1170.298,
     "cr_interest_income": 19.186,
     "cr_employees_adjusted": 2163.0,
     "ns_growth": -0.00393617,
@@ -86,7 +86,7 @@
     "cr_current_liabilities_total": 1371.277,
     "cr_fiscal_period_length": 12.0,
     "cr_current_assets_total": 1382.014,
-    "cr_employee_expenses": -1391.195,
+    "cr_wages_and_salaries": -1391.195,
     "cr_interest_income": 24.203,
     "cr_employees_adjusted": 2271.0,
     "ns_growth": 0.10442474,

@@ -11,7 +11,7 @@ test('a raw 0 in place of a Value is rejected (missing must never be zero)', () 
     const bad = byName(batch2(), 'Exempel Nolla')
     const res = validateRecord(bad)
     assert.equal(res.ok, false)
-    assert.ok(res.errors.some((e) => e.includes('personnelCosts') && e.includes('never omit or 0')))
+    assert.ok(res.errors.some((e) => e.includes('wagesAndSalaries') && e.includes('never omit or 0')))
 })
 
 test('omitted fields are rejected, explicit missing is accepted', () => {

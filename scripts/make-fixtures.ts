@@ -7,7 +7,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { luhnCheckDigit } from '../src/lib/orgnr.ts'
-import type { CompanyRecord, FiscalPeriod, MissingReason, SourceRef, Value } from '../src/lib/contract/types.ts'
+import { BALANCE_FIELDS, INCOME_FIELDS, SCHEMA_VERSION, type CompanyRecord, type FiscalPeriod, type MissingReason, type SourceRef, type Value } from '../src/lib/contract/types.ts'
 
 const SRC: SourceRef = { source: 'synthetic', retrievedAt: '2026-09-01' }
 const orgnr = (n: number) => {
@@ -16,6 +16,7 @@ const orgnr = (n: number) => {
 }
 const v = (n: number): Value => ({ status: 'reported', value: Math.round(n), source: SRC })
 const miss = (reason: MissingReason = 'not_in_source'): Value => ({ status: 'missing', reason })
+const none = <K extends string>(keys: readonly K[]) => Object.fromEntries(keys.map((k) => [k, miss()])) as Record<K, Value>
 
 interface Fig {
     year: number
@@ -68,39 +69,25 @@ function period(f: Fig): FiscalPeriod {
         filedAt: new Date(Date.UTC(endD.getUTCFullYear(), endD.getUTCMonth() + 5, 15)).toISOString().slice(0, 10),
         source: { ...SRC, documentId: `SYN-${f.year}` },
         income: {
+            ...none(INCOME_FIELDS),
             netSales: o.has('sales') ? miss() : v(f.sales),
-            personnelCosts: val('staff', -(f.staff ?? (f.emp ? f.emp * 560_000 : 0))),
+            wagesAndSalaries: val('staff', -(f.staff ?? (f.emp ? f.emp * 560_000 : 0))),
             operatingProfit: val('ebit', f.ebit),
-            incomeFromGroupCompanies: miss(),
-            incomeFromAssociates: miss(),
-            incomeFromOtherFinancialAssets: miss(),
             interestIncome: val('fin', fin > 0 ? fin : undefined),
-            otherFinancialIncome: miss(),
-            financialAssetWriteDowns: miss(),
             interestExpenses: val('fin', fin < 0 ? fin : undefined),
-            otherFinancialExpenses: miss(),
             profitAfterFinancialItems: val('pafi', pafi),
-            changeInAcceleratedDepreciation: miss(),
-            changeInUntaxedReserves: miss(),
-            groupContributions: miss(),
             incomeTaxes: val('pafi', tax),
-            minorityShareOfProfit: miss(),
             netProfit: val('net', net),
         },
         balance: {
-            intangibleAssets: miss(),
+            ...none(BALANCE_FIELDS),
             tangibleAssets: val('ca', f.assets - ca),
-            financialAssets: miss(),
-            deferredTaxAssets: miss(),
             inventories: balanced('inv', inv),
             shortTermReceivables: val('ca', ca - inv - cash),
-            shortTermInvestments: miss(),
             cash: val('cash', cash),
             totalAssets: val('assets', f.assets),
             equity: val('equity', f.equity),
-            minorityInterest: miss(),
             untaxedReserves: balanced('ur', ur),
-            provisions: miss(),
             longTermLiabilities: val('ltl', f.ltl ?? Math.max(0, f.assets - f.equity - ur - cl)),
             currentLiabilities: val('cl', cl),
             totalEquityAndLiabilities: val('assets', f.assets),
@@ -166,7 +153,7 @@ function company(
 ): CompanyRecord {
     const { figs, ...rest } = extra
     return {
-        schemaVersion: 2,
+        schemaVersion: SCHEMA_VERSION,
         orgnr: orgnr(n) as CompanyRecord['orgnr'],
         synthetic: true,
         name,
@@ -354,7 +341,7 @@ const newCoOlder = structuredClone(newCo)
 newCoOlder.periods = newCoOlder.periods.slice(1)
 const badChecksum = { ...company(120, 'Exempel Felaktigt Orgnr AB', {}), orgnr: '0021234567' }
 const zeroForMissing = company(121, 'Exempel Nolla Istället AB', { municipality: KOMMUN.sthlm, sni: [SNI.software], figs: [{ year: 2025, sales: 1_000_000, ebit: 50_000, assets: 600_000, equity: 200_000, emp: 1 }] })
-;(zeroForMissing.periods[0].income as unknown as Record<string, unknown>).personnelCosts = 0 // raw 0 instead of a Value -> must be rejected
+;(zeroForMissing.periods[0].income as unknown as Record<string, unknown>).wagesAndSalaries = 0 // raw 0 instead of a Value -> must be rejected
 const hyphenated = { ...structuredClone(software), orgnr: software.orgnr.slice(0, 6) + '-' + software.orgnr.slice(6) }
 
 const batch2 = [byggUpdated, elRenamed, newCoOlder, newCo, badChecksum, zeroForMissing, hyphenated]

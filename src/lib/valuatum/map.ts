@@ -23,27 +23,44 @@ import type { Bundle } from './api.ts'
 /** modeldata amounts are in millions of the model currency. */
 const UNIT = 1e6
 
-// The statement items are rows of the company view (CV) tables in sweden-db:
+// The statement items are the rows of the company view (CV) tables in sweden-db:
 // income statement (CVSVTABLE 450), assets (447) and equity and liabilities (11638),
-// checked on 2026-10-12. Rows between the subtotals that no Bolagsverket linking rule
-// fills (leasing interest, exchange differences, extraordinary items ...) are left out:
-// they are always empty for Swedish companies, so the shown rows still add up.
-// The key ratios are the CV overview tables 442, 444 and 445 and personnel costs
-// and employees the volume table 17088.
+// checked on 2026-10-12. Left out are the rows that no Bolagsverket linking rule fills
+// and that are empty for every Swedish company (leasing, extraordinary items ...), the
+// sub-rows that repeat their parent (depreciation, loans from credit institutions), and
+// the rows that do not add up with the items above them: Bruttoresultat, whose content
+// depends on the report format, and the result after extraordinary items, which equals
+// the result after financial items. The "unspecified" items are the part of a Bolagsverket
+// subtotal the filing does not break down. In the income statement each subtotal is the
+// previous one plus the items between; associates' share of the result belongs above
+// EBITDA, although the CV lists it below depreciation.
+// The key ratios are the CV overview tables 442, 444 and 445 and employees the volume table 17088.
 
 /** Contract field -> REST variable name. */
 export const INCOME_VARS = {
     netSales: 'ns',
-    personnelCosts: 'cr_employee_expenses',
+    changeInInventories: 'cr_change_in_finished_goods_inv',
+    ownWorkCapitalised: 'cr_manufacturing_for_own_use',
+    otherOperatingIncome: 'cr_other_operating_income',
+    rawMaterialsAndGoods: 'cr_purchases_during_fy',
+    costOfGoodsSold: 'cr_costs_of_manufacturing',
+    sellingExpenses: 'cr_costs_of_marketing',
+    administrativeExpenses: 'cr_costs_of_management',
+    wagesAndSalaries: 'cr_wages_and_salaries',
+    socialSecurityCosts: 'cr_social_security_expenses',
+    otherOperatingExpenses: 'cr_other_oper_expenses',
+    shareOfAssociatesResult: 'cr_net_income_from_associates',
+    ebitda: 'cr_ebitda',
+    depreciation: 'cr_depreciation',
     operatingProfit: 'ebit',
-    incomeFromGroupCompanies: 'cr_income_from_group_members',
-    incomeFromAssociates: 'cr_income_from_associates',
-    incomeFromOtherFinancialAssets: 'cr_income_from_non_current_investments',
     interestIncome: 'cr_interest_income',
     otherFinancialIncome: 'cr_other_financial_income',
-    financialAssetWriteDowns: 'cr_amortization_financial_assets',
     interestExpenses: 'cr_interest_expenses',
     otherFinancialExpenses: 'cr_other_financial_expenses',
+    incomeFromOtherFinancialAssets: 'cr_income_from_non_current_investments',
+    incomeFromGroupCompanies: 'cr_income_from_group_members',
+    incomeFromAssociates: 'cr_income_from_associates',
+    financialAssetWriteDowns: 'cr_amortization_financial_assets',
     // Before the extraordinary items, which Swedish annual reports no longer have.
     profitAfterFinancialItems: 'cr_pre_tax_profit_less_eo',
     changeInAcceleratedDepreciation: 'cr_change_in_accelerated_depreciations',
@@ -55,22 +72,90 @@ export const INCOME_VARS = {
 } as const satisfies Record<keyof IncomeStatement, string>
 
 export const BALANCE_VARS = {
+    developmentExpenditure: 'cr_development_expenditure',
+    intangibleRights: 'cr_intangible_rights',
+    goodwill: 'cr_goodwill',
+    otherIntangibleAssets: 'cr_other_capitalised_lt_expen',
+    intangibleAdvancePayments: 'cr_advance_payments_lt',
+    intangibleAssetsUnspecified: 'cr_input_intangible_assets_total',
     intangibleAssets: 'cr_intangible_assets_total',
+    buildingsAndLand: 'cr_buildings',
+    machineryAndEquipment: 'cr_machinery_and_equipment',
+    constructionInProgress: 'cr_advance_payments_and_cons_in_prog',
+    otherTangibleAssets: 'cr_other_tangible_assets',
+    tangibleAssetsUnspecified: 'cr_input_tangibles_assets_total',
     tangibleAssets: 'cr_tangibles_assets_total',
+    sharesInGroupCompanies: 'cr_holdings_in_group_companies',
+    sharesInAssociates: 'cr_participating_interests',
+    otherShareholdings: 'cr_other_shares_and_ownership',
+    receivablesFromGroupCompaniesLongTerm: 'cr_receivables_from_group_member',
+    receivablesFromAssociatesLongTerm: 'cr_receivables_from_participating',
+    otherLongTermSecurities: 'cr_other_non_curr_investments',
+    otherLongTermReceivables: 'cr_other_receivables',
+    financialAssetsUnspecified: 'cr_input_investments_total',
     financialAssets: 'cr_investments_total',
     // Of the CV's long-term receivables only the deferred tax asset is linked for Sweden.
-    deferredTaxAssets: 'cr_long_term_receivables_total',
+    deferredTaxAssets: 'cr_lt_tax_assets',
+    longTermReceivablesUnspecified: 'cr_input_long_term_receivables_total',
+    longTermReceivables: 'cr_long_term_receivables_total',
+    rawMaterials: 'cr_raw_materials',
+    workInProgress: 'cr_semifinished_products',
+    otherInventories: 'cr_other_stocks',
+    finishedGoods: 'cr_finished_goods',
+    advancesToSuppliers: 'cr_advance_payments',
+    inventoriesUnspecified: 'cr_input_current_assets_total',
     // "Inventories total" in the CV, Bolagsverket's Varulager m.m.
     inventories: 'cr_current_assets_total',
+    tradeReceivables: 'cr_curr_trade_debtors',
+    receivablesFromGroupCompanies: 'cr_curr_owed_by_group_member',
+    receivablesFromAssociates: 'cr_curr_owed_by_participating',
+    unpaidShareCapital: 'cr_current_unpaid_shares',
+    prepaidExpenses: 'cr_curr_prepayments_and_accured_inc',
+    otherReceivables: 'cr_curr_other_receivables',
+    shortTermReceivablesUnspecified: 'cr_input_short_term_receivables_total',
     shortTermReceivables: 'cr_short_term_receivables_total',
+    otherShortTermInvestments: 'cr_other_curr_investments',
+    shortTermSharesInGroupCompanies: 'cr_holdings_in_group_member',
+    shortTermInvestmentsUnspecified: 'cr_input_cash_equivalents_total',
     shortTermInvestments: 'cr_cash_equivalents_total',
     cash: 'cr_cash_and_bank_deposits',
     totalAssets: 'bs_total_assets',
+    shareCapital: 'share_cap',
+    sharePremiumReserve: 'cr_share_premium_account',
+    revaluationReserve: 'asset_revaluation_res',
+    fairValueReserve: 'cr_fair_value_reserve',
+    statutoryReserve: 'cr_legal_reserve',
+    otherReserves: 'cr_other_reserves',
+    unregisteredShareCapital: 'cr_other_restricted_equity',
+    // The rest of the equity the filing does not break down.
+    otherEquity: 'cr_other_equity',
+    retainedEarnings: 'cr_retained_earnings',
+    profitForTheYear: 'cr_profit_for_fy',
+    // cr_shareholders_equity leaves out the minority interest, which the CV lists above it.
     equity: 'cr_shareholders_equity',
     minorityInterest: 'minorities',
+    accumulatedAcceleratedDepreciation: 'cr_cumulative_accelerated_depreciations',
+    taxAllocationReserves: 'cr_untaxed_reserves',
+    untaxedReservesUnspecified: 'cr_input_appropriations_total',
     untaxedReserves: 'cr_appropriations_total',
     provisions: 'cr_provisions',
+    bondLoans: 'cr_non_current_bonds',
+    liabilitiesToCreditInstitutions: 'cr_non_current_loans_from_credit_total',
+    liabilitiesToGroupCompaniesLongTerm: 'cr_non_current_owed_to_group_member',
+    liabilitiesToAssociatesLongTerm: 'cr_non_current_owed_to_participating',
+    otherLongTermLiabilities: 'cr_non_current_other_liabilities',
+    longTermLiabilitiesUnspecified: 'cr_input_non_current_liabilities_total',
     longTermLiabilities: 'cr_non_current_liabilities_total',
+    shortTermBondLoans: 'cr_current_bonds',
+    shortTermLiabilitiesToCreditInstitutions: 'cr_current_loans_from_credit_total',
+    advancesFromCustomers: 'cr_current_advances_received',
+    tradePayables: 'cr_current_trade_creditors',
+    billsOfExchange: 'cr_bills_of_exhange',
+    liabilitiesToAssociates: 'cr_current_owed_to_participating',
+    liabilitiesToGroupCompanies: 'cr_current_owed_to_group_member',
+    otherCurrentLiabilities: 'cr_other_current_creditors',
+    accruedExpenses: 'cr_current_accruals_and_deferred_income',
+    currentLiabilitiesUnspecified: 'cr_input_current_liabilities_total',
     currentLiabilities: 'cr_current_liabilities_total',
     totalEquityAndLiabilities: 'bs_total_liab',
 } as const satisfies Record<keyof BalanceSheet, string>

@@ -8,7 +8,7 @@ import { BALANCE_ROWS, INCOME_ROWS } from '../src/config/statement.ts'
 import { BALANCE_VARS, INCOME_VARS, mapBundle, RATIO_VARS } from '../src/lib/valuatum/map.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
 import type { FiscalPeriod } from '../src/lib/contract/types.ts'
-import { batch1, byName } from './helpers.ts'
+import { batch1, byName, statementGaps } from './helpers.ts'
 
 const sample = (): Bundle => JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'data', 'sample', 'api-cache', '52.json'), 'utf8'))
 const samplePeriods = () => {
@@ -31,22 +31,8 @@ test('every Bokslut row has a CV variable and every statement field a row', () =
     assert.deepEqual(BALANCE_ROWS.map((r) => r.key).sort(), Object.keys(BALANCE_VARS).sort())
 })
 
-// The rows between two subtotals must add up to the second one, so a reader can follow the table.
 test('real sample: the Bokslut rows add up to their subtotals', () => {
-    const sum = (p: FiscalPeriod, keys: string[], side: 'income' | 'balance') =>
-        keys.reduce((a, k) => a + (numeric((p[side] as unknown as Record<string, never>)[k]) ?? 0), 0)
-    const between = (rows: { key: string }[], from: string, to: string) => rows.slice(rows.findIndex((r) => r.key === from) + 1, rows.findIndex((r) => r.key === to)).map((r) => r.key)
-    const close = (a: number, b: number, what: string) => assert.ok(Math.abs(a - b) <= 2, `${what}: ${a} vs ${b}`)
-    for (const p of samplePeriods()) {
-        const inc = (k: keyof FiscalPeriod['income']) => numeric(p.income[k]) ?? 0
-        const bal = (k: keyof FiscalPeriod['balance']) => numeric(p.balance[k]) ?? 0
-        if (p.income.operatingProfit.status === 'reported') {
-            close(inc('operatingProfit') + sum(p, between(INCOME_ROWS, 'operatingProfit', 'profitAfterFinancialItems'), 'income'), inc('profitAfterFinancialItems'), `${p.end} financial items`)
-            close(inc('profitAfterFinancialItems') + sum(p, between(INCOME_ROWS, 'profitAfterFinancialItems', 'netProfit'), 'income'), inc('netProfit'), `${p.end} below the line`)
-        }
-        close(sum(p, between(BALANCE_ROWS, 'intangibleAssets', 'totalAssets').concat('intangibleAssets'), 'balance'), bal('totalAssets'), `${p.end} assets`)
-        close(sum(p, between(BALANCE_ROWS, 'totalAssets', 'totalEquityAndLiabilities'), 'balance'), bal('totalEquityAndLiabilities'), `${p.end} equity and liabilities`)
-    }
+    for (const p of samplePeriods()) assert.deepEqual(statementGaps(p), [])
 })
 
 test('sparse data: missing ratios show as saknas, never zero', () => {
@@ -65,6 +51,12 @@ test('zero net sales: shown as 0 kr', () => {
     assert.equal(compactSek(p.income.netSales).text, '0 kr')
     assert.equal(compactSek(p.income.netSales).state, 'zero')
     assert.equal(metricsOf(p).operatingMargin.status, 'missing')
+})
+
+test('an amount that rounds to 0 tkr prints 0, not −0', () => {
+    const src = { source: 'synthetic' as const, retrievedAt: '2026-10-12' }
+    assert.deepEqual(tkr({ status: 'reported', value: -400, source: src }), { text: '0', state: 'zero' })
+    assert.equal(tkr({ status: 'reported', value: -600, source: src }).text, '−1')
 })
 
 test('negative equity: soliditet negative', () => {

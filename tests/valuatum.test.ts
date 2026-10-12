@@ -33,7 +33,7 @@ test('maps a REST bundle to a valid record', () => {
     assert.deepEqual(r.periods.map((p) => p.end), ['2025-12-31', '2024-12-31', '2023-12-31', '2022-12-31', '2021-12-31', '2020-12-31'])
     const p24 = r.periods[1]
     assert.deepEqual(p24.income.netSales, { status: 'reported', value: 5_902_461_000, source: r.status.source })
-    assert.ok(p24.income.personnelCosts.status === 'reported' && p24.income.personnelCosts.value < 0, 'costs keep the negative sign of the source')
+    assert.ok(p24.income.wagesAndSalaries.status === 'reported' && p24.income.wagesAndSalaries.value < 0, 'costs keep the negative sign of the source')
     assert.deepEqual(p24.balance.untaxedReserves, { status: 'reported', value: 0, source: r.status.source }, 'the backend stores no zeros: absent reserves next to a balance sheet are 0')
     assert.equal(numeric(p24.income.profitAfterFinancialItems), 0, 'so is every other absent item')
     assert.equal(p24.months, 12)

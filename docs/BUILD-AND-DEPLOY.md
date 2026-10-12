@@ -138,23 +138,40 @@ the full directory set `PUBLIC_SE_SEARCH_ENDPOINT` to a search API returning
 
 The Bokslut table and the key ratios use the variables of the Valuatum company
 view (CV) pages in sweden-db, so the site, the CV pages and the credit reports show
-the same figures. The variable names are in `src/lib/valuatum/map.ts` (one comment
-per contract field in `src/lib/contract/types.ts`), the row order and Swedish labels
-in `src/config/statement.ts`. The source tables:
+the same figures. The variable of each contract field is in `src/lib/valuatum/map.ts`,
+the row order, subtotals and Swedish labels in `src/config/statement.ts`. The source tables:
 
 | Section | CV table (CVSVTABLE) |
 |---|---|
 | Resultaträkning | 450 `income_statement_with_currency` |
 | Balansräkning, tillgångar | 447 `assets` |
 | Balansräkning, eget kapital och skulder | 11638 `equity_and_liabilities` |
-| Nyckeltal | 442 `cr_profitability`, 444 `cr_solvency`, 445 `cr_liquidity`; growth, personnel costs and employees from 17088 `cr_volume` |
+| Nyckeltal | 442 `cr_profitability`, 444 `cr_solvency`, 445 `cr_liquidity`; growth and employees from 17088 `cr_volume` |
 
-The table shows the subtotals and every row between them that a Bolagsverket linking
-rule can fill, so the rows add up (checked for all 56 cached companies, 204 years).
-CV rows that no Swedish linking rule fills (leasing interest, exchange differences,
-extraordinary items, discontinued operations …) are left out because they are always
-empty. A row that is 0 or missing in every shown year is hidden, as on the CV pages;
-the subtotals, inventories, untaxed reserves and the liability totals always show.
+The table shows every CV row that a Bolagsverket linking rule can fill, in CV order, with
+the CV subtotals in bold and their items indented. The rows add up (checked for all 56
+cached companies, 204 years; `statementGaps` in `tests/helpers.ts`). Left out are:
+
+- CV rows that no Swedish linking rule fills (leasing, exchange differences,
+  extraordinary items, discontinued operations …); they are always empty.
+- Sub-rows that repeat their parent: the depreciation breakdown, and the loans from
+  credit institutions under their total. Also `cr_cash_and_cash_eq_total` (= Kassa och
+  bank), `cr_pre_tax_profit` (= the result after financial items) and
+  `bs_additional_cash_result`, which the REST API does not return.
+- Bruttoresultat (`cr_gross_profit`): in function-format reports (Kostnad för sålda
+  varor) it leaves out the other operating income that the CV lists above it, and in 13
+  of 214 company-years it matches none of the rows above it.
+- The interest-bearing and non-interest-bearing liability analysis below the balance
+  sheet, and the owner/minority split of the year's result after it.
+
+Associates' share of the operating result (`cr_net_income_from_associates`) is listed
+above EBITDA: the CV shows it below depreciation, but EBITDA includes it. The
+"Övrigt, ej specificerat" rows (`cr_input_*`) are the part of a Bolagsverket subtotal
+the annual report does not break down.
+
+A row that shows 0 or is missing in every shown year is hidden, as on the CV pages;
+the four income-statement subtotals, inventories, total assets, equity, untaxed
+reserves and the liability totals always show.
 
 Amounts arrive in millions and are stored in kronor with the source's sign (costs
 negative). The key ratios are taken as they are; the site computes none of them, and

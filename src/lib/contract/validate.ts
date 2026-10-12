@@ -3,7 +3,7 @@
 
 import { parseOrgnr } from '../orgnr.ts'
 import type { CompanyRecord } from './types.ts'
-import { SCHEMA_VERSION } from './types.ts'
+import { BALANCE_FIELDS, INCOME_FIELDS, SCHEMA_VERSION } from './types.ts'
 
 const SOURCES = new Set([
     'bolagsverket-foretagsinformation',
@@ -24,44 +24,6 @@ const INCOMPARABLE = new Set([
     'consolidation_change',
     'no_prior_period',
 ])
-const INCOME_FIELDS = [
-    'netSales',
-    'personnelCosts',
-    'operatingProfit',
-    'incomeFromGroupCompanies',
-    'incomeFromAssociates',
-    'incomeFromOtherFinancialAssets',
-    'interestIncome',
-    'otherFinancialIncome',
-    'financialAssetWriteDowns',
-    'interestExpenses',
-    'otherFinancialExpenses',
-    'profitAfterFinancialItems',
-    'changeInAcceleratedDepreciation',
-    'changeInUntaxedReserves',
-    'groupContributions',
-    'incomeTaxes',
-    'minorityShareOfProfit',
-    'netProfit',
-] as const
-const BALANCE_FIELDS = [
-    'intangibleAssets',
-    'tangibleAssets',
-    'financialAssets',
-    'deferredTaxAssets',
-    'inventories',
-    'shortTermReceivables',
-    'shortTermInvestments',
-    'cash',
-    'totalAssets',
-    'equity',
-    'minorityInterest',
-    'untaxedReserves',
-    'provisions',
-    'longTermLiabilities',
-    'currentLiabilities',
-    'totalEquityAndLiabilities',
-] as const
 const RATIO_FIELDS = ['revenueGrowth', 'operatingMargin', 'profitMargin', 'equityRatio', 'quickRatio', 'returnOnEquity'] as const
 // Items that cannot be negative in a correctly parsed statement.
 const NON_NEGATIVE = new Set(['totalAssets', 'inventories', 'cash', 'currentLiabilities', 'longTermLiabilities', 'untaxedReserves'])

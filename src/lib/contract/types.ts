@@ -9,7 +9,7 @@
 
 import type { Orgnr } from '../orgnr.ts'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 3
 
 // ---------------------------------------------------------------- sources
 
@@ -129,46 +129,128 @@ export type AccountingFramework = 'K2' | 'K3' | 'IFRS' | 'unknown'
 /**
  * Amounts are in whole currency units (kronor), not thousands, with the sign
  * the source gives them: costs and other deductions are negative.
+ * The items are the rows of the Valuatum company view (CV) statement tables;
+ * src/lib/valuatum/map.ts maps each to its CV variable.
  */
-export interface IncomeStatement {
-    netSales: Value // ns
-    personnelCosts: Value // cr_employee_expenses
-    operatingProfit: Value // ebit
-    incomeFromGroupCompanies: Value // cr_income_from_group_members
-    incomeFromAssociates: Value // cr_income_from_associates
-    incomeFromOtherFinancialAssets: Value // cr_income_from_non_current_investments
-    interestIncome: Value // cr_interest_income
-    otherFinancialIncome: Value // cr_other_financial_income
-    financialAssetWriteDowns: Value // cr_amortization_financial_assets
-    interestExpenses: Value // cr_interest_expenses
-    otherFinancialExpenses: Value // cr_other_financial_expenses
-    profitAfterFinancialItems: Value // cr_pre_tax_profit_less_eo
-    changeInAcceleratedDepreciation: Value // cr_change_in_accelerated_depreciations
-    changeInUntaxedReserves: Value // cr_change_in_untaxed_reserves
-    groupContributions: Value // cr_group_contributions
-    incomeTaxes: Value // cr_income_taxes
-    minorityShareOfProfit: Value // cr_minorities
-    netProfit: Value // cr_net_earnings
-}
+export const INCOME_FIELDS = [
+    'netSales',
+    'changeInInventories',
+    'ownWorkCapitalised',
+    'otherOperatingIncome',
+    'rawMaterialsAndGoods',
+    'costOfGoodsSold',
+    'sellingExpenses',
+    'administrativeExpenses',
+    'wagesAndSalaries',
+    'socialSecurityCosts',
+    'otherOperatingExpenses',
+    'shareOfAssociatesResult',
+    'ebitda',
+    'depreciation',
+    'operatingProfit',
+    'interestIncome',
+    'otherFinancialIncome',
+    'interestExpenses',
+    'otherFinancialExpenses',
+    'incomeFromOtherFinancialAssets',
+    'incomeFromGroupCompanies',
+    'incomeFromAssociates',
+    'financialAssetWriteDowns',
+    'profitAfterFinancialItems',
+    'changeInAcceleratedDepreciation',
+    'changeInUntaxedReserves',
+    'groupContributions',
+    'incomeTaxes',
+    'minorityShareOfProfit',
+    'netProfit',
+] as const
+export type IncomeStatement = Record<(typeof INCOME_FIELDS)[number], Value>
 
-export interface BalanceSheet {
-    intangibleAssets: Value // cr_intangible_assets_total
-    tangibleAssets: Value // cr_tangibles_assets_total
-    financialAssets: Value // cr_investments_total
-    deferredTaxAssets: Value // cr_long_term_receivables_total
-    inventories: Value // cr_current_assets_total
-    shortTermReceivables: Value // cr_short_term_receivables_total
-    shortTermInvestments: Value // cr_cash_equivalents_total
-    cash: Value // cr_cash_and_bank_deposits
-    totalAssets: Value // bs_total_assets
-    equity: Value // cr_shareholders_equity
-    minorityInterest: Value // minorities
-    untaxedReserves: Value // cr_appropriations_total
-    provisions: Value // cr_provisions
-    longTermLiabilities: Value // cr_non_current_liabilities_total
-    currentLiabilities: Value // cr_current_liabilities_total
-    totalEquityAndLiabilities: Value // bs_total_liab
-}
+export const BALANCE_FIELDS = [
+    'developmentExpenditure',
+    'intangibleRights',
+    'goodwill',
+    'otherIntangibleAssets',
+    'intangibleAdvancePayments',
+    'intangibleAssetsUnspecified',
+    'intangibleAssets',
+    'buildingsAndLand',
+    'machineryAndEquipment',
+    'constructionInProgress',
+    'otherTangibleAssets',
+    'tangibleAssetsUnspecified',
+    'tangibleAssets',
+    'sharesInGroupCompanies',
+    'sharesInAssociates',
+    'otherShareholdings',
+    'receivablesFromGroupCompaniesLongTerm',
+    'receivablesFromAssociatesLongTerm',
+    'otherLongTermSecurities',
+    'otherLongTermReceivables',
+    'financialAssetsUnspecified',
+    'financialAssets',
+    'deferredTaxAssets',
+    'longTermReceivablesUnspecified',
+    'longTermReceivables',
+    'rawMaterials',
+    'workInProgress',
+    'otherInventories',
+    'finishedGoods',
+    'advancesToSuppliers',
+    'inventoriesUnspecified',
+    'inventories',
+    'tradeReceivables',
+    'receivablesFromGroupCompanies',
+    'receivablesFromAssociates',
+    'unpaidShareCapital',
+    'prepaidExpenses',
+    'otherReceivables',
+    'shortTermReceivablesUnspecified',
+    'shortTermReceivables',
+    'otherShortTermInvestments',
+    'shortTermSharesInGroupCompanies',
+    'shortTermInvestmentsUnspecified',
+    'shortTermInvestments',
+    'cash',
+    'totalAssets',
+    'shareCapital',
+    'sharePremiumReserve',
+    'revaluationReserve',
+    'fairValueReserve',
+    'statutoryReserve',
+    'otherReserves',
+    'unregisteredShareCapital',
+    'otherEquity',
+    'retainedEarnings',
+    'profitForTheYear',
+    'equity',
+    'minorityInterest',
+    'accumulatedAcceleratedDepreciation',
+    'taxAllocationReserves',
+    'untaxedReservesUnspecified',
+    'untaxedReserves',
+    'provisions',
+    'bondLoans',
+    'liabilitiesToCreditInstitutions',
+    'liabilitiesToGroupCompaniesLongTerm',
+    'liabilitiesToAssociatesLongTerm',
+    'otherLongTermLiabilities',
+    'longTermLiabilitiesUnspecified',
+    'longTermLiabilities',
+    'shortTermBondLoans',
+    'shortTermLiabilitiesToCreditInstitutions',
+    'advancesFromCustomers',
+    'tradePayables',
+    'billsOfExchange',
+    'liabilitiesToAssociates',
+    'liabilitiesToGroupCompanies',
+    'otherCurrentLiabilities',
+    'accruedExpenses',
+    'currentLiabilitiesUnspecified',
+    'currentLiabilities',
+    'totalEquityAndLiabilities',
+] as const
+export type BalanceSheet = Record<(typeof BALANCE_FIELDS)[number], Value>
 
 /** Key ratios as fractions (0.25 = 25 %); kassalikviditet is a ratio (1.5 = 150 %). */
 export interface KeyRatios {
