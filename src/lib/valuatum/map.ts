@@ -27,8 +27,6 @@ const UNIT = 1e6
 export const VARS = {
     netSales: ['ns'],
     operatingProfit: ['ebit'],
-    // Only a fallback: this sum leaves out results from group and associated companies and
-    // write-downs of financial assets, which cr_pre_tax_profit includes. See financialNet below.
     financialNet: ['fundu_financial_income_and_expenses'],
     // pre_tax_profit is after bokslutsdispositioner, so it cannot substitute this line.
     profitAfterFinancialItems: ['cr_pre_tax_profit'],
@@ -126,14 +124,6 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             if (v === undefined) return { status: 'missing', reason: 'not_in_source' }
             return { status: 'reported', value: Math.round((opts.abs ? Math.abs(v) : v) * UNIT), source: src }
         }
-        // The model's profit after financial items is EBIT plus every financial item, so their
-        // difference is the whole Finansnetto and the income statement adds up in kronor.
-        const financialNet = (): Value => {
-            const ebit = amount(VARS.operatingProfit)
-            const ptp = amount(VARS.profitAfterFinancialItems)
-            if (ebit.status === 'reported' && ptp.status === 'reported') return { status: 'reported', value: ptp.value - ebit.value, source: src }
-            return amount(VARS.financialNet)
-        }
         if (get(VARS.netSales) === undefined && !hasBalanceSheet) continue
         const months = Math.round(get([PERIOD_MONTHS]) ?? 12)
         // Without an end date the year is assumed to end in December.
@@ -153,7 +143,7 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             income: {
                 netSales: amount(VARS.netSales),
                 operatingProfit: amount(VARS.operatingProfit),
-                financialNet: financialNet(),
+                financialNet: amount(VARS.financialNet),
                 profitAfterFinancialItems: amount(VARS.profitAfterFinancialItems),
                 netProfit: amount(VARS.netProfit),
                 personnelCosts: amount(VARS.personnelCosts, { abs: true }),

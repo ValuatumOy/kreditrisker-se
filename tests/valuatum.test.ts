@@ -39,18 +39,6 @@ test('maps a REST bundle to a valid record', () => {
     assert.equal(p24.months, 12)
 })
 
-test('Finansnetto is the whole gap between operating profit and profit after financial items', () => {
-    const b = bundle()
-    // Brightec Group 2024: 7.0 MSEK from group companies is outside fundu_financial_income_and_expenses.
-    Object.assign(b.modeldata.dataMap['2024'], { ebit: 1.581, fundu_financial_income_and_expenses: 0.006, cr_pre_tax_profit: 8.587 })
-    const res = mapBundle(b, opts)
-    assert.ok(res.ok)
-    const { income } = res.record.periods[1]
-    assert.deepEqual(income.financialNet, { status: 'reported', value: 7_006_000, source: res.record.status.source })
-    assert.equal(numeric(income.operatingProfit)! + numeric(income.financialNet)!, numeric(income.profitAfterFinancialItems))
-    assert.equal(numeric(res.record.periods[0].income.financialNet), 24_203_000, 'without profit after financial items the financial-items sum is used')
-})
-
 test('absent reserves and inventories are 0 only for periods with a balance sheet', () => {
     const b = bundle()
     Object.assign(b.modeldata.dataMap['2024'], { cr_ifrs_current_assets_total: 2, cr_current_liabilities_total: 1 })
