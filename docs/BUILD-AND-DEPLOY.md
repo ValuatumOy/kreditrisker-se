@@ -306,6 +306,45 @@ Checked in sweden-db (ASP 1, 64 models, all SEK):
   period with a balance sheet is therefore 0, and the mapper reports it as 0. Soliditet and
   kassalikviditet now show for these companies. Since the CV variable change, every absent
   statement item of a period is 0, as the CV pages show it.
-- Missing net sales are correct. Luni Metall and Vännäs Plåt file abbreviated income statements
+- The absence of net sales in the source is explained. Luni Metall and Vännäs Plåt file abbreviated income statements
   without a `Nettoomsattning` fact; their bruttoresultat is in other operating income. Aros Städ,
   Restaurang Zhang Kungshallen and EC Intressenter have no sales.
+
+### Financial-table summary and follow-up (2026-10-14)
+
+The Bokslut table initially shows the four main income-statement rows, seven balance-sheet
+totals and all seven key-ratio/employee rows. `Visa alla bokslutsposter` expands the existing
+table in place; `Visa färre bokslutsposter` returns to the overview. Every previously shown
+detail remains available with the same values and order. The existing gross-profit and
+all-zero-row rules still apply. Without JavaScript and when printing, all rows are visible.
+The source note now describes the omitted-source-item-to-zero convention rather than
+claiming that an absent item is a verified zero in the original filing.
+
+Rechecked the 14 companies with financial-item discrepancies in the October 9 review against
+the current CloudFront HTML: operating profit plus every displayed intervening financial
+component equals profit after financial items in all 42 visible fiscal periods, allowing
+0.5 tkr rounding per displayed amount. Brightec's 2024 group-company income is now 7,000 tkr.
+This closes the published-table discrepancy; it does not independently validate the
+original annual reports, the CV/report unit conversions or all 51 CONVERTIBLE changes.
+
+Remaining source/method questions:
+
+- All five companies with previously absent sales now display zero, including the generated
+  summary. For Luni Metall and Vännäs Plåt, absence of a separately reported sales fact in
+  an abbreviated income statement does not establish zero sales. The current REST bundle
+  provides no per-field distinction between omitted zero and an unavailable fact. Obtain
+  that distinction from the importer rather than infer it from gross profit or hard-code
+  company exceptions. Then use the existing missing-value display for unavailable sales;
+  retain confirmed zeros for the other three companies.
+- Decide Swedish ratio definitions in the shared backend so CV, the site and reports agree.
+- Verify the 51 CONVERTIBLE changes have reached CV and reports, and complete backend Swedish
+  translations. The site's labels are already locally defined in Swedish.
+- The business-id-dash change is a separate backend branch. Its production rollout still
+  requires Swedish/PRH import checks and confirmation of any Jasper templates adding dashes.
+
+Verification: 54 existing tests pass; cached-sample production build succeeds (34 pages).
+The five-period S M Entreprenad table has 18 overview rows and 53 expanded rows. Enter/Space
+toggle it while preserving focus; the control is 44 px tall. At 320 px, the page has no
+horizontal overflow and the table retains its own horizontal scroll. Printing and disabled
+JavaScript both expose all 53 rows. No AWS/Jenkins build was triggered; rebuild company
+pages to release this UI on CloudFront.

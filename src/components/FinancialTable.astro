@@ -14,6 +14,7 @@ interface Props {
 const { periods, no } = Astro.props
 const cols = periods.slice(0, 5)
 const metrics = cols.map(metricsOf)
+const tableId = `bokslut-${no.replace(/[^a-zA-Z0-9-]/g, '-')}`
 
 // Collapse identical sources into one sentence; list per year only when they differ.
 const uniform = cols.every((p) => p.source.source === cols[0].source.source && p.framework === cols[0].framework && p.consolidated === cols[0].consolidated)
@@ -22,14 +23,14 @@ const sourceLine = uniform
     ? `${SOURCE_TEXT[cols[0].source.source]}, ${cols[0].consolidated ? 'koncernens ' : ''}årsredovisningar för ${cols.length === 1 ? periodLabel(cols[0]) : `${periodLabel(cols.at(-1)!)}–${periodLabel(cols[0])}`}${cols[0].framework !== 'unknown' ? ` (${cols[0].framework})` : ''}${filed.length ? `, registrerade ${filed.length > 1 ? `${date(filed[0])}–${date(filed.at(-1)!)}` : date(filed[0])}` : ''}${cols.some((p) => p.months !== 12) ? '. Räkenskapsår som inte är 12 månader är markerade i tabellhuvudet' : ''}`
     : cols.map((p) => `${periodLabel(p)}: ${SOURCE_TEXT[p.source.source]}, period ${date(p.start)}–${date(p.end)}${p.framework !== 'unknown' ? `, ${p.framework}` : ''}${p.filedAt ? `, registrerad ${date(p.filedAt)}` : ''}`).join('; ')
 
-type Row = { label: string; cells: Display[]; sum?: boolean; item?: boolean }
+type Row = { label: string; cells: Display[]; sum?: boolean; item?: boolean; detail?: boolean }
 const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label, cells: metrics.map((m) => percent(m[key], digits)) })
 // A row that shows 0 or is missing in every shown year is left out, as on the CV pages.
 const rows = <K extends string>(defs: StatementRow<K>[], get: (p: FiscalPeriod, k: K) => Value): Row[] =>
     defs
         .filter((d) => d.always || cols.some((p) => Math.round((numeric(get(p, d.key)) ?? 0) / 1000) !== 0))
         .filter((d) => !d.ifItAddsUp || cols.every((p) => addsUp(p, d.key as keyof IncomeStatement)))
-        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum, item: !d.sum && !d.standalone }))
+        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum, item: !d.sum && !d.standalone, detail: !d.always }))
 
 const groups: { title: string; rows: Row[] }[] = [
     { title: 'Resultaträkning, tkr', rows: rows(INCOME_ROWS, (p, k) => p.income[k]) },
@@ -54,8 +55,17 @@ const groups: { title: string; rows: Row[] }[] = [
         <span class="fig__no">{no}</span>
         <span class="fig__title">Bokslut <span class="fig__sub">– {cols.length === 1 ? 'ett räkenskapsår' : `${cols.length} räkenskapsår`}</span></span>
     </div>
+    <div class="ft__controls" hidden>
+        <span class="ft__view">Översikt</span>
+        <button type="button" class="ft__toggle" aria-expanded="false" aria-controls={tableId}>
+            <span>Visa alla bokslutsposter</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="m4 6 4 4 4-4" stroke="currentColor" stroke-width="1.5" />
+            </svg>
+        </button>
+    </div>
     <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, bokslut`}>
-        <table class="data">
+        <table class="data" id={tableId}>
             <thead>
                 <tr>
                     <th scope="col"><span class="visually-hidden">Post</span></th>
@@ -81,7 +91,7 @@ const groups: { title: string; rows: Row[] }[] = [
                             </th>
                         </tr>
                         {g.rows.map((r) => (
-                            <tr class:list={{ sum: r.sum, item: r.item }}>
+                            <tr class:list={{ sum: r.sum, item: r.item, 'ft__detail': r.detail }}>
                                 <th scope="row">{r.label}</th>
                                 {r.cells.map((d) => (
                                     <td>
@@ -97,11 +107,78 @@ const groups: { title: string; rows: Row[] }[] = [
     </div>
     <figcaption class="fig__src">
         <b>Källa:</b> {sourceLine}.
-        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. En post som inte finns i bokslutet är 0. «saknas» betyder att nyckeltalet inte finns i källan.
+        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. Bokslutsposter som saknas i källdatan visas som 0, som i Valuatums företagsvy. «saknas» betyder att nyckeltalet inte finns i källan.
     </figcaption>
 </figure>
 
+<script>
+    for (const figure of document.querySelectorAll<HTMLElement>('.ft')) {
+        const controls = figure.querySelector<HTMLElement>('.ft__controls')!
+        const button = figure.querySelector<HTMLButtonElement>('.ft__toggle')!
+        const label = button.querySelector('span')!
+        const view = figure.querySelector('.ft__view')!
+        const table = figure.querySelector('table')!
+        if (!table.querySelector('.ft__detail')) continue
+        table.classList.add('ft--compact')
+        controls.hidden = false
+        button.addEventListener('click', () => {
+            const compact = table.classList.toggle('ft--compact')
+            button.setAttribute('aria-expanded', String(!compact))
+            label.textContent = compact ? 'Visa alla bokslutsposter' : 'Visa färre bokslutsposter'
+            view.textContent = compact ? 'Översikt' : 'Alla bokslutsposter'
+        })
+    }
+</script>
+
 <style>
+    .ft__controls:not([hidden]) {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 0.25rem 1rem;
+        margin-bottom: 0.5rem;
+    }
+    .ft__view {
+        font-size: var(--step--1);
+        color: var(--ink-3);
+    }
+    .ft__toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        min-height: 44px;
+        padding: 0.5rem 0;
+        border: 0;
+        background: none;
+        color: var(--blue);
+        font: inherit;
+        font-size: var(--step--1);
+        font-weight: 500;
+        text-align: left;
+        cursor: pointer;
+    }
+    .ft__toggle:hover span {
+        text-decoration: underline;
+        text-underline-offset: 0.2em;
+    }
+    .ft__toggle:active {
+        color: var(--ink);
+    }
+    .ft__toggle[aria-expanded='true'] svg {
+        transform: rotate(180deg);
+    }
+    .ft--compact .ft__detail {
+        display: none;
+    }
+    @media print {
+        .ft__controls {
+            display: none !important;
+        }
+        .ft--compact .ft__detail {
+            display: table-row;
+        }
+    }
     .ft thead th {
         vertical-align: bottom;
     }
