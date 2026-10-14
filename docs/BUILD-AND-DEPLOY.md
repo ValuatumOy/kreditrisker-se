@@ -343,6 +343,10 @@ under its own label. This rule does not prove abbreviated reporting: Aros Städ'
 periods with other income and nonzero gross profit also become uncertain, although its
 latest period with zero gross profit still shows zero sales.
 
+Local original-filing verification is available with `npm run audit:statements`.
+See [STATEMENT-AUDIT.md](STATEMENT-AUDIT.md) for the manual two-screen workflow,
+the 14-value reconciliation and its limits. This tool is not part of the public build.
+
 Remaining backend/method questions:
 - Decide Swedish ratio definitions in the shared backend so CV, the site and reports agree.
 - Verify the 51 CONVERTIBLE changes have reached CV and reports, and complete backend Swedish

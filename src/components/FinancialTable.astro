@@ -10,8 +10,9 @@ import Val from './Val.astro'
 interface Props {
     periods: FiscalPeriod[]
     no: string
+    orgnr: string
 }
-const { periods, no } = Astro.props
+const { periods, no, orgnr } = Astro.props
 const cols = periods.slice(0, 5)
 const metrics = cols.map(metricsOf)
 const tableId = `bokslut-${no.replace(/[^a-zA-Z0-9-]/g, '-')}`
@@ -51,7 +52,7 @@ const groups: { title: string; rows: Row[] }[] = [
 ]
 ---
 
-<figure class="fig ft">
+<figure class="fig ft" data-orgnr={orgnr}>
     <div class="fig__head">
         <span class="fig__no">{no}</span>
         <span class="fig__title">Bokslut <span class="fig__sub">– {cols.length === 1 ? 'ett räkenskapsår' : `${cols.length} räkenskapsår`}</span></span>
@@ -72,7 +73,7 @@ const groups: { title: string; rows: Row[] }[] = [
                     <th scope="col"><span class="visually-hidden">Post</span></th>
                     {
                         cols.map((p) => (
-                            <th scope="col">
+                            <th scope="col" data-period-start={p.start} data-period-end={p.end} data-period-months={p.months} data-consolidated={String(p.consolidated)}>
                                 <span class="ft__y">{periodLabel(p)}</span>
                                 <span class="ft__p">
                                     {p.months !== 12 ? `${p.months} mån` : '12 mån'}

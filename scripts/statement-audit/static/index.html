@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="fi">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Ruotsin tilinpäätösten tarkistus</title><link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script></head>
+<body>
+<header><div><h1>Tilinpäätösten tarkistus</h1><p>Alkuperäinen tilinpäätös, Valuatumin data ja julkaistu yrityssivu.</p></div><span class="local">Paikallinen työkalu</span></header>
+<main>
+  <form id="compare-form">
+    <div class="fields">
+      <label>Yritys<select id="company" required></select></label>
+      <label>Tilikausi päättyy<select id="period" required></select></label>
+      <label class="url-field">Yrityssivun osoite<input id="website-url" type="url" required></label>
+      <button id="compare" type="submit">Vertaa luvut</button>
+    </div>
+    <details class="inputs"><summary>Lähdetiedostot ja järjestelmälinkki</summary>
+      <div class="fields">
+        <label>Yrityksen tilinpäätös<input id="filing-file" type="file" accept=".zip,.xhtml,.html"></label>
+        <label>Valuatumin data<input id="backend-file" type="file" accept=".json"></label>
+        <label class="url-field">Järjestelmän yrityssivun linkki<input id="system-url" type="url" placeholder="Liitä CV-sivun osoite"></label>
+      </div>
+      <p>Valitse yrityksen ZIP tai XHTML. Viikkopakettia ei tarvitse ladata tähän. Valuatumin data luetaan paikallisesta REST-vastauksesta; JSON ei sisällä API-tunnusta.</p>
+    </details>
+  </form>
+  <p id="message" role="status" aria-live="polite"></p>
+  <nav class="links" aria-label="Avaa vertailulähteet">
+    <a id="open-filing" target="_blank" rel="noopener" hidden>Avaa asiakirja uuteen ikkunaan</a>
+    <a id="open-audit" target="_blank" rel="noopener" hidden>Tilintarkastuskertomus</a>
+    <a id="open-system" target="_blank" rel="noopener" hidden>Avaa järjestelmä</a>
+    <a id="open-website" target="_blank" rel="noopener">Avaa yrityssivu</a>
+  </nav>
+  <div id="report-meta" class="report-meta" hidden></div>
+  <div id="warnings" hidden></div>
+  <div class="workspace">
+    <section class="original" aria-labelledby="original-title">
+      <div class="panel-head"><h2 id="original-title">Alkuperäinen tilinpäätös</h2><label class="document-label">Asiakirja<select id="document"></select></label></div>
+      <div id="filing-empty" class="empty"><h3>Valitse tilinpäätös</h3><p>Lataa yrityksen ZIP- tai XHTML-tiedosto yllä. Tilinpäätös näkyy tässä, ja vertailurivin linkki vie suoraan kyseiseen lähdelukuun.</p><a href="https://vardefulla-datamangder.bolagsverket.se/arsredovisningar/" target="_blank" rel="noopener">Bolagsverketin tiedostot</a></div>
+      <iframe id="original-frame" title="Alkuperäinen tilinpäätös" sandbox hidden></iframe>
+    </section>
+    <section class="comparison" aria-labelledby="comparison-title">
+      <div class="panel-head"><h2 id="comparison-title">Lukujen vertailu</h2><button id="download" type="button" hidden>Lataa tarkistus</button></div>
+      <p class="scope">14 pääluvun automaattinen vertailu. Summat kruunuina, työntekijät henkilöinä. Nettisivun tkr-luvut muunnetaan kruunuiksi; pyöristys huomioidaan.</p>
+      <div id="summary" class="summary" hidden></div>
+      <label id="filter-label" class="filter" hidden><input id="only-open" type="checkbox"> Näytä vain erot ja käsintarkistettavat</label>
+      <div class="table-wrap" tabindex="0" role="region" aria-label="Tilinpäätöslukujen vertailu">
+        <table><thead><tr><th scope="col">Luku</th><th scope="col">Tilinpäätös</th><th scope="col">Valuatum / REST</th><th scope="col">Nettisivu</th><th scope="col">Tulos</th></tr></thead><tbody id="rows"></tbody></table>
+      </div>
+      <p id="comparison-empty" class="empty">Valitse yritys, tilikausi ja tilinpäätös. Automaattinen tarkistus erottaa lähteen ja järjestelmän välisen poikkeaman järjestelmän ja nettisivun välisestä poikkeamasta.</p>
+      <details id="technical" hidden><summary>Lähdetiedot ja tekninen erittely</summary><pre id="technical-data"></pre></details>
+    </section>
+  </div>
+</main>
+</body></html>

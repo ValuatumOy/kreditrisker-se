@@ -19,6 +19,8 @@
     "data:preview": "node scripts/data.ts preview",
     "fetch": "node --env-file-if-exists=.env scripts/fetch.ts",
     "preview:companies": "node --env-file-if-exists=.env scripts/preview.ts",
+    "audit:statements": "node --env-file-if-exists=.env scripts/statement-audit.ts",
+    "test:audit": "python -m unittest discover -s scripts/statement-audit -p test_*.py",
     "build:vercel": "node scripts/build-vercel.ts",
     "build:scripts": "sh build/get_static_params/build.sh"
   },

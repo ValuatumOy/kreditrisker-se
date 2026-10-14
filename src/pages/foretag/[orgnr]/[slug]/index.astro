@@ -173,7 +173,7 @@ const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
                     {latest && (
                         <section class="co__sec" aria-labelledby="bokslut">
                             <h2 id="bokslut">Bokslut</h2>
-                            <FinancialTable periods={r.periods} no={nextFig('Tabell')} />
+                            <FinancialTable periods={r.periods} orgnr={r.orgnr} no={nextFig('Tabell')} />
                         </section>
                     )}
 

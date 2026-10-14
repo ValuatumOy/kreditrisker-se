@@ -12,4 +12,6 @@ dist-mock/
 data/build/
 data/api-cache/
 data/params/
+data/statement-audit/
+__pycache__/
 backend/node_modules/
