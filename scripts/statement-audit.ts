@@ -5,12 +5,13 @@ import { spawn } from 'node:child_process'
 import { INCOME_VARS, BALANCE_VARS } from '../src/lib/valuatum/map.ts'
 import { INCOME_ROWS, BALANCE_ROWS } from '../src/config/statement.ts'
 import { fetchBundle } from '../src/lib/valuatum/api.ts'
+import { readParams } from '../src/lib/valuatum/params.ts'
 
 const args = process.argv.slice(2)
 const options: Record<string, string> = {}
 for (let i = 0; i < args.length; i += 2) {
-    if (!['--bundle', '--filing', '--port', '--site-origin', '--system-url', '--source-url', '--fid'].includes(args[i]) || !args[i + 1])
-        throw new Error('Options: --bundle file.json --filing company.zip --port 4332 --site-origin URL --system-url URL --source-url URL --fid number')
+    if (!['--bundle', '--filing', '--port', '--site-origin', '--system-url', '--source-url', '--fid', '--params'].includes(args[i]) || !args[i + 1])
+        throw new Error('Options: --bundle file.json --filing company.zip --port 4332 --site-origin URL --system-url URL --source-url URL --fid number --params staticparams.txt')
     options[args[i].slice(2)] = args[i + 1]
 }
 const dir = path.resolve('data/statement-audit')
@@ -45,9 +46,14 @@ const metrics = [
 ]
 const config = path.join(dir, 'config.json')
 fs.writeFileSync(config, JSON.stringify({ metrics, namespacePrefix: 'http://www.taxonomier.se/se/fr/gen-base/' }))
+const paramsFile = options.params ?? process.env.BUILD_STATIC_PARAMS_FILE_ALL ?? 'data/params/staticparams.txt'
+const catalog = path.join(dir, 'companies.json')
+const companies = fs.existsSync(paramsFile) ? readParams(paramsFile).filter(p => p.orgnr) : []
+fs.writeFileSync(catalog, JSON.stringify(companies))
 const serverArgs = [path.resolve('scripts/statement-audit/server.py'), '--config', config,
     '--bundle', path.resolve(options.bundle ?? 'data/sample/api-cache/52.json'),
-    '--port', options.port ?? '4332', '--site-origin', options['site-origin'] ?? 'https://d3po43lod2ykoc.cloudfront.net', '--output', dir]
+    '--port', options.port ?? '4332', '--site-origin', options['site-origin'] ?? 'https://d3po43lod2ykoc.cloudfront.net', '--output', dir,
+    '--catalog', catalog, '--node', process.execPath]
 for (const key of ['filing', 'system-url', 'source-url']) if (options[key]) serverArgs.push(`--${key}`, key === 'filing' ? path.resolve(options[key]) : options[key])
 const child = spawn(process.env.SE_AUDIT_PYTHON ?? 'python', serverArgs, { stdio: 'inherit' })
 child.on('error', () => { console.error('Python 3 is required. Set SE_AUDIT_PYTHON to its path if python is not on PATH.'); process.exitCode = 1 })

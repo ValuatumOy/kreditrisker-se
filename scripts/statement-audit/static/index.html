@@ -4,12 +4,18 @@
 <body>
 <header><div><h1>Tilinpäätösten tarkistus</h1><p>Alkuperäinen tilinpäätös, Valuatumin data ja julkaistu yrityssivu.</p></div><span class="local">Paikallinen työkalu</span></header>
 <main>
+  <form id="search-form" class="fields">
+    <label class="url-field">Hae yritys nimellä tai organisationsnummerilla<input id="company-query" type="search" minlength="2" placeholder="Esim. S M Entreprenad tai 556193-9215" required></label>
+    <button id="search" type="submit">Hae yritys</button>
+  </form>
+  <p id="data-mode" class="scope"></p>
   <form id="compare-form">
     <div class="fields">
       <label>Yritys<select id="company" required></select></label>
       <label>Tilikausi päättyy<select id="period" required></select></label>
       <label class="url-field">Yrityssivun osoite<input id="website-url" type="url" required></label>
-      <button id="compare" type="submit">Vertaa luvut</button>
+      <button id="compare" type="submit">Hae ja vertaa</button>
+      <button id="cancel" type="button" hidden>Peru haku</button>
     </div>
     <details class="inputs"><summary>Lähdetiedostot ja järjestelmälinkki</summary>
       <div class="fields">
@@ -17,7 +23,8 @@
         <label>Valuatumin data<input id="backend-file" type="file" accept=".json"></label>
         <label class="url-field">Järjestelmän yrityssivun linkki<input id="system-url" type="url" placeholder="Liitä CV-sivun osoite"></label>
       </div>
-      <p>Valitse yrityksen ZIP tai XHTML. Viikkopakettia ei tarvitse ladata tähän. Valuatumin data luetaan paikallisesta REST-vastauksesta; JSON ei sisällä API-tunnusta.</p>
+      <label class="filter"><input id="manual-mode" type="checkbox"> Käytä itse tuotuja tiedostoja automaattihaun sijaan</label>
+      <p>Tavallisesti työkalu hakee tilinpäätöksen itse Bolagsverketistä ja luvut Valuatumin API:sta. Tiedostotuonti on vaihtoehto valmiin aineiston tarkistamiseen.</p>
     </details>
   </form>
   <p id="message" role="status" aria-live="polite"></p>
@@ -32,7 +39,7 @@
   <div class="workspace">
     <section class="original" aria-labelledby="original-title">
       <div class="panel-head"><h2 id="original-title">Alkuperäinen tilinpäätös</h2><label class="document-label">Asiakirja<select id="document"></select></label></div>
-      <div id="filing-empty" class="empty"><h3>Valitse tilinpäätös</h3><p>Lataa yrityksen ZIP- tai XHTML-tiedosto yllä. Tilinpäätös näkyy tässä, ja vertailurivin linkki vie suoraan kyseiseen lähdelukuun.</p><a href="https://vardefulla-datamangder.bolagsverket.se/arsredovisningar/" target="_blank" rel="noopener">Bolagsverketin tiedostot</a></div>
+      <div id="filing-empty" class="empty"><h3>Valitse yritys ja tilikausi</h3><p>Paina Hae ja vertaa. Työkalu löytää yrityksen tilinpäätöksen Bolagsverketin paketeista ja näyttää sen tässä. Ensimmäinen haku voi kestää muutaman minuutin; jatkossa hakemistoja käytetään välimuistista.</p><a href="https://vardefulla-datamangder.bolagsverket.se/arsredovisningar/" target="_blank" rel="noopener">Bolagsverketin tiedostot</a></div>
       <iframe id="original-frame" title="Alkuperäinen tilinpäätös" sandbox hidden></iframe>
     </section>
     <section class="comparison" aria-labelledby="comparison-title">
@@ -43,7 +50,7 @@
       <div class="table-wrap" tabindex="0" role="region" aria-label="Tilinpäätöslukujen vertailu">
         <table><thead><tr><th scope="col">Luku</th><th scope="col">Tilinpäätös</th><th scope="col">Valuatum / REST</th><th scope="col">Nettisivu</th><th scope="col">Tulos</th></tr></thead><tbody id="rows"></tbody></table>
       </div>
-      <p id="comparison-empty" class="empty">Valitse yritys, tilikausi ja tilinpäätös. Automaattinen tarkistus erottaa lähteen ja järjestelmän välisen poikkeaman järjestelmän ja nettisivun välisestä poikkeamasta.</p>
+      <p id="comparison-empty" class="empty">Valitse yritys ja tilikausi, sitten paina Hae ja vertaa. Automaattinen tarkistus erottaa lähteen ja järjestelmän välisen poikkeaman järjestelmän ja nettisivun välisestä poikkeamasta.</p>
       <details id="technical" hidden><summary>Lähdetiedot ja tekninen erittely</summary><pre id="technical-data"></pre></details>
     </section>
   </div>
