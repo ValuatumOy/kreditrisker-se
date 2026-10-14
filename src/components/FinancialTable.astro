@@ -15,6 +15,7 @@ const { periods, no } = Astro.props
 const cols = periods.slice(0, 5)
 const metrics = cols.map(metricsOf)
 const tableId = `bokslut-${no.replace(/[^a-zA-Z0-9-]/g, '-')}`
+const showGrossProfit = cols.some((p) => p.income.netSales.status === 'missing' && (numeric(p.income.grossProfit) ?? 0) !== 0)
 
 // Collapse identical sources into one sentence; list per year only when they differ.
 const uniform = cols.every((p) => p.source.source === cols[0].source.source && p.framework === cols[0].framework && p.consolidated === cols[0].consolidated)
@@ -29,8 +30,8 @@ const ratio = (key: MetricKey, digits = 1): Row => ({ label: FORMULAS[key].label
 const rows = <K extends string>(defs: StatementRow<K>[], get: (p: FiscalPeriod, k: K) => Value): Row[] =>
     defs
         .filter((d) => d.always || cols.some((p) => Math.round((numeric(get(p, d.key)) ?? 0) / 1000) !== 0))
-        .filter((d) => !d.ifItAddsUp || cols.every((p) => addsUp(p, d.key as keyof IncomeStatement)))
-        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum, item: !d.sum && !d.standalone, detail: !d.always }))
+        .filter((d) => !d.ifItAddsUp || (d.key === 'grossProfit' && showGrossProfit) || cols.every((p) => addsUp(p, d.key as keyof IncomeStatement)))
+        .map((d) => ({ label: d.label, cells: cols.map((p) => tkr(get(p, d.key))), sum: d.sum, item: !d.sum && !d.standalone, detail: !d.always && !(d.key === 'grossProfit' && showGrossProfit) }))
 
 const groups: { title: string; rows: Row[] }[] = [
     { title: 'Resultaträkning, tkr', rows: rows(INCOME_ROWS, (p, k) => p.income[k]) },
@@ -107,7 +108,8 @@ const groups: { title: string; rows: Row[] }[] = [
     </div>
     <figcaption class="fig__src">
         <b>Källa:</b> {sourceLine}.
-        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. Bokslutsposter som saknas i källdatan visas som 0, som i Valuatums företagsvy. «saknas» betyder att nyckeltalet inte finns i källan.
+        Nyckeltalen följer Valuatums definitioner, se <a href="/metod/#nyckeltal">formler</a>. Bokslutsposter som saknas i källdatan visas normalt som 0, som i Valuatums företagsvy. «saknas» betyder att uppgiften inte kan verifieras från källdatan.
+        {showGrossProfit && ' När nettoomsättningen saknas i källdatan och bruttoresultatet är skilt från noll visas nettoomsättningen som «saknas». Bruttoresultat är inte nettoomsättning.'}
     </figcaption>
 </figure>
 

@@ -35,7 +35,7 @@ test('real sample: the Bokslut rows add up to their subtotals', () => {
     for (const p of samplePeriods()) assert.deepEqual(statementGaps(p), [])
 })
 
-test('Bruttoresultat is shown only where it adds up with the rows above it', () => {
+test('gross-profit reconciliation distinguishes full cost-format and function-format inputs', () => {
     const [p] = samplePeriods()
     assert.ok(addsUp(p, 'grossProfit'), 'cost-format report: net sales and the operating items above it')
     const fn = structuredClone(p)

@@ -247,7 +247,8 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
         const get = (name: string): number | undefined => (typeof row[name] === 'number' && Number.isFinite(row[name]) ? (row[name] as number) : undefined)
         if ([...Object.values(INCOME_VARS), ...Object.values(BALANCE_VARS)].every((name) => get(name) === undefined)) continue
         // The backend never stores zero values (checked in sweden-db on 2026-10-12), so an item
-        // absent from a period is 0, as the CV pages show it. Only the key ratios can be missing.
+        // absent from a period is normally 0, as the CV pages show it. Net sales without
+        // a source value are uncertain when gross profit is nonzero (e.g. abbreviated accounts).
         const value = (name: string, unit: number, zero: boolean): Value => {
             const v = get(name) ?? (zero ? 0 : undefined)
             if (v === undefined) return { status: 'missing', reason: 'not_in_source' }
@@ -262,6 +263,9 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
         const endDate = new Date(end + 'T00:00:00Z')
         const startDate = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() - months + 1, 1))
         const employees = get(EMPLOYEES)
+        const income = values(INCOME_VARS, UNIT, true)
+        if (get(INCOME_VARS.netSales) === undefined && (get(INCOME_VARS.grossProfit) ?? 0) !== 0)
+            income.netSales = { status: 'missing', reason: 'not_in_source' }
         periods.push({
             start: startDate.toISOString().slice(0, 10),
             end,
@@ -270,7 +274,7 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             consolidated: company.companyCode.endsWith('K'),
             framework: 'unknown',
             source: src,
-            income: values(INCOME_VARS, UNIT, true),
+            income,
             balance: values(BALANCE_VARS, UNIT, true),
             ratios: values(RATIO_VARS, 1, false),
             employees: employees === undefined ? { status: 'missing', reason: 'not_in_source' } : { status: 'reported', value: Math.round(employees), source: src },

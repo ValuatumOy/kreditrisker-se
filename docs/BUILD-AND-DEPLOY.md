@@ -313,10 +313,12 @@ Checked in sweden-db (ASP 1, 64 models, all SEK):
 ### Financial-table summary and follow-up (2026-10-14)
 
 The Bokslut table initially shows the four main income-statement rows, seven balance-sheet
-totals and all seven key-ratio/employee rows. `Visa alla bokslutsposter` expands the existing
+totals and all seven key-ratio/employee rows, plus gross profit when sales are uncertain.
+`Visa alla bokslutsposter` expands the existing
 table in place; `Visa färre bokslutsposter` returns to the overview. Every previously shown
-detail remains available with the same values and order. The existing gross-profit and
-all-zero-row rules still apply. Without JavaScript and when printing, all rows are visible.
+detail remains available with the same values and order. The existing all-zero-row rule
+still applies. Gross profit is also shown when sales are uncertain, even if the preceding
+displayed components cannot reconstruct it. Without JavaScript and when printing, all rows are visible.
 The source note now describes the omitted-source-item-to-zero convention rather than
 claiming that an absent item is a verified zero in the original filing.
 
@@ -327,24 +329,32 @@ component equals profit after financial items in all 42 visible fiscal periods, 
 This closes the published-table discrepancy; it does not independently validate the
 original annual reports, the CV/report unit conversions or all 51 CONVERTIBLE changes.
 
-Remaining source/method questions:
+Net-sales ambiguity is handled locally by an agreed conservative display rule, without
+changing zero storage or asking the importer team for a new flag. In each period, absent
+`ns` with nonzero `cr_gross_profit` maps to `missing/not_in_source`. Positive and negative
+gross profit both trigger it. Explicit source sales (including zero) take precedence;
+absent sales with absent/zero gross profit keep the existing zero convention. No sales
+amount is inferred from gross profit and no company-specific exceptions are used.
+The profile summary names gross profit and explains that sales cannot be established.
+KPIs, sales charts and the slim index use the same missing Value, so it cannot become a
+zero sales claim or a value in the sales or sales-growth ranking. A missing sales KPI has
+no growth delta. CV ratios themselves are not recalculated. The Bokslut overview includes gross profit
+under its own label. This rule does not prove abbreviated reporting: Aros Städ's older
+periods with other income and nonzero gross profit also become uncertain, although its
+latest period with zero gross profit still shows zero sales.
 
-- All five companies with previously absent sales now display zero, including the generated
-  summary. For Luni Metall and Vännäs Plåt, absence of a separately reported sales fact in
-  an abbreviated income statement does not establish zero sales. The current REST bundle
-  provides no per-field distinction between omitted zero and an unavailable fact. Obtain
-  that distinction from the importer rather than infer it from gross profit or hard-code
-  company exceptions. Then use the existing missing-value display for unavailable sales;
-  retain confirmed zeros for the other three companies.
+Remaining backend/method questions:
 - Decide Swedish ratio definitions in the shared backend so CV, the site and reports agree.
 - Verify the 51 CONVERTIBLE changes have reached CV and reports, and complete backend Swedish
   translations. The site's labels are already locally defined in Swedish.
 - The business-id-dash change is a separate backend branch. Its production rollout still
   requires Swedish/PRH import checks and confirmation of any Jasper templates adding dashes.
 
-Verification: 54 existing tests pass; cached-sample production build succeeds (34 pages).
+Verification: 57 tests pass, including signed gross profit, explicit sales/zero precedence,
+per-period isolation, summary wording and omitted sales-ranking values. Cached-sample
+production build succeeds (34 pages).
 The five-period S M Entreprenad table has 18 overview rows and 53 expanded rows. Enter/Space
 toggle it while preserving focus; the control is 44 px tall. At 320 px, the page has no
 horizontal overflow and the table retains its own horizontal scroll. Printing and disabled
 JavaScript both expose all 53 rows. No AWS/Jenkins build was triggered; rebuild company
-pages to release this UI on CloudFront.
+pages with `COMPANIES=all` to release this UI and remap existing profiles on CloudFront.

@@ -10,11 +10,12 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { BALANCE_VARS, INCOME_VARS, mapBundle, RATIO_VARS } from '../src/lib/valuatum/map.ts'
 import { batchMode, readParams, selectBatch } from '../src/lib/valuatum/params.ts'
-import { recentlyUpdated, type IndexRow } from '../src/lib/publish.ts'
+import { publishCompany, recentlyUpdated, toRow, type IndexRow } from '../src/lib/publish.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
 import type { Bundle } from '../src/lib/valuatum/api.ts'
 import { metricsOf, numeric } from '../src/lib/metrics.ts'
 import { percent } from '../src/lib/format.ts'
+import { summarize } from '../src/lib/summary.ts'
 
 const ROOT = path.join(import.meta.dirname, '..')
 const bundle = (): Bundle => JSON.parse(fs.readFileSync(path.join(import.meta.dirname, 'fixtures-api-bundle.json'), 'utf8'))
@@ -54,6 +55,57 @@ test('absent items are 0 in every period that has data; absent ratios stay missi
     assert.deepEqual(p24.ratios.equityRatio, { status: 'missing', reason: 'not_in_source' })
     assert.equal(p22.end, '2022-12-31')
     assert.equal(numeric(p22.income.netProfit), 0, 'a balance-only year has a zero income statement, as on the CV page')
+})
+
+test('absent net sales with positive or negative gross profit are uncertain, per period', () => {
+    for (const gross of [28.642, -2.5, 0.009]) {
+        const b = bundle()
+        const row = b.modeldata.dataMap['2025']
+        delete row[INCOME_VARS.netSales]
+        row[INCOME_VARS.grossProfit] = gross
+        const res = mapBundle(b, opts)
+        assert.ok(res.ok)
+        const [latest, prior] = res.record.periods
+        assert.deepEqual(latest.income.netSales, { status: 'missing', reason: 'not_in_source' })
+        assert.equal(numeric(latest.income.grossProfit), Math.round(gross * 1e6))
+        assert.equal(numeric(prior.income.netSales), 5_902_461_000, 'other periods retain their source sales')
+        assert.deepEqual(validateRecord(res.record).errors, [])
+    }
+})
+
+test('zero/missing gross profit keeps omitted sales at zero; explicit sales always take precedence', () => {
+    for (const [sales, gross, expected] of [
+        [undefined, undefined, 0],
+        [undefined, 0, 0],
+        [0, 28.642, 0],
+        [3.5, 28.642, 3_500_000],
+    ] as const) {
+        const b = bundle()
+        const row = b.modeldata.dataMap['2025']
+        delete row[INCOME_VARS.netSales]
+        delete row[INCOME_VARS.grossProfit]
+        if (sales !== undefined) row[INCOME_VARS.netSales] = sales
+        if (gross !== undefined) row[INCOME_VARS.grossProfit] = gross
+        const res = mapBundle(b, opts)
+        assert.ok(res.ok)
+        assert.equal(numeric(res.record.periods[0].income.netSales), expected)
+    }
+})
+
+test('uncertain sales do not become a zero claim or a sales-ranking value; summary names gross profit', () => {
+    const b = bundle()
+    const row = b.modeldata.dataMap['2025']
+    delete row[INCOME_VARS.netSales]
+    row[INCOME_VARS.grossProfit] = 28.642
+    const res = mapBundle(b, opts)
+    assert.ok(res.ok)
+    const company = publishCompany(res.record, undefined, '2026-10-14')
+    const text = summarize(company).join(' ')
+    assert.match(text, /bruttoresultatet 28,6 Mkr/)
+    assert.match(text, /Nettoomsättningen kan inte fastställas/)
+    assert.doesNotMatch(text, /nettoomsättningen 0|nettoomsättningen 28,6|en ökning|en minskning/)
+    assert.equal(toRow(company).ns, undefined)
+    assert.equal(toRow(company).rg, undefined, 'unverified sales cannot enter the sales-growth ranking either')
 })
 
 test('rejects bundles that are not Swedish companies', () => {

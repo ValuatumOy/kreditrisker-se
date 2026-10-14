@@ -78,7 +78,7 @@ export function toRow(c: PublishedCompany): IndexRow {
         row.om = numeric(m.operatingMargin)
         row.er = numeric(m.equityRatio)
         // The growth list compares two directly consecutive 12-month years only.
-        if (p.months === 12 && prior?.months === 12 && periodsConsecutive(p, prior)) row.rg = numeric(m.revenueGrowth)
+        if (row.ns !== undefined && row.nsp !== undefined && p.months === 12 && prior?.months === 12 && periodsConsecutive(p, prior)) row.rg = numeric(m.revenueGrowth)
     }
     return JSON.parse(JSON.stringify(row)) // drop undefined keys
 }

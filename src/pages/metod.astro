@@ -66,7 +66,7 @@ const toc = [
             <dl>
                 <dt>Rapporterat</dt>
                 <dd>
-                    Beloppet står i årsredovisningen. Negativa belopp visas med minustecken. En post som inte finns i ett redovisat bokslut är noll och visas som 0, som i
+                    Beloppet kommer från källdatan. Negativa belopp visas med minustecken. Bokslutsposter som saknas i källdatan visas normalt som 0, som i
                     Valuatums bokslutsanalys. Rader som är 0 alla visade år visas inte.
                 </dd>
                 <dt>Saknas</dt>
@@ -75,6 +75,10 @@ const toc = [
                 <dd>{Object.values(INCOMPARABLE_TEXT).join(' Eller: ')}</dd>
             </dl>
             <p>Saknas ett nyckeltal i källan, står det som saknas.</p>
+            <p>
+                Saknas nettoomsättningen i källdatan samtidigt som bruttoresultatet är skilt från noll, visas nettoomsättningen som <em>saknas</em>.
+                Det går då inte att avgöra om nettoomsättningen är noll eller inte har redovisats separat. Bruttoresultatet visas med sitt eget namn och ersätter inte nettoomsättningen.
+            </p>
 
             <h2 id="aktualitet">Hur aktuella uppgifterna är</h2>
             <p>

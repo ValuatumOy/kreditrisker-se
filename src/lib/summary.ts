@@ -3,7 +3,7 @@
 
 import type { PublishedCompany } from './contract/types.ts'
 import { compactSek, count, kommunName, LEGAL_FORM_TEXT, percent, periodLabel, STATUS_TEXT } from './format.ts'
-import { metricsOf } from './metrics.ts'
+import { metricsOf, numeric } from './metrics.ts'
 
 export function summarize(c: PublishedCompany): string[] {
     const r = c.record
@@ -23,6 +23,7 @@ export function summarize(c: PublishedCompany): string[] {
     const year = periodLabel(p)
     const sales = compactSek(p.income.netSales)
     const ebit = compactSek(p.income.operatingProfit)
+    const showGrossProfit = sales.state === 'missing' && (numeric(p.income.grossProfit) ?? 0) !== 0
     const parts: string[] = []
     if (sales.state !== 'missing' && sales.state !== 'not_applicable') {
         let s = `nettoomsättningen ${sales.text}`
@@ -31,9 +32,11 @@ export function summarize(c: PublishedCompany): string[] {
         else if (g.state === 'negative') s += `, en minskning med ${g.text.replace('−', '')} från året innan`
         parts.push(s)
     }
+    if (showGrossProfit) parts.push(`bruttoresultatet ${compactSek(p.income.grossProfit).text}`)
     if (ebit.state !== 'missing' && ebit.state !== 'not_applicable') parts.push(`rörelseresultatet ${ebit.text}`)
     const lead = p.months === 12 ? `Räkenskapsåret ${year}` : `Räkenskapsåret ${year} (${p.months} månader)`
     if (parts.length) out.push(`${lead} var ${parts.join(' och ')}.`)
+    if (showGrossProfit) out.push('Nettoomsättningen kan inte fastställas från de tillgängliga uppgifterna.')
     const eq = percent(m.equityRatio)
     if (eq.state === 'positive' || eq.state === 'negative' || eq.state === 'zero') out.push(`Soliditeten var ${eq.text}.`)
     const emp = count(p.employees)

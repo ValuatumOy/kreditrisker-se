@@ -25,7 +25,7 @@ const ppDelta = (a: Value, b: Value | undefined): { text: string; up: boolean } 
     return fmt((x - y) * 100, 'p.e.')
 }
 const cells: { label: string; d: Display; delta: ReturnType<typeof growth> }[] = [
-    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), delta: growth(m.revenueGrowth) },
+    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), delta: numeric(p.income.netSales) === undefined ? null : growth(m.revenueGrowth) },
     { label: 'Rörelseresultat', d: compactSek(p.income.operatingProfit), delta: null },
     { label: 'Årets resultat', d: compactSek(p.income.netProfit), delta: null },
     { label: 'Soliditet', d: percent(m.equityRatio), delta: ppDelta(m.equityRatio, mPrior?.equityRatio) },

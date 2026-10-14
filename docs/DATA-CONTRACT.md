@@ -24,7 +24,7 @@ Every item is a `Value`. An omitted field or a raw number is **rejected**.
 | `incomparable` | `reason` | "ej jämförbar" |
 | `derived` | computed at build time only (medians); rejected on import | number |
 
-Import rule: the Valuatum backend stores no zeros, so a statement item absent from a period is `reported 0`, as on the CV pages. Key ratios the source leaves out stay `missing`.
+Import rule: the Valuatum backend stores no zeros, so a statement item absent from a period normally becomes `reported 0`, as on the CV pages. Exception: absent `ns` with nonzero `cr_gross_profit` becomes `missing/not_in_source`, because zero sales cannot be verified from that combination. Explicit sales, including zero, take precedence. Gross profit is kept under its own label; it is never used as sales. This is a conservative display rule, not proof of an abbreviated income statement. Key ratios the source leaves out stay `missing`.
 
 Total assets, inventories, cash, untaxed reserves and liabilities may not be negative. Results and equity may be.
 

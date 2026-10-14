@@ -30,7 +30,7 @@ const ppDelta = (a: Value, b?: Value): string | null => {
 }
 
 const cells: { label: string; d: Display; delta: string | null }[] = [
-    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), delta: pctDelta(m.revenueGrowth) },
+    { label: 'Nettoomsättning', d: compactSek(p.income.netSales), delta: numeric(p.income.netSales) === undefined ? null : pctDelta(m.revenueGrowth) },
     { label: 'Rörelseresultat', d: compactSek(p.income.operatingProfit), delta: null },
     { label: 'Årets resultat', d: compactSek(p.income.netProfit), delta: null },
     { label: 'Soliditet', d: percent(m.equityRatio), delta: ppDelta(m.equityRatio, mPrior?.equityRatio) },
