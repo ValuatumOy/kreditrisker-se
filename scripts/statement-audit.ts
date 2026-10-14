@@ -2,12 +2,14 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'node:child_process'
-import { INCOME_VARS, BALANCE_VARS } from '../src/lib/valuatum/map.ts'
+import { INCOME_VARS, BALANCE_VARS, RATIO_VARS } from '../src/lib/valuatum/map.ts'
 import { INCOME_ROWS, BALANCE_ROWS } from '../src/config/statement.ts'
 import { fetchBundle } from '../src/lib/valuatum/api.ts'
 import { readParams } from '../src/lib/valuatum/params.ts'
+import { FORMULAS, type MetricKey } from '../src/lib/metrics.ts'
 
-const args = process.argv.slice(2)
+const batch = process.argv[2] === '--batch'
+const args = batch ? [] : process.argv.slice(2)
 const options: Record<string, string> = {}
 for (let i = 0; i < args.length; i += 2) {
     if (!['--bundle', '--filing', '--port', '--site-origin', '--system-url', '--source-url', '--fid', '--params'].includes(args[i]) || !args[i + 1])
@@ -40,12 +42,26 @@ const definitions = [
 ] as const
 const vars: Record<string, string> = { ...INCOME_VARS, ...BALANCE_VARS }
 const labels = new Map([...INCOME_ROWS, ...BALANCE_ROWS].map((r) => [r.key, r.label]))
-const metrics = [
+const coreMetrics = [
     ...definitions.map(([key, concept, kind]) => ({ key, label: labels.get(key), variable: vars[key], concepts: [concept], kind, unit: 'SEK', websiteGroup: kind === 'duration' ? 'Resultaträkning' : 'Balansräkning', zeroWhenAbsent: true })),
     { key: 'employees', label: 'Medelantal anställda', variable: 'cr_employees_adjusted', concepts: ['MedelantaletAnstallda'], kind: 'duration', unit: 'people', websiteGroup: 'Nyckeltal', zeroWhenAbsent: false },
 ]
+const known = new Map(coreMetrics.map(m => [m.key, m]))
+const metrics = [
+    ...INCOME_ROWS.map(r => known.get(r.key) ?? ({ key: r.key, label: r.label, variable: INCOME_VARS[r.key], concepts: [], kind: 'duration', unit: 'SEK', websiteGroup: 'Resultaträkning', zeroWhenAbsent: true, sourceCheck: false })),
+    ...BALANCE_ROWS.map(r => known.get(r.key) ?? ({ key: r.key, label: r.label, variable: BALANCE_VARS[r.key], concepts: [], kind: 'instant', unit: 'SEK', websiteGroup: 'Balansräkning', zeroWhenAbsent: true, sourceCheck: false })),
+    ...Object.entries(RATIO_VARS).map(([key, variable]) => ({ key, label: FORMULAS[key as MetricKey].label, variable, concepts: [], kind: 'duration', unit: 'percent', displayDigits: key === 'quickRatio' ? 0 : 1, websiteGroup: 'Nyckeltal', zeroWhenAbsent: false, sourceCheck: false })),
+    known.get('employees')!,
+]
 const config = path.join(dir, 'config.json')
 fs.writeFileSync(config, JSON.stringify({ metrics, namespacePrefix: 'http://www.taxonomier.se/se/fr/gen-base/' }))
+if (batch) {
+    const child = spawn(process.env.SE_AUDIT_PYTHON ?? 'python', ['-u', path.resolve('scripts/statement-audit/batch.py'), '--config', config, ...process.argv.slice(3)], { stdio: 'inherit' })
+    child.on('error', () => { console.error('Python 3 is required.'); process.exit(1) })
+    child.on('exit', (code) => process.exit(code ?? 1))
+    process.on('SIGINT', () => child.kill('SIGINT'))
+    await new Promise(() => {})
+}
 const paramsFile = options.params ?? process.env.BUILD_STATIC_PARAMS_FILE_ALL ?? 'data/params/staticparams.txt'
 const catalog = path.join(dir, 'companies.json')
 const companies = fs.existsSync(paramsFile) ? readParams(paramsFile).filter(p => p.orgnr) : []

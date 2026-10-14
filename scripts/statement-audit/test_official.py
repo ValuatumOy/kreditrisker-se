@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import struct
 import tempfile
+import threading
+import time
 import unittest
 from unittest.mock import patch
 import urllib.parse
@@ -220,6 +222,84 @@ class OfficialTests(unittest.TestCase):
             with self.subTest(orgnr=orgnr, period=period), self.assertRaises(ValueError):
                 self.reader.fetch(orgnr, period)
         self.assertEqual(self.server.requests, [])
+
+    def test_parallel_completion_preserves_newest_filing_and_root_progress(self):
+        newest = "arsredovisningar/2026/41_1.zip"
+        old_completed = threading.Event()
+        order = []
+        self.server.archives[newest] = outer_zip([(NAME, inner_zip("newest"))])
+        original_index = self.reader._index
+        def out_of_order(archive):
+            if archive["key"] == newest:
+                self.assertTrue(old_completed.wait(2))
+            result = original_index(archive)
+            order.append(archive["key"])
+            if archive["key"] == self.key:
+                old_completed.set()
+            return result
+        main_thread = threading.get_ident()
+        progress_threads = []
+        with patch.object(self.reader, "_index", side_effect=out_of_order):
+            result = self.reader.fetch(ORGNR, PERIOD, lambda _: progress_threads.append(threading.get_ident()))
+        self.assertEqual(order, [self.key, newest])
+        self.assertEqual(result["data"], inner_zip("newest"))
+        self.assertTrue(all(identity == main_thread for identity in progress_threads))
+
+    def test_failed_newer_archive_prevents_choosing_older_match(self):
+        newest = "arsredovisningar/2026/41_1.zip"
+        self.server.archives[newest] = outer_zip([(NAME, self.payload)])
+        original_index = self.reader._index
+        def fail_newer(archive):
+            if archive["key"] == newest:
+                raise ValueError("newer archive failed")
+            return original_index(archive)
+        with patch.object(self.reader, "_index", side_effect=fail_newer), self.assertRaisesRegex(ValueError, "newer archive failed"):
+            self.reader.fetch(ORGNR, PERIOD)
+        self.assertFalse((self.cache / NAME).exists())
+
+    def test_cancellation_joins_all_inflight_workers(self):
+        newest = "arsredovisningar/2026/41_1.zip"
+        self.server.archives[newest] = outer_zip([(NAME, self.payload)])
+        active, completed = [], []
+        started = threading.Event()
+        def slow_index(archive):
+            active.append(archive["key"])
+            started.set()
+            time.sleep(0.05)
+            completed.append(archive["key"])
+            return []
+        main_thread = threading.get_ident()
+        def cancel(message):
+            self.assertEqual(threading.get_ident(), main_thread)
+            if "Etsitään" in message:
+                self.assertTrue(started.wait(2))
+                raise ValueError("cancelled")
+        with patch.object(self.reader, "_index", side_effect=slow_index), self.assertRaisesRegex(ValueError, "cancelled"):
+            self.reader.fetch(ORGNR, PERIOD, cancel)
+        self.assertTrue(active)
+        self.assertEqual(sorted(active), sorted(completed))
+        self.assertFalse((self.cache / NAME).exists())
+
+    def test_parallel_windows_have_at_most_four_workers(self):
+        self.server.archives = {f"arsredovisningar/2026/{week}_1.zip": outer_zip([]) for week in range(1, 10)}
+        lock = threading.Lock()
+        active = maximum = 0
+        seen = []
+        def bounded_index(archive):
+            nonlocal active, maximum
+            with lock:
+                active += 1
+                maximum = max(maximum, active)
+                seen.append(archive["key"])
+            time.sleep(0.01)
+            with lock:
+                active -= 1
+            return []
+        with patch.object(self.reader, "_index", side_effect=bounded_index), self.assertRaisesRegex(ValueError, "ei löytynyt"):
+            self.reader.fetch(ORGNR, PERIOD)
+        self.assertEqual(len(seen), 9)
+        self.assertEqual(maximum, 4)
+        self.assertEqual(active, 0)
 
 
 if __name__ == "__main__":

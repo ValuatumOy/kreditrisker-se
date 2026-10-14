@@ -2,7 +2,8 @@
 
 Työkalu helpottaa käsintarkistusta: alkuperäinen tilinpäätös näkyy vieressä,
 asiakirjan voi avata omalle ruudulle ja yrityssivulle sekä CV-järjestelmään pääsee linkeistä.
-14 pääluvun automaattinen vertailu auttaa löytämään tarkistettavat kohdat.
+14 pääluvun lähdevertailu ja 120 mahdollisen taulukkorivin API–sivuvertailu
+auttavat löytämään tarkistettavat kohdat. Vertailujen kattavuus näkyy erikseen.
 
 ## Käynnistä
 
@@ -67,7 +68,8 @@ Liitä CV-yrityssivun osoite, jos haluat avata järjestelmän toiselle ruudulle.
 3. Avaa alkuperäinen asiakirja omalle ruudulle. Avaa CV tai yrityssivu toiselle ruudulle.
 4. **Näytä lähdeluku** vie juuri vertailussa käytetyn luvun kohdalle.
 5. Näytä tarvittaessa vain erot ja käsintarkistettavat. Tarkista myös rivit ja liitetiedot,
-   joita 14 pääluvun vertailu ei kata. Tilintarkastuskertomus on erikseen avattavissa.
+   joita lähdevertailu ei kata. **Kaikki 120 riviä** näyttää myös yksityiskohtaiset
+   taulukkorivit ja tunnusluvut. Tilintarkastuskertomus on erikseen avattavissa.
 6. **Lataa tarkistus** tallentaa JSON-raportin lähdetietoineen.
 
 ## Mitä automatiikka tarkistaa
@@ -89,8 +91,14 @@ RESTistä pois jätettyihin tilinpäätöseriin sovelletaan nykyistä nollakäyt
 puuttuva liikevaihto ja nollasta poikkeava bruttotulos jättävät liikevaihdon epävarmaksi.
 Suoraan ilmoittamaton bruttotulos tarkistetaan laskelmana käsin.
 
-Tunnuslukujen määritelmät, kaikki yksityiskohtaiset tilinpäätösrivit ja liitetiedot
-eivät kuulu automaattiseen vertailuun. Vihreä yhteenveto ei hyväksy koko tilinpäätöstä.
+API–sivuvertailu kattaa 31 tuloslaskelmariviä, 82 taseriviä, kuusi tunnuslukua ja
+henkilöstömäärän. Prosentit muunnetaan API:n suhdeluvuista prosenttiyksiköiksi;
+sallittu pyöristys vastaa sivun näyttötarkkuutta. Sivulta pois jätettyjä rivejä
+ei hyväksytä täsmääviksi. Samannimiset rivit yksilöidään `data-metric-key`-avaimella.
+106 riviltä puuttuu vielä alkuperäisen tilinpäätöksen vertailusääntö: ne saavat
+**Ei tarkistettu** -tilan lähdevertailussa, vaikka API ja sivu täsmäisivät.
+Liitetiedot, kaaviot ja CV:n käyttöliittymä eivät kuulu tähän taulukkotarkistukseen.
+Vihreä yksittäinen vertailu ei hyväksy koko tilinpäätöstä.
 REST-vastauksen hakupäivä ja verkkosivun tarkistushetki näytetään, koska tiedot voivat
 olla eri päivityksistä.
 
@@ -118,7 +126,99 @@ Myöhemmin yrityskohtaiseen automaattihakuun voi käyttää
 joka edellyttää asiakasrekisteröintiä ja OAuth-tunnuksia. Digitaaliset tilinpäätökset
 eivät kata kaikkia yrityksiä tai skannattuja asiakirjoja.
 
-## Säilytys ja kehitys
+## Eräajo ja paketti kollegalle
+
+Ylläpitäjä voi tarkistaa valitut yritykset ja kaksi uusinta tilikautta yhdellä ajolla:
+
+```powershell
+npm run audit:batch -- --company 5561939215 --company 5562368075 --company 5564248937 --company 5564480282 --latest 2 --share
+```
+
+`--period YYYY-MM-DD` valitsee täsmällisen kauden kaikille valituille yrityksille.
+`--output kansio` määrittää tuloskansion. Ajo hakee API:n luvut tuoreina,
+tarkistaa tuontimallin ja yritystunnuksen ja käyttää alkuperäisten paikallista
+välimuistia. Yksi epäonnistunut tapaus ei katkaise muita. Alkuperäisen puuttuminen
+ei estä API–sivuvertailua, mutta lähdelukuja ei silloin hyväksytä.
+Prosessin paluukoodi 1 kertoo lukueroista tai hakuvioista; käsintarkistus ja
+puuttuva kattavuus näkyvät raportissa myös silloin, kun paluukoodi on 0.
+
+`summary.json` erottaa molemmat vertailut. Jokaiselle yritykselle ja kaudelle
+tallennetaan oma raportti. Jos otoksessa on myös uudempi tilinpäätös, työkalu
+tarkistaa, selittääkö siinä ilmoitettu saman kauden vertailuluku API:n luvun.
+Alkuperäisen asiakirjan ero säilytetään; uudempi lähdetodiste kirjataan erikseen.
+
+`--share` tuottaa ajon kansioon `share.zip`. Kollegan tarvitsee purkaa koko ZIP
+ja avata **index.html**. Paketissa on tarkistuksen luvut, tilat, päivämäärät,
+alkuperäisten asiakirjojen avausversiot ja linkit juuri valittuihin lähdelukuihin.
+Asiakirjat ja ZIP-hashit varmistetaan ennen liittämistä. Avausversioista poistetaan
+aktiivinen sisältö; API-avaimet ja kokonaiset REST-vastaustiedostot eivät tule mukaan.
+Paketti toimii ilman asennusta ja yhteyttä API:in. Verkkosivulinkit tarvitsevat verkon.
+Tämä on tallennettu otos: vastaanottaja voi tarkistaa sen rivejä itse, mutta uusia
+yrityksiä varten tarvitaan uusi ajo tai paikallinen työkalu.
+
+Jo tehdyn ajon voi paketoida ilman verkkohakuja:
+
+```powershell
+python scripts/statement-audit/share.py --run data/statement-audit/runs/<ajo> --output <jakokansio>
+```
+
+Jatkuvaan kollegakäyttöön suositus on yksi sisäinen, kirjautumisella suojattu
+osoite ja palvelimelle asetettu API-tunnus. Nykyinen paikallinen palvelin pitää
+ennen sitä muuttaa käyttäjäkohtaisiksi hauiksi ja pysyviksi raporttitunnuksiksi:
+sen asiakirja ja aktiivinen haku ovat nyt yhteisiä saman prosessin selaimille.
+Nykyistä palvelinta ei siis pidä sellaisenaan avata julkiseen verkkoon.
+Satunnaistarkistaja valitsisi yrityksen ja kauden; ylläpitäjä ajaisi erävertailut
+ja jättäisi erot sekä puuttuvat lähteet tarkistajan työlistaksi.
+
+## Moniyritystesti 14.10.2026
+
+Tuore REST-haku, Bolagsverketin automaattihaku ja vertailu ajettiin neljälle
+yritykselle, kahdelle uusimmalle kaudelle. Kahdeksan kausivertailua
+onnistui ilman hakuvikoja; alkuperäinen löytyi seitsemälle kaudelle.
+
+| Yritys / kausi päättyy | Lähde → API: täsmää / ero / käsin / puuttuu | Paikallinen uusi sivu → API: täsmää |
+| --- | --- | --- |
+| S M Entreprenad / 2026-06-30 | 13 / 0 / 1 / 0 | 53 |
+| S M Entreprenad / 2025-06-30 | 11 / 1 / 1 / 1 | 53 |
+| Brightec / 2025-12-31 | 9 / 3 / 2 / 0 | 61 |
+| Brightec / 2024-12-31 | 10 / 2 / 2 / 0 | 61 |
+| Aros Städ / 2025-12-31 | 9 / 0 / 1 / 4 | 28 |
+| Aros Städ / 2024-12-31 | 9 / 0 / 1 / 4 | 28 |
+| Atea / 2025-12-31 | 13 / 0 / 1 / 0 | 65 |
+| Atea / 2024-12-31 | 0 / 0 / 1 / 13 | 64 |
+
+Lähdevertailun luvut koskevat 14 päälukua. Lisäksi jokaisella kaudella 106 riviä
+on ilman lähdesääntöä. Paikallisista, tuoreesta REST-aineistosta rakennetuista
+44 sivusta tarkistettiin yritystaulukoiden 413 vertailtavaa solua: kaikki täsmäsivät
+API:in pyöristyksen rajoissa. Muita mahdollisia rivejä ei ollut näkyvissä tai niiltä
+puuttui vertailtava arvo; niitä ei laskettu hyväksytyiksi. **Julkaistun CloudFrontin
+sivuvertailut jäivät käsintarkistettaviksi**, koska vanhasta HTML:stä puuttuvat tarkat
+yritys-/kausitiedot. Jenkinsin yrityssivut tarvitsevat uuden rakennuksen nykyisestä
+mainista (koko hakemistolle `COMPANIES=all`). Tätä tuotantoajoa ei tehty tässä testissä.
+
+Korjaukset: yritys- ja konsernikontekstien erottelu Brightecin asiakirjoissa,
+120 rivin kattavuus, prosenttien yksiköt, samannimisten rivien avaimet,
+puuttuvan alkuperäisen selkeä käsittely ja rajattu rinnakkainen pakettihaku.
+
+S M Entreprenadin 2025 lyhytaikaiset velat ovat vuoden 2025 alkuperäisessä
+73 365 587 kr, uudemman vuoden 2026 tilinpäätöksen vertailuluvussa 71 387 079 kr.
+API vastaa uudempaa vertailulukua. Brightecin 2025 tulos on lähteessä 2 583 000 kr
+ja API:ssa 2 582 000 kr; taseen loppusumma ja oma pääoma + velat ovat 22 337 000
+vs. 22 338 000 kr. Vuonna 2024 samat tasesummat ovat 20 682 000 vs. 20 683 000 kr.
+Eroja ei peitetty kasvattamalla toleranssia tai muuttamalla kantaa.
+Atean 2024 alkuperäistä ei löytynyt 858 vuosien 2024–2026 viikkopaketista.
+
+Nykyiset 103 Bolagsverketin lähdemäppäykset luettiin myös tuotannon ai/IAM-tilillä,
+pelkkänä metatietojen lukuoperaationa. Tämä poisti Excelin käyttöönottoon liittyvän
+epävarmuuden. Aggregaattien, ehtojen, etumerkkien ja laskettujen tunnuslukujen
+riippumaton toteutus tarkistimeen on silti tekemättä; kartoituksen olemassaolo ei
+yksin vahvista kaikkia lähderivejä. Tätä laajennusta voidaan jatkaa itse ilman,
+että teknisten tarvitsee ensin toimittaa uutta mäppäystiedostoa.
+
+102 työkalutestiä ja 57 sivustotestiä läpäisivät. Riippumaton tarkistus vahvisti
+paketin lähdehashit, kaikki 82 lähdeankkuria ja kattavuusrajausten säilymisen.
+
+## Paikallinen säilytys
 
 Palvelin kuuntelee vain tämän koneen osoitteessa `127.0.0.1`. Asiakirjat luetaan
 muistiin ja näytetään ilman skriptejä tai ulkoisia verkkopyyntöjä.

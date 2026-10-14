@@ -3,9 +3,9 @@ let state
 let selectionVersion = 0
 let busy = false
 let activeJob
-const labels = { match: 'Täsmää', difference: 'Ero', manual: 'Tarkista käsin', unavailable: 'Tieto puuttuu' }
+const labels = { match: 'Täsmää', difference: 'Ero', manual: 'Tarkista käsin', unavailable: 'Tieto puuttuu', not_checked: 'Ei tarkistettu' }
 const number = new Intl.NumberFormat('fi-FI', { maximumFractionDigits: 2 })
-const format = (cell) => cell?.value == null ? '—' : number.format(cell.value)
+const format = (cell, unit) => cell?.value == null ? '—' : number.format(cell.value) + (unit === 'percent' ? ' %' : '')
 function message(text, error = false) { el('message').textContent = text; el('message').classList.toggle('error', error) }
 async function api(path, body) {
     const response = await fetch(path, body ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})
@@ -71,24 +71,28 @@ function renderReport() {
     el('warnings').hidden = !report?.warnings?.length
     for (const text of report?.warnings || []) { const p = document.createElement('p'); p.textContent = text; el('warnings').append(p) }
     if (!report) return
-    const counts = report.rows.reduce((all, row) => { all[row.status] = (all[row.status] || 0) + 1; return all }, {})
-    el('summary').textContent = `${counts.match || 0} täsmää · ${counts.difference || 0} eroa · ${(counts.manual || 0) + (counts.unavailable || 0)} tarkistettavaa`
+    const countsFor = (field) => report.rows.reduce((all, row) => { all[row[field]] = (all[row[field]] || 0) + 1; return all }, {})
+    const summaryFor = (title, counts) => `${title}: ${counts.match || 0} täsmää · ${counts.difference || 0} eroa · ${(counts.manual || 0) + (counts.unavailable || 0)} tarkistettavaa${counts.not_checked ? ` · ${counts.not_checked} ilman lähdesääntöä` : ''}`
+    el('summary').replaceChildren(...[['Alkuperäinen → API', countsFor('sourceBackendStatus')], ['API → nettisivu', countsFor('backendWebsiteStatus')]].map(([title, counts]) => { const p = document.createElement('p'); p.textContent = summaryFor(title, counts); return p }))
     el('report-meta').textContent = `${report.company.name} · tilikausi päättyy ${report.periodEnd}. Valuatumin data (${report.provenance.backendMode === 'live' ? 'API-haku' : 'tallennettu'}): ${report.provenance.backendRetrievedAt || 'hakuaika puuttuu'}. Nettisivu tarkistettu: ${new Date(report.provenance.checkedAt).toLocaleString('fi-FI')}. Lähde: ${report.provenance.filingName}.`
     for (const row of report.rows) {
+        if (el('row-scope').value === 'core' && row.sourceBackendStatus === 'not_checked') continue
         if (el('only-open').checked && row.status === 'match') continue
         const tr = document.createElement('tr')
         const name = document.createElement('th'); name.scope = 'row'; name.textContent = row.label
         const evidence = row.official?.selectedFact
         if (evidence) { const button = document.createElement('button'); button.type = 'button'; button.className = 'evidence'; button.textContent = 'Näytä lähdeluku'; button.addEventListener('click', () => showDocument(evidence.documentIndex, evidence.elementId)); name.append(button) }
         tr.append(name)
-        for (const field of ['official', 'backend', 'website']) { const td = document.createElement('td'); td.className = 'number'; td.textContent = format(row[field]); td.title = row[field]?.note || row[field]?.text || ''; tr.append(td) }
+        for (const field of ['official', 'backend', 'website']) { const td = document.createElement('td'); td.className = 'number'; td.textContent = format(row[field], row.unit); td.title = row[field]?.note || row[field]?.text || ''; tr.append(td) }
         const result = document.createElement('td'); result.className = `result ${row.status}`
         const strong = document.createElement('strong'); strong.textContent = labels[row.status] || row.status
         const detail = document.createElement('small'); detail.textContent = `Lähde → Valuatum: ${labels[row.sourceBackendStatus] || row.sourceBackendStatus}. Valuatum → sivu: ${labels[row.backendWebsiteStatus] || row.backendWebsiteStatus}.`
         result.append(strong, detail)
         if (row.status !== 'match') {
             const note = document.createElement('small')
-            note.textContent = row.key === 'grossProfit' && row.official.value == null
+            note.textContent = row.sourceBackendStatus === 'not_checked'
+                ? 'Alkuperäisen tilinpäätöksen vertailusääntöä ei ole vielä määritelty. API:n ja sivun tulos näkyy erikseen.'
+                : row.key === 'grossProfit' && row.official.value == null
                 ? 'Bruttotulosta ei ole omana lähderivinään. Tarkista laskentatapa tuloslaskelmasta.'
                 : /metadata|company identity|consolidation scope/.test(row.website.note || '')
                 ? 'Sivulta ei voitu vahvistaa yritystä ja tarkkaa tilikautta. Tarkista ne käsin; vanha sivuversio tarvitsee uuden rakennuksen.'
@@ -187,6 +191,7 @@ el('website-url').addEventListener('input', () => { invalidate(); try { link('op
 el('filing-file').addEventListener('change', event => importFile(event, 'filing'))
 el('backend-file').addEventListener('change', event => importFile(event, 'backend'))
 el('only-open').addEventListener('change', renderReport)
+el('row-scope').addEventListener('change', renderReport)
 el('download').addEventListener('click', () => {
     const blob = new Blob([JSON.stringify(state.report, null, 2)], { type: 'application/json' })
     const href = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = href; a.download = `tarkistus-${state.report.company.orgnr}-${state.report.periodEnd}.json`; a.click(); URL.revokeObjectURL(href)

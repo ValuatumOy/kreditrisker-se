@@ -1,5 +1,6 @@
 """Fetch one original filing through bounded HTTP ranges of public bulk ZIPs."""
 
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeout
 from datetime import date, datetime, timezone
 import hashlib
 import io
@@ -24,6 +25,7 @@ MAX_LIST_PAGES = 100
 MAX_CENTRAL = 16 * 1024 * 1024
 MAX_FILING = 20 * 1024 * 1024
 MAX_ENTRIES = 100000
+INDEX_WORKERS = 4
 KEY_PATTERN = re.compile(r"arsredovisningar/(20\d{2})/(\d{1,2})_(\d+)\.zip\Z")
 ENTRY_PATTERN = re.compile(r"\d{10}_\d{4}-\d{2}-\d{2}\.zip\Z")
 
@@ -221,6 +223,37 @@ class OfficialFilings:
             raise ValueError("Ladattu tilinpäätös ei ole kelvollinen yrityskohtainen ZIP.")
         return data
 
+    def _find(self, archives, target, progress):
+        # Resolve each bounded batch in newest-first order, irrespective of network completion order.
+        with ThreadPoolExecutor(max_workers=INDEX_WORKERS) as executor:
+            futures = []
+            try:
+                for begin in range(0, len(archives), INDEX_WORKERS):
+                    batch = archives[begin:begin + INDEX_WORKERS]
+                    futures = [executor.submit(self._index, archive) for archive in batch]
+                    for index, (archive, future) in enumerate(zip(batch, futures), begin + 1):
+                        message = f"Etsitään tilinpäätöstä: {archive['key'].removeprefix('arsredovisningar/')} ({index}/{len(archives)})"
+                        while True:
+                            if progress:
+                                progress(message)
+                            try:
+                                entries = future.result(timeout=0.5)
+                                break
+                            except FutureTimeout:
+                                if future.done():
+                                    raise
+                                continue
+                        matches = [entry for entry in entries if entry["name"] == target]
+                        if len(matches) > 1:
+                            raise ValueError("Samassa viikkopaketissa on useita saman yrityksen ja tilikauden tilinpäätöksiä. Lähde pitää tarkistaa käsin.")
+                        if matches:
+                            return archive, matches[0]
+                return None
+            finally:
+                for future in futures:
+                    future.cancel()
+                # The context waits for in-flight requests before returning, including cancellation.
+
     def fetch(self, orgnr: str, period_end: str, progress=None) -> dict:
         if not isinstance(orgnr, str) or not re.fullmatch(r"\d{6}-?\d{4}", orgnr):
             raise ValueError("Anna ruotsalainen 10-numeroinen yritystunnus.")
@@ -239,14 +272,9 @@ class OfficialFilings:
             match = KEY_PATTERN.fullmatch(archive["key"])
             return tuple(int(value) for value in match.groups())
         archives = sorted((a for a in archives if order(a)[0] >= max(2020, period.year)), key=order, reverse=True)
-        for number, archive in enumerate(archives, 1):
-            if progress:
-                progress(f"Etsitään tilinpäätöstä: {archive['key'].removeprefix('arsredovisningar/')} ({number}/{len(archives)})")
-            matches = [entry for entry in self._index(archive) if entry["name"] == target]
-            if len(matches) > 1:
-                raise ValueError("Samassa viikkopaketissa on useita saman yrityksen ja tilikauden tilinpäätöksiä. Lähde pitää tarkistaa käsin.")
-            if not matches:
-                continue
+        found = self._find(archives, target, progress)
+        if found:
+            archive, entry = found
             identity = self._identity(archive)
             data_path = self.cache_dir / target
             meta_path = self.cache_dir / (target + ".json")
@@ -256,7 +284,7 @@ class OfficialFilings:
                 data = data_path.read_bytes() if data_path.stat().st_size <= MAX_FILING else b""
                 from_cache = bool(data and hashlib.sha256(data).hexdigest() == meta.get("sha256"))
             if not from_cache:
-                data = self._download(archive, matches[0])
+                data = self._download(archive, entry)
                 meta = {"name": target, "url": BASE_URL + "/" + archive["key"], "retrievedAt": _utc_now(),
                         "archiveIdentity": identity, "sha256": hashlib.sha256(data).hexdigest()}
                 _write_bytes(data_path, data)

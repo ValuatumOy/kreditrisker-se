@@ -44,8 +44,9 @@
     </section>
     <section class="comparison" aria-labelledby="comparison-title">
       <div class="panel-head"><h2 id="comparison-title">Lukujen vertailu</h2><button id="download" type="button" hidden>Lataa tarkistus</button></div>
-      <p class="scope">14 pääluvun automaattinen vertailu. Summat kruunuina, työntekijät henkilöinä. Nettisivun tkr-luvut muunnetaan kruunuiksi; pyöristys huomioidaan.</p>
+      <p class="scope">API:n ja sivun vertailu kattaa 120 mahdollista taulukkoriviä. Alkuperäisen tilinpäätöksen vertailussa on 14 pääluvun säännöt. Muut lähderivit jäävät tarkistamatta. Summat kruunuina, henkilöstö henkilöinä ja tunnusluvut prosentteina.</p>
       <div id="summary" class="summary" hidden></div>
+      <label class="document-label">Näytettävät rivit<select id="row-scope"><option value="core">14 päälukua</option><option value="all">Kaikki 120 riviä</option></select></label>
       <label id="filter-label" class="filter" hidden><input id="only-open" type="checkbox"> Näytä vain erot ja käsintarkistettavat</label>
       <div class="table-wrap" tabindex="0" role="region" aria-label="Tilinpäätöslukujen vertailu">
         <table><thead><tr><th scope="col">Luku</th><th scope="col">Tilinpäätös</th><th scope="col">Valuatum / REST</th><th scope="col">Nettisivu</th><th scope="col">Tulos</th></tr></thead><tbody id="rows"></tbody></table>

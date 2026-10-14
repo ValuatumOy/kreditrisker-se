@@ -128,25 +128,32 @@ def _website_rows(html, label):
                 values = [n for n in cells if n.tag == "td"]
                 if len(indexes) != 1 or len(labels) != 1:
                     if indexes:
-                        result.append((_text(labels[0].text()), None, group, "Ambiguous website period headers or row label."))
+                        result.append((_text(labels[0].text()), None, group, "Ambiguous website period headers or row label.",
+                                       "", {}, row.attrs.get("data-metric-key")))
                     continue
                 index = indexes[0]
                 header = headers[index]
                 note = "" if len(header_rows) == 1 and all(h[2] == 1 for h in headers) and len(values) == len(headers) else "Ambiguous website fiscal labels or cell order."
                 result.append((_text(labels[0].text()), _text(values[index].text()) if index < len(values) else None, group,
-                               note, header[1], {**header[3], "data-orgnr": figure.attrs.get("data-orgnr")}))
+                               note, header[1], {**header[3], "data-orgnr": figure.attrs.get("data-orgnr")},
+                               row.attrs.get("data-metric-key")))
     return result
 
 
 def _website(metric, rows, months, orgnr, start, end):
     group_prefix = _text(metric.get("websiteGroup", ""))
-    matches = [r for r in rows if r[0] == _text(metric["label"]) and (not group_prefix or r[2].startswith(group_prefix))]
+    keyed = any(r[6] is not None for r in rows)
+    matches = ([r for r in rows if r[6] == metric["key"]] if keyed else
+               [r for r in rows if r[0] == _text(metric["label"]) and (not group_prefix or r[2].startswith(group_prefix))])
     out = {"value": None, "status": "missing", "note": "Published FinancialTable row or exact fiscal column is absent.", "text": None}
     if not matches:
         return out
     if len(matches) != 1 or matches[0][3]:
         return {**out, "status": "manual", "note": matches[0][3] or "Multiple published rows have this label and period."}
-    _, text, group, _, header, metadata = matches[0]
+    visible_label, text, group, _, header, metadata, metric_key = matches[0]
+    if keyed and (visible_label != _text(metric["label"]) or (group_prefix and not group.startswith(group_prefix))):
+        return {**out, "status": "manual", "note": "Published metric key has a different visible label or statement group."}
+    out["keyVerified"] = keyed
     out["text"] = text
     metadata_notes = []
     if not orgnr or _orgnr(metadata.get("data-orgnr")) != orgnr:
@@ -167,7 +174,13 @@ def _website(metric, rows, months, orgnr, start, end):
         return {**out, "status": "manual", "note": "Published monetary group does not declare tkr."}
     if metric["unit"] == "people" and group != "Nyckeltal":
         return {**out, "status": "manual", "note": "Published employee count is not in Nyckeltal."}
+    if metric["unit"] == "percent" and group != "Nyckeltal":
+        return {**out, "status": "manual", "note": "Published percentage is not in Nyckeltal."}
     number = re.sub(r"[\s\u00a0\u202f]", "", text).replace("−", "-").replace(",", ".")
+    if metric["unit"] == "percent":
+        if not number.endswith("%"):
+            return {**out, "status": "manual", "note": "Published percentage cell does not declare %."}
+        number = number[:-1]
     if not re.fullmatch(r"[+-]?\d+(?:\.\d+)?", number):
         return {**out, "status": "manual", "note": "Published cell is not an unambiguous Swedish number."}
     value = float(number) * (1000 if metric["unit"] == "SEK" else 1)
@@ -197,6 +210,8 @@ def _tolerance(fact):
 
 def _official(metric, facts, documents, orgnr, start, end, metadata_ok, consolidated):
     out = {"value": None, "unit": metric["unit"], "facts": [], "selectedFact": None, "status": "missing", "note": "No eligible official fact; absence does not establish zero."}
+    if metric.get("sourceCheck") is False:
+        return {**out, "status": "not_checked", "note": "Original filing mapping is not verified for this metric; only REST to website is checked."}, None
     if not metric.get("concepts"):
         return {**out, "status": "manual", "note": "No direct official concept configured; a calculated subtotal needs manual review."}, None
     relevant = [f for f in facts if f.get("localName") in metric["concepts"]]
@@ -209,10 +224,13 @@ def _official(metric, facts, documents, orgnr, start, end, metadata_ok, consolid
         return {**out, "status": "manual", "note": "Cannot select an exact official duration without explicit REST period metadata."}, None
     period_facts = [f for f in annual if (f.get("instant") == end if metric["kind"] == "instant"
                                          else f.get("start") == start and f.get("end") == end and not f.get("instant"))]
-    eligible = [f for f in period_facts if _orgnr(f.get("entity")) == orgnr and not f.get("dimensions") and f.get("contextId")]
+    segmented_documents = {f.get("documentIndex") for f in facts if f.get("reportingScope") in {"company", "group", "general"}}
+    eligible = [f for f in period_facts if _orgnr(f.get("entity")) == orgnr and not f.get("dimensions") and f.get("contextId")
+                and (f.get("reportingScope", "unsegmented") == "company" or
+                     (f.get("reportingScope", "unsegmented") == "unsegmented" and f.get("documentIndex") not in segmented_documents))]
     if not eligible:
         if period_facts:
-            return {**out, "status": "manual", "note": "Matching-period facts have the wrong/unknown entity, dimensional scope or unknown context."}, None
+            return {**out, "status": "manual", "note": "Matching-period facts have the wrong/unknown entity, company/group scope, dimensions or unknown context."}, None
         if metric["key"] == "grossProfit":
             return {**out, "status": "manual", "note": "Gross profit has no direct official fact; the backend subtotal may be calculated."}, None
         return out, None
@@ -260,10 +278,15 @@ def _backend(metric, raw, state, note, currency):
         if metric["key"] == "netSales" and (_number(raw.get("cr_gross_profit")) or 0) != 0:
             return {**out, "note": "Net sales is absent with nonzero gross profit; net sales is not verified."}
         return {**out, "value": 0, "status": "zero_omission", "note": "Backend omitted variable interpreted as zero using the CV statement convention."}
-    return {**out, "value": float(value) * (1_000_000 if metric["unit"] == "SEK" else 1), "status": "reported", "note": "REST monetary value converted from millions to SEK." if metric["unit"] == "SEK" else "REST employee count."}
+    multiplier = {"SEK": 1_000_000, "percent": 100}.get(metric["unit"], 1)
+    note = {"SEK": "REST monetary value converted from millions to SEK.",
+            "percent": "REST fraction converted to percentage points."}.get(metric["unit"], "REST employee count.")
+    return {**out, "value": float(value) * multiplier, "status": "reported", "note": note}
 
 
 def _leg(left, right, tolerance):
+    if left["status"] == "not_checked" or right["status"] == "not_checked":
+        return "not_checked", None
     if left["status"] == "manual" or right["status"] == "manual":
         return "manual", None
     if left["value"] is None or right["value"] is None:
@@ -306,26 +329,33 @@ def compare(filing, bundle, website_html, period_end, config):
         same_scope = [m for m in config if _text(m["label"]) == _text(metric["label"]) and (
             not group_prefix or not m.get("websiteGroup") or group_prefix.startswith(_text(m["websiteGroup"]))
             or _text(m["websiteGroup"]).startswith(group_prefix))]
-        if len(same_scope) > 1:
+        if len(same_scope) > 1 and not website.get("keyVerified") and website["status"] != "missing":
             website.update(value=None, status="manual", note="Configured website label is not unique within its statement group.")
         if not start:
             website["note"] = "Cannot verify published fiscal column without explicit REST period metadata."
         source_status, source_difference = _leg(official, backend, tolerance or Decimal(0))
-        website_status, website_difference = _leg(backend, website, Decimal(500 if metric["unit"] == "SEK" else "0.5"))
+        website_tolerance = (Decimal("0.5") * Decimal(10) ** -metric.get("displayDigits", 1)
+                             if metric["unit"] == "percent" else Decimal(500 if metric["unit"] == "SEK" else "0.5"))
+        website_status, website_difference = _leg(backend, website, website_tolerance)
         if backend["value"] is None and website["value"] is not None:
             website_status = "manual"
             website["note"] += " Published numeric value has no verified backend counterpart."
         statuses = (source_status, website_status)
-        overall = next((s for s in ("difference", "manual", "unavailable") if s in statuses), "match")
+        overall = next((s for s in ("difference", "manual", "unavailable") if s in statuses),
+                       "manual" if "not_checked" in statuses else "match")
         note = "Both comparison legs match." if overall == "match" else "; ".join(dict.fromkeys(
             item["note"] for item in (official, backend, website) if item["note"]))
-        rows.append({"key": metric["key"], "label": metric["label"], "variable": metric["variable"],
+        rows.append({"key": metric["key"], "label": metric["label"], "variable": metric["variable"], "unit": metric["unit"],
                      "concepts": metric.get("concepts", []), "official": official, "backend": backend, "website": website,
                      "sourceBackendStatus": source_status, "backendWebsiteStatus": website_status,
                      "differenceSourceBackend": source_difference, "differenceBackendWebsite": website_difference,
                      "status": overall, "note": note})
     summary = {status: sum(r["status"] == status for r in rows) for status in ("match", "difference", "manual", "unavailable")}
     summary["total"] = len(rows)
+    coverage = {leg: {status: sum(r[field] == status for r in rows)
+                     for status in ("match", "difference", "manual", "unavailable", "not_checked")}
+                for leg, field in (("sourceBackend", "sourceBackendStatus"), ("backendWebsite", "backendWebsiteStatus"))}
+    coverage["total"] = len(rows)
     return {"company": {"name": md.get("companyName"), "orgnr": orgnr, "fid": bundle.get("fid", md.get("followedModelId")),
                         "currency": md.get("currency"), "retrievedAt": bundle.get("retrievedAt")},
-            "periodEnd": end, "rows": rows, "summary": summary, "warnings": warnings}
+            "periodEnd": end, "rows": rows, "summary": summary, "coverage": coverage, "warnings": warnings}

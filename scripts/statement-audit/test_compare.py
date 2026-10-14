@@ -41,6 +41,13 @@ def html(value="427 568", label="Nettoomsättning", year="2025/26", group="Resul
 
 
 class CompareTest(unittest.TestCase):
+    def test_absent_keyed_duplicate_label_remains_unavailable(self):
+        other = {**SALES, "key": "other", "label": "Övrigt", "sourceCheck": False}
+        another = {**other, "key": "another"}
+        site = html().replace('<tr>\n      <th scope="row">', '<tr data-metric-key="netSales">\n      <th scope="row">')
+        report = compare(filing(fact()), bundle(), site, END, [SALES, other, another])
+        self.assertEqual([r["backendWebsiteStatus"] for r in report["rows"][1:]], ["unavailable", "unavailable"])
+
     def row(self, source=None, backend=None, site=None, metrics=None):
         result = compare(source if source is not None else filing(fact()), backend if backend is not None else bundle(),
                          site if site is not None else html(), END, metrics if metrics is not None else [SALES])
@@ -71,6 +78,28 @@ class CompareTest(unittest.TestCase):
 
     def test_annual_documents_only(self):
         self.assertEqual(self.row(source=filing(fact(documentIndex=1)))["sourceBackendStatus"], "unavailable")
+
+    def test_company_and_group_same_period_are_separated(self):
+        company = fact(reportingScope="company", contextId="jur", elementId="company")
+        group = fact(900000000, reportingScope="group", contextId="kon", elementId="group")
+        general = fact(123, reportingScope="general", contextId="gem", elementId="general")
+        for facts in ((company, group, general), (general, group, company)):
+            row = self.row(source=filing(*facts))
+            self.assertEqual(row["sourceBackendStatus"], "match")
+            self.assertEqual(row["official"]["selectedFact"]["elementId"], "company")
+            self.assertEqual(row["official"]["facts"], [company])
+
+    def test_general_group_unknown_and_dimensional_scope_never_match_company(self):
+        for changes in ({"reportingScope": "group"}, {"reportingScope": "general"}, {"reportingScope": "unknown"},
+                        {"reportingScope": None}, {"reportingScope": "company", "dimensions": {"axis": "value"}}):
+            with self.subTest(changes=changes):
+                self.assertEqual(self.row(source=filing(fact(**changes)))["sourceBackendStatus"], "manual")
+
+    def test_unsegmented_numbers_in_segmented_document_have_unknown_scope(self):
+        unsegmented = fact(reportingScope="unsegmented")
+        group = fact(900000000, reportingScope="group", localName="OtherFact")
+        self.assertEqual(self.row(source=filing(unsegmented, group))["sourceBackendStatus"], "manual")
+        self.assertEqual(self.row(source=filing(unsegmented))["sourceBackendStatus"], "match")
 
     def test_rounded_summary_and_exact_duplicate_are_consistent(self):
         rounded = fact(427568000, decimals=-3, elementId="rounded-summary")
@@ -217,6 +246,77 @@ class CompareTest(unittest.TestCase):
     def test_real_sample_year_key_2025_means_june_2026(self):
         sample = json.loads((Path(__file__).resolve().parents[2] / "data/sample/api-cache/52.json").read_text(encoding="utf-8"))
         self.assertEqual(self.row(backend=sample)["status"], "match")
+
+    def test_unmapped_additional_metric_checks_only_website(self):
+        metric = {**SALES, "key": "otherIncome", "concepts": [], "sourceCheck": False}
+        row = self.row(metrics=[metric])
+        self.assertEqual(row["sourceBackendStatus"], "not_checked")
+        self.assertEqual(row["official"]["status"], "not_checked")
+        self.assertEqual(row["backendWebsiteStatus"], "match")
+        self.assertEqual(row["status"], "manual")
+        self.assertEqual(row["unit"], "SEK")
+        self.assertIsNone(row["differenceSourceBackend"])
+
+    def test_percent_fraction_conversion_and_display_precision(self):
+        metric = {"key": "margin", "label": "Rörelsemarginal", "variable": "margin", "unit": "percent",
+                  "kind": "duration", "sourceCheck": False, "concepts": [], "displayDigits": 1,
+                  "websiteGroup": "Nyckeltal", "zeroWhenAbsent": False}
+        for raw, displayed in ((0.456, "45,6 %"), (0.45561, "45,6 %"), (-0.45561, "−45,6 %"), (0, "0,0 %")):
+            with self.subTest(raw=raw):
+                row = self.row(backend=bundle(margin=raw), site=html(displayed, metric["label"], group="Nyckeltal"), metrics=[metric])
+                self.assertEqual(row["backendWebsiteStatus"], "match")
+                self.assertAlmostEqual(row["backend"]["value"], raw * 100)
+                self.assertEqual(row["status"], "manual")
+                self.assertEqual(row["unit"], "percent")
+        self.assertEqual(self.row(backend=bundle(margin=0.45549), site=html("45,6 %", metric["label"], group="Nyckeltal"),
+                                  metrics=[metric])["backendWebsiteStatus"], "difference")
+        self.assertEqual(self.row(backend=bundle(margin=45.6), site=html("45,6 %", metric["label"], group="Nyckeltal"),
+                                  metrics=[metric])["backendWebsiteStatus"], "difference")
+        for displayed, group in (("45,6", "Nyckeltal"), ("45,6 kr", "Nyckeltal"), ("45,6 %%", "Nyckeltal")):
+            self.assertEqual(self.row(backend=bundle(margin=0.456), site=html(displayed, metric["label"], group=group),
+                                      metrics=[metric])["backendWebsiteStatus"], "manual")
+        self.assertNotEqual(self.row(backend=bundle(margin=0.456), site=html("45,6 %", metric["label"], group="Resultaträkning, tkr"),
+                                     metrics=[metric])["backendWebsiteStatus"], "match")
+        metric["displayDigits"] = 0
+        self.assertEqual(self.row(backend=bundle(margin=0.456), site=html("46 %", metric["label"], group="Nyckeltal"),
+                                  metrics=[metric])["backendWebsiteStatus"], "match")
+        self.assertEqual(self.row(backend=bundle(margin=0.4549), site=html("46 %", metric["label"], group="Nyckeltal"),
+                                  metrics=[metric])["backendWebsiteStatus"], "difference")
+
+    def test_metric_keys_disambiguate_repeated_statement_labels(self):
+        metric = {**SALES, "key": "otherA", "label": "Övrigt", "websiteGroup": "Balansräkning"}
+        other_metric = {**metric, "key": "otherB"}
+        site = html(label="Övrigt", group="Balansräkning, tkr").replace('<tr>\n      <th scope="row">', '<tr data-metric-key="otherA">\n      <th scope="row">')
+        other_site = html("100", label="Övrigt", group="Balansräkning, tkr").replace('<tr>\n      <th scope="row">', '<tr data-metric-key="otherB">\n      <th scope="row">')
+        report = compare(filing(fact()), bundle(), site + other_site, END, [metric, other_metric])
+        self.assertEqual(report["rows"][0]["backendWebsiteStatus"], "match")
+        self.assertEqual(report["rows"][1]["backendWebsiteStatus"], "difference")
+        self.assertEqual(report["rows"][1]["website"]["value"], 100000)
+        self.assertEqual(self.row(site=site + site, metrics=[metric])["backendWebsiteStatus"], "manual")
+        self.assertEqual(self.row(site=site.replace('data-metric-key="otherA"', 'data-metric-key="wrong"'),
+                                  metrics=[metric])["backendWebsiteStatus"], "unavailable")
+        for changed in (site.replace('scope="row">Övrigt', 'scope="row">Other'),
+                        site.replace("Balansräkning, tkr", "Resultaträkning, tkr")):
+            self.assertEqual(self.row(site=changed, metrics=[metric])["backendWebsiteStatus"], "manual")
+        self.assertEqual(self.row(site=site.replace('data-period-end="2026-06-30"', 'data-period-end="2025-06-30"'),
+                                  metrics=[metric])["backendWebsiteStatus"], "manual")
+
+    def test_missing_publication_does_not_pass_unmapped_metric(self):
+        metric = {**SALES, "sourceCheck": False, "concepts": []}
+        row = self.row(site="", metrics=[metric])
+        self.assertEqual(row["website"]["status"], "missing")
+        self.assertEqual(row["backendWebsiteStatus"], "unavailable")
+        self.assertNotEqual(row["status"], "match")
+
+    def test_coverage_counts_both_legs_separately(self):
+        extra = {**SALES, "key": "other", "label": "Other", "sourceCheck": False, "concepts": []}
+        report = compare(filing(fact()), bundle(), html() + html(label="Other"), END, [SALES, extra])
+        self.assertEqual(report["coverage"]["total"], 2)
+        self.assertEqual(report["coverage"]["sourceBackend"]["match"], 1)
+        self.assertEqual(report["coverage"]["sourceBackend"]["not_checked"], 1)
+        self.assertEqual(report["coverage"]["backendWebsite"]["match"], 2)
+        self.assertEqual(sum(report["coverage"]["sourceBackend"].values()), 2)
+        self.assertEqual(sum(report["coverage"]["backendWebsite"].values()), 2)
 
 
 if __name__ == "__main__":

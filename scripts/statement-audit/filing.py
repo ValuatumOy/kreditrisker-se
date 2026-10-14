@@ -22,6 +22,11 @@ XBRLI = "http://www.xbrl.org/2003/instance"
 XBRLDI = "http://xbrl.org/2006/xbrldi"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 TRANSFORM_BASE = "http://www.xbrl.org/inlineXBRL/transformation/"
+REPORTING_SCOPES = {
+    f"{{http://www.taxonomier.se/se/fr/gen-base/{version}}}RedovisningInformation{name}Segment": scope
+    for version in ("2020-12-01", "2021-10-31")
+    for name, scope in (("JuridiskPerson", "company"), ("Koncern", "group"), ("Generell", "general"))
+}
 TRANSFORMS = {
     "2010-04-20": {"numspacecomma", "numspacedot", "numcomma", "numdot", "numdotcomma", "numcommadot"},
     "2011-07-31": {"numcommadecimal", "numdotdecimal"},
@@ -133,7 +138,7 @@ def _one_text(element, path):
 
 
 def _context(element, scopes):
-    result = {"entity": None, "start": None, "end": None, "instant": None, "dimensions": {}}
+    result = {"entity": None, "start": None, "end": None, "instant": None, "dimensions": {}, "reportingScope": "unsegmented"}
     result["entity"] = _one_text(element, "i:entity/i:identifier")
     periods = element.findall("i:period", NS)
     if len(periods) != 1:
@@ -155,7 +160,17 @@ def _context(element, scopes):
         raise ValueError("Context start date is after end date")
     containers = element.findall("i:entity/i:segment", NS) + element.findall("i:scenario", NS)
     for container in containers:
+        if not len(container):
+            raise ValueError("Empty context segment/scenario has unknown reporting scope")
+        if (container.text or "").strip() or any((member.tail or "").strip() for member in container):
+            raise ValueError("Mixed context segment/scenario text has unknown reporting scope")
         for member in container:
+            if member.tag in REPORTING_SCOPES:
+                if (container.tag != f"{{{XBRLI}}}segment" or len(containers) != 1 or len(container) != 1
+                        or len(member) or member.attrib or (member.text or "").strip()):
+                    raise ValueError("Mixed or ambiguous reporting scope segment")
+                result["reportingScope"] = REPORTING_SCOPES[member.tag]
+                continue
             if member.tag not in {f"{{{XBRLDI}}}explicitMember", f"{{{XBRLDI}}}typedMember"}:
                 raise ValueError("Unsupported context segment/scenario content")
             dimension = member.get("dimension", "")
@@ -312,7 +327,7 @@ def _document(data, name, index):
         fact = {
             "concept": element.get("name", ""), "localName": element.get("name", "").split(":")[-1],
             "namespace": None, "contextId": element.get("contextRef"), "entity": None,
-            "start": None, "end": None, "instant": None, "dimensions": {},
+            "start": None, "end": None, "instant": None, "dimensions": {}, "reportingScope": None,
             "unit": None, "unitRef": element.get("unitRef"), "value": None, "decimals": None,
             "text": _text(element).strip(), "elementId": element.get("id"), "documentIndex": index,
         }

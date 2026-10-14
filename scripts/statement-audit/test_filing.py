@@ -131,6 +131,42 @@ class FilingTests(unittest.TestCase):
         self.assertIsNone(fact["value"])
         self.assertIn("Duplicate", fact["error"])
 
+    def test_known_company_group_general_segments_preserve_scope(self):
+        for version in ("2020-12-01", "2021-10-31"):
+            for name, expected in (("JuridiskPerson", "company"), ("Koncern", "group"), ("Generell", "general")):
+                with self.subTest(version=version, scope=expected):
+                    contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment><se-gen-base:RedovisningInformation{name}Segment/></xbrli:segment></xbrli:entity>')
+                    xml = document(numeric("123"), contexts=contexts).replace(b"gen-base/2020-12-01", f"gen-base/{version}".encode())
+                    fact = filing.read_filing(xml, "scope.xhtml")["facts"][0]
+                    self.assertEqual(fact["reportingScope"], expected)
+                    self.assertEqual(fact["value"], 123)
+                    self.assertEqual(fact["dimensions"], {})
+                    self.assertNotIn("error", fact)
+
+    def test_unknown_mixed_and_ambiguous_scope_segments_are_excluded(self):
+        marker = '<se-gen-base:RedovisningInformationJuridiskPersonSegment/>'
+        members = [
+            '<test:RedovisningInformationJuridiskPersonSegment/>',
+            '<se-gen-base:RedovisningInformationUnknownSegment/>',
+            marker + '<se-gen-base:RedovisningInformationKoncernSegment/>',
+            marker + marker,
+            'unknown scope' + marker,
+            marker + 'unknown scope',
+            marker + '<xbrldi:explicitMember dimension="test:Group">test:Parent</xbrldi:explicitMember>',
+            '<se-gen-base:RedovisningInformationJuridiskPersonSegment>company</se-gen-base:RedovisningInformationJuridiskPersonSegment>',
+            '<se-gen-base:RedovisningInformationJuridiskPersonSegment test:extra="company"/>',
+            '<se-gen-base:RedovisningInformationJuridiskPersonSegment><test:Child/></se-gen-base:RedovisningInformationJuridiskPersonSegment>',
+            '',
+        ]
+        for member in members:
+            with self.subTest(member=member):
+                contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment>{member}</xbrli:segment></xbrli:entity>')
+                fact = self.read(numeric("123"), contexts=contexts)["facts"][0]
+                self.assertIsNone(fact["reportingScope"])
+                self.assertIn("error", fact)
+        scenario = CONTEXT.replace('</xbrli:context>', f'<xbrli:scenario>{marker}</xbrli:scenario></xbrli:context>')
+        self.assertIn("error", self.read(numeric("123"), contexts=scenario)["facts"][0])
+
     def test_continuations_exclude_text_and_do_not_double_count(self):
         body = '<ix:nonNumeric name="test:Description" contextRef="duration" continuedAt="one">Hello <ix:exclude>skip</ix:exclude><span>world</span></ix:nonNumeric><ix:continuation id="one" continuedAt="two"> and </ix:continuation><ix:continuation id="two">Sweden.</ix:continuation>'
         result = self.read(body)
