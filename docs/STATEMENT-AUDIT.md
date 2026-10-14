@@ -150,4 +150,10 @@ hakemistoista noin 20 sekunnissa; välimuistihaku kesti 0,28 sekuntia. 67 työka
 läpäisivät, mukaan lukien osittaiset ZIP-lataukset, CRC-virheet, oikean Node-asiakkaan
 REST-haku paikallista testi-API:a vasten, väärän yrityksen/mallin torjunta,
 peruutus ja vanhan raportin poistuminen epäonnistuneessa haussa.
-Oikean Ruotsin REST:n tuoretta hakua ei voitu kokeilla ilman API-tunnusta.
+14.10.2026 yhteys kokeiltiin myös oikealla Ruotsin REST-API:lla paikallisen tunnuksen
+asettamisen jälkeen. S M Entreprenadin nimihaku löysi mallin 52, tilikausivalinta
+2026-06-30 haki luvut uudelleen API:sta (backendMode `live`, hakupäivä 14.10.2026),
+ja automaattinen Bolagsverket-haku löysi saman tilinpäätöksen hakemistojen ja
+yritystiedoston välimuistia hyödyntäen. Käyttöliittymässä 13 päälukua täsmäsi,
+eroja oli 0 ja bruttotulos jäi käsintarkistettavaksi. Tiedostoja ei tuotu käsin.
+Paikallinen `.env` ja tunnus pysyvät Gitin ulkopuolella.
