@@ -4,6 +4,7 @@
 //   http:     the Stripe checkout backend in backend/ (PUBLIC_SE_REPORT_API=/api/)
 // Runs in the browser, so it must not import Node modules.
 
+import { formatOrgnr } from '../orgnr.ts'
 import type { OrderRequest, ReportBackend, ReportProduct, ReportState } from './types.ts'
 
 export const disabledBackend: ReportBackend = {
@@ -65,7 +66,8 @@ export function httpBackend(base: string, fetchImpl: typeof fetch = fetch): Repo
                     body: JSON.stringify({
                         reportType: REPORT_TYPE[req.product],
                         fid: req.fid,
-                        businessId: req.orgnr,
+                        // Valuatum stores a Swedish organisationsnummer with its dash (556987-6542)
+                        businessId: formatOrgnr(req.orgnr),
                         companyName: req.companyName,
                         email: req.email,
                         lang: 'sv',
