@@ -47,7 +47,7 @@ test('http adapter: Stripe redirect only to Stripe, errors become states', async
     })
     assert.deepEqual(await ok.createOrder(req), { kind: 'redirect', url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
     assert.equal(sent.reportType, 'se_credit_risk')
-    assert.equal(sent.businessId, '5569876542')
+    assert.equal(sent.businessId, '556987-6542')
     assert.equal(sent.fid, '900001')
     assert.equal('price' in sent || 'amount' in sent, false, 'the client never sends a price')
     const evil = httpBackend('https://x/api/', async () => Response.json({ url: 'https://evil.example/pay' }))
