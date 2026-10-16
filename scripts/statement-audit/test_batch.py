@@ -97,7 +97,7 @@ class BatchExecutionTest(unittest.TestCase):
     def test_newer_comparative_explains_but_never_erases_original_difference(self):
         row = {"key": "sales", "label": "Liikevaihto", "sourceBackendStatus": "difference", "status": "difference", "note": "Original mismatch", "official": {"value": 100}}
         report = {"periodEnd": "2025-06-30", "rows": [row], "warnings": []}
-        checked = {"rows": [{"sourceBackendStatus": "match", "official": {"value": 110, "selectedFact": {"elementId": "new-fact"}}}]}
+        checked = {"rows": [{"key": "sales", "sourceBackendStatus": "match", "official": {"value": 110, "selectedFact": {"elementId": "new-fact"}}}]}
         newer = [("2026-06-30", {}, {"name": "new.zip", "data": b"new"})]
         with patch.object(batch, "compare", return_value=checked):
             batch.comparative_evidence(report, {}, [{"key": "sales"}], newer)

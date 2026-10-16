@@ -44,8 +44,17 @@ function renderState(next, preserve = false) {
     state = next
     el('company').replaceChildren(...state.companies.map(c => new Option(`${c.name} · ${c.orgnr}`, c.id)))
     if (preserve && state.companies.some(c => String(c.id) === previous)) el('company').value = previous
+    else if (state.report) {
+        const reported = state.companies.find(c => String(c.fid) === String(state.report.company.fid) && c.orgnr === state.report.company.orgnr)
+        if (reported) el('company').value = String(reported.id)
+    }
     periods()
     if (preserve && [...el('period').options].some(p => p.value === previousPeriod)) el('period').value = previousPeriod
+    else if (state.report && [...el('period').options].some(p => p.value === state.report.periodEnd)) el('period').value = state.report.periodEnd
+    if (!preserve && state.report?.provenance.websiteUrl) {
+        el('website-url').value = state.report.provenance.websiteUrl
+        link('open-website', state.report.provenance.websiteUrl)
+    }
     const docs = state.documents || []
     el('document').replaceChildren(...docs.map((d, i) => new Option(d.kind === 'annual' ? 'Tilinpäätös' : d.kind === 'audit' ? 'Tilintarkastuskertomus' : d.title || d.name, i)))
     el('original-frame').hidden = !docs.length
@@ -72,7 +81,8 @@ function renderReport() {
     for (const text of report?.warnings || []) { const p = document.createElement('p'); p.textContent = text; el('warnings').append(p) }
     if (!report) return
     const sourceCount = report.rows.filter(row => row.sourceBackendStatus !== 'not_checked').length
-    el('scope-description').textContent = `API:n ja sivun vertailu kattaa ${report.rows.length} mahdollista taulukkoriviä. Alkuperäiseen tilinpäätökseen on ${sourceCount} rivin lähdesäännöt; ${report.rows.length - sourceCount} riviltä sääntö puuttuu. Sääntö ei yksin vahvista lukua: puuttuvat tai epäselvät lähdetiedot jäävät tarkistettaviksi. Kulujen etumerkit muunnetaan vertailussa Valuatumin esitystapaan.`
+    const referenceCount = report.rows.filter(row => row.sourceReviewRequired).length
+    el('scope-description').textContent = `API:n ja sivun vertailu kattaa ${report.rows.length} mahdollista taulukkoriviä. ${sourceCount - referenceCount} riville on lähdesääntö ja ${referenceCount} riville määritelmän varmistusta odottava apulaskelma; ${report.rows.length - sourceCount} riviltä sääntö puuttuu. Kaavat ja osaluvut voi avata riviltä. Puuttuva osaluku on vain merkityssä laskentaesimerkissä nolla; tulos jää käsintarkistettavaksi. Kulujen etumerkit muunnetaan Valuatumin esitystapaan.`
     const countsFor = (field) => report.rows.reduce((all, row) => { all[row[field]] = (all[row[field]] || 0) + 1; return all }, {})
     const summaryFor = (title, counts) => `${title}: ${counts.match || 0} täsmää · ${counts.difference || 0} eroa · ${(counts.manual || 0) + (counts.unavailable || 0)} tarkistettavaa${counts.not_checked ? ` · ${counts.not_checked} ilman lähdesääntöä` : ''}`
     el('summary').replaceChildren(...[['Alkuperäinen → API', countsFor('sourceBackendStatus')], ['API → nettisivu', countsFor('backendWebsiteStatus')]].map(([title, counts]) => { const p = document.createElement('p'); p.textContent = summaryFor(title, counts); return p }))
@@ -84,11 +94,28 @@ function renderReport() {
         const name = document.createElement('th'); name.scope = 'row'; name.textContent = row.label
         const evidence = row.official?.selectedFact
         if (evidence) { const button = document.createElement('button'); button.type = 'button'; button.className = 'evidence'; button.textContent = 'Näytä lähdeluku'; button.addEventListener('click', () => showDocument(evidence.documentIndex, evidence.elementId)); name.append(button) }
+        const calculations = [...(row.official?.formula ? [{...row.official, title: 'Lähdelaskelma'}] : []), ...(row.reconciliations || [])]
+        for (const calculation of calculations) {
+            const details = document.createElement('details'); details.className = 'calculation'
+            const summary = document.createElement('summary'); summary.textContent = calculation.title
+            const code = document.createElement('code'); code.textContent = calculation.formula
+            details.append(summary, code)
+            if (calculation.note) { const note = document.createElement('p'); note.textContent = calculation.note; details.append(note) }
+            for (const fact of calculation.selectedFacts || []) {
+                const button = document.createElement('button'); button.type = 'button'; button.className = 'evidence'
+                button.textContent = `${fact.localName} · ${fact.instant || fact.end} · ${number.format(fact.value)} kr`
+                button.addEventListener('click', () => showDocument(fact.documentIndex, fact.elementId)); details.append(button)
+            }
+            name.append(details)
+        }
         tr.append(name)
         for (const field of ['official', 'backend', 'website']) {
             const td = document.createElement('td'); td.className = 'number'; td.textContent = format(row[field], row.unit); td.title = row[field]?.note || row[field]?.text || ''
             if (field === 'official' && row.official.sourceSign === -1 && evidence) {
                 const original = document.createElement('small'); original.textContent = `Lähteessä ${number.format(evidence.value)}; etumerkki muunnettu.`; td.append(original)
+            }
+            if (field === 'official' && row.official.formula && row.official.value != null) {
+                const caption = document.createElement('small'); caption.textContent = row.official.status === 'calculated' ? 'Laskettu lähteestä' : 'Laskentaesimerkki · ei varmennettu'; td.append(caption)
             }
             tr.append(td)
         }
@@ -96,13 +123,16 @@ function renderReport() {
         const strong = document.createElement('strong'); strong.textContent = labels[row.status] || row.status
         const detail = document.createElement('small'); detail.textContent = `Lähde → Valuatum: ${labels[row.sourceBackendStatus] || row.sourceBackendStatus}. Valuatum → sivu: ${labels[row.backendWebsiteStatus] || row.backendWebsiteStatus}.`
         result.append(strong, detail)
+        for (const assumption of row.official?.assumptions || []) {
+            const note = document.createElement('small'); note.textContent = assumption; result.append(note)
+        }
         if (row.status !== 'match') {
             const note = document.createElement('small')
             note.textContent = row.sourceBackendStatus === 'not_checked'
-                ? 'Alkuperäisen tilinpäätöksen vertailusääntöä ei ole vielä määritelty. API:n ja sivun tulos näkyy erikseen.'
+                ? row.official.note
                 : row.key === 'grossProfit' && row.official.value == null
                 ? 'Bruttotulosta ei ole omana lähderivinään. Tarkista laskentatapa tuloslaskelmasta.'
-                : /metadata|company identity|consolidation scope/.test(row.website.note || '')
+                : row.website.status === 'manual' && /metadata|company identity|consolidation scope/.test(row.website.note || '')
                 ? 'Sivulta ei voitu vahvistaa yritystä ja tarkkaa tilikautta. Tarkista ne käsin; vanha sivuversio tarvitsee uuden rakennuksen.'
                 : row.status === 'difference' ? 'Luvuissa on pyöristyksen ylittävä ero. Tarkista lähderivi ja tilikausi.'
                 : 'Lukua ei voitu varmistaa automaattisesti. Tarkista asiakirja ja avaa yrityssivu.'

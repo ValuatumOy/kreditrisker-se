@@ -65,6 +65,22 @@ class ShareTest(unittest.TestCase):
             "sourceBackend": {"match": 1}, "backendWebsite": {"manual": 1}}]}), encoding="utf-8")
         return run, cache
 
+    def test_calculation_and_reconciliation_expose_all_anchors_and_manual_assumptions(self):
+        source = {"formula": '[A] + [B] <script>', "value": 10, "status": "manual",
+                  "assumptions": ["Puuttuva B vain esimerkissä nollana"],
+                  "selectedFacts": [{"documentIndex": 0, "elementId": "a", "localName": "A", "value": 10},
+                                    {"documentIndex": 1, "elementId": "b", "localName": "B", "value": 0}]}
+        report = {"rows": [{"official": source, "status": "manual", "sourceBackendStatus": "manual",
+                   "reconciliations": [{"title": "Pyöristys", "formula": "A+B", "note": "Ero säilyy",
+                                        "selectedFacts": source["selectedFacts"]}]}]}
+        html = share.make_case(report, [{"path": "one.html", "title": "First"}, {"path": "two.html", "title": "Second"}])
+        self.assertIn('href="one.html#a"', html)
+        self.assertIn('href="two.html#b"', html)
+        self.assertIn("Laskentaesimerkki · ei varmennettu", html)
+        self.assertIn("Puuttuva B vain esimerkissä nollana", html)
+        self.assertIn("Ero säilyy", html)
+        self.assertNotIn("<script>", html)
+
     def source(self):
         return {"documents": [{"name": "annual.xhtml", "title": "Tilinpäätös", "sha256": "document-sha",
             "html": '<html><head></head><body><span id="fact-1">5</span><script>unsafe</script></body></html>'}]}

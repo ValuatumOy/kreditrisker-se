@@ -3,9 +3,11 @@
 import calendar
 import math
 import re
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from html.parser import HTMLParser
+
+from formulas import Amount, FormulaError, calculate
 
 
 def _number(value):
@@ -211,13 +213,15 @@ def _tolerance(fact):
 def _official(metric, facts, documents, orgnr, start, end, metadata_ok, consolidated):
     out = {"value": None, "unit": metric["unit"], "facts": [], "selectedFact": None, "status": "missing", "note": "No eligible official fact; absence does not establish zero."}
     if metric.get("sourceCheck") is False:
-        return {**out, "status": "not_checked", "note": "Original filing mapping is not verified for this metric; only REST to website is checked."}, None
+        return {**out, "status": "not_checked", "note": metric.get("sourceUnresolved") or "Original filing mapping is not verified for this metric; only REST to website is checked."}, None
     if not metric.get("concepts"):
         return {**out, "status": "manual", "note": "No direct official concept configured; a calculated subtotal needs manual review."}, None
     relevant = [f for f in facts if f.get("localName") in metric["concepts"]]
     annual = [f for f in relevant if isinstance(f.get("documentIndex"), int) and 0 <= f["documentIndex"] < len(documents)
               and documents[f["documentIndex"]].get("kind") == "annual"]
     out["facts"] = annual
+    if any(f.get("error") and not (f.get("instant") or (f.get("start") and f.get("end"))) for f in annual):
+        return {**out, "status": "manual", "note": "Official fact has an invalid or missing context; its fiscal period cannot be established."}, None
     if consolidated or not orgnr:
         return {**out, "status": "manual", "note": "Consolidated or unknown backend entity requires manual review."}, None
     if metric["kind"] == "duration" and not metadata_ok:
@@ -291,6 +295,119 @@ def _backend(metric, raw, state, note, currency):
     return {**out, "value": float(value) * multiplier, "status": "reported", "note": note}
 
 
+class SourceReader:
+    def __init__(self, filing, bundle, metrics, definitions, orgnr, consolidated):
+        self.filing, self.bundle = filing, bundle
+        self.metrics = {metric["variable"]: metric for metric in metrics}
+        self.definitions, self.orgnr, self.consolidated = definitions, orgnr, consolidated
+        self.cache, self.active = {}, set()
+
+    def read(self, metric, end):
+        cache_key = (metric["key"], metric["variable"], end, metric["unit"], metric["kind"],
+                     metric.get("sourceFormula"), tuple(metric.get("concepts", [])),
+                     metric.get("sourceSign", 1), metric.get("sourceCheck"), metric.get("namespacePrefix"),
+                     metric.get("reviewRequired"), metric.get("sourceUnresolved"))
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        if cache_key in self.active:
+            raise FormulaError("Lähdekaavan riippuvuuksissa on kehä.")
+        self.active.add(cache_key)
+        try:
+            result = self._read(metric, end)
+            self.cache[cache_key] = result
+            return result
+        finally:
+            self.active.remove(cache_key)
+
+    def _read(self, metric, end):
+        _, start, _, state, _ = _period(self.bundle, end)
+        direct_args = (self.filing.get("facts", []), self.filing.get("documents", []), self.orgnr,
+                       start, end, state == "reported", self.consolidated)
+        formula = metric.get("sourceFormula") if metric.get("sourceCheck") is not False else None
+        if not formula:
+            out, tolerance = _official(metric, *direct_args)
+            amount = None
+            if out["value"] is not None and tolerance is not None:
+                evidence = out["selectedFact"]
+                key = (evidence["documentIndex"], evidence.get("contextId"), evidence.get("namespace"),
+                       evidence.get("localName"), evidence.get("elementId"))
+                amount = Amount.linear(out["value"], {key: tolerance * metric.get("sourceSign", 1)})
+            return out, tolerance, amount
+        out = {"value": None, "unit": metric["unit"], "facts": [], "selectedFact": None,
+               "selectedFacts": [], "status": "manual", "formula": formula, "assumptions": []}
+        if state != "reported" or self.consolidated or not self.orgnr:
+            return {**out, "note": "Lähdelaskenta vaatii varmennetun yrityksen ja tarkan tilikauden."}, None, None
+        used, issues = {}, set()
+        if metric.get("reviewRequired"):
+            issues.add(metric["reviewRequired"])
+
+        def period(offset):
+            if not offset:
+                return end
+            previous = (date.fromisoformat(start) - timedelta(days=1)).isoformat()
+            if _period(self.bundle, previous)[3] != "reported":
+                raise FormulaError("Edeltävän peräkkäisen tilikauden metatietoja ei ole varmistettu.")
+            return previous
+
+        def consume(result):
+            official, _, amount = result
+            for evidence in official.get("selectedFacts") or ([official["selectedFact"]] if official.get("selectedFact") else []):
+                key = (evidence.get("documentIndex"), evidence.get("elementId"), evidence.get("contextId"), evidence.get("localName"))
+                used[key] = evidence
+            issues.update(official.get("assumptions", []))
+            if official["status"] == "missing":
+                issues.add("Puuttuva lähde-erä vain laskentaesimerkissä nollana: " + ", ".join(official.get("missingConcepts", [])))
+                return Amount.linear(0)
+            if official["status"] == "manual" and amount is not None:
+                issues.add(official["note"])
+                return amount
+            if official["status"] not in ("reported", "calculated") or amount is None:
+                raise FormulaError(official["note"])
+            return amount
+
+        def fact(concept, offset):
+            target_end = period(offset)
+            _, target_start, _, target_state, _ = _period(self.bundle, target_end)
+            leaf = {**metric, "key": concept, "concepts": [concept], "unit": "SEK", "sourceSign": 1}
+            official, tolerance = _official(leaf, self.filing.get("facts", []), self.filing.get("documents", []),
+                self.orgnr, target_start, target_end, target_state == "reported", self.consolidated)
+            official["missingConcepts"] = [concept + (" (edeltävä kausi)" if offset else "")]
+            amount = None
+            if official["value"] is not None and tolerance is not None:
+                evidence = official["selectedFact"]
+                key = (evidence["documentIndex"], evidence.get("contextId"), evidence.get("namespace"),
+                       evidence.get("localName"), evidence.get("elementId"))
+                amount = Amount.linear(official["value"], {key: tolerance})
+            return consume((official, tolerance, amount))
+
+        def variable(name, offset):
+            base = self.metrics.get(name)
+            rule = self.definitions.get(name)
+            if base is None and rule is None:
+                raise FormulaError("Muuttujan lähdemääritelmä puuttuu: " + name)
+            dependency = {"key": name, "label": name, "variable": name, "sourceSign": 1, "sourceCheck": True,
+                          "namespacePrefix": metric.get("namespacePrefix"), "kind": metric["kind"],
+                          "concepts": [], "unit": "SEK", **(base or {}), **(rule or {})}
+            if rule:
+                dependency["sourceCheck"] = rule.get("sourceCheck", True)
+            result = self.read(dependency, period(offset))
+            result[0].setdefault("missingConcepts", dependency.get("concepts") or [name])
+            return consume(result)
+
+        try:
+            amount = calculate(formula, fact, variable, issues.add)
+            out.update(selectedFacts=list(used.values()), assumptions=sorted(issues))
+            if not used:
+                return {**out, "status": "missing", "note": "Laskelmalle ei löytynyt yhtään varmennettua lähdelukua; nollaa ei vahvistettu."}, None, None
+            out.update(value=float(amount.value), precisionInterval=[float(amount.low), float(amount.high)],
+                       status="manual" if issues else "calculated",
+                       note="Laskettu alkuperäisistä lähdeluvuista; osalukujen ilmoitettu tarkkuus säilytetty." + (
+                           " Oletuksia tai epävarma ehto: " + " ".join(sorted(issues)) if issues else ""))
+            return out, None, amount
+        except FormulaError as error:
+            return {**out, "selectedFacts": list(used.values()), "assumptions": sorted(issues), "note": str(error)}, None, None
+
+
 def _leg(left, right, tolerance):
     if left["status"] == "not_checked" or right["status"] == "not_checked":
         return "not_checked", None
@@ -299,11 +416,53 @@ def _leg(left, right, tolerance):
     if left["value"] is None or right["value"] is None:
         return "unavailable", None
     difference = Decimal(str(right["value"])) - Decimal(str(left["value"]))
-    return ("match" if abs(difference) <= tolerance + Decimal("0.000001") else "difference"), float(difference)
+    if left.get("status") == "calculated":
+        low, high = map(lambda n: Decimal(str(n)), left["precisionInterval"])
+        matches = low - Decimal("0.000001") <= Decimal(str(right["value"])) <= high + Decimal("0.000001")
+    else:
+        matches = abs(difference) <= tolerance + Decimal("0.000001")
+    return ("match" if matches else "difference"), float(difference)
+
+
+def _explain_difference(row, metric, reader, end):
+    if row["sourceBackendStatus"] != "difference" or row["official"]["status"] != "reported":
+        return
+    original, backend = row["official"], row["backend"]["value"]
+    _, _, original_amount = reader.read(metric, end)
+    tolerance = _tolerance(original["selectedFact"])
+    for alternative in original.get("facts", []):
+        alternative_tolerance = _tolerance(alternative)
+        normalized_alternative = metric.get("sourceSign", 1) * alternative["value"]
+        if alternative_tolerance is not None and alternative_tolerance > tolerance and (
+                abs(Decimal(str(backend)) - Decimal(str(normalized_alternative))) <= Decimal("0.000001")):
+            row.setdefault("reconciliations", []).append({"title": "Pyöristetty rinnakkaisluku",
+                "formula": ("-" if metric.get("sourceSign", 1) == -1 else "") + "[" + alternative["localName"] + "]",
+                "selectedFacts": [alternative], "value": normalized_alternative,
+                "note": "API vastaa asiakirjan karkeammin pyöristettyä rinnakkaislukua. Tarkemman lähdeluvun ero säilyy; API:n lähdevalintaa tämä ei yksin todista."})
+            break
+    bridges = {
+        "totalAssets": ["[Anlaggningstillgangar] + [Omsattningstillgangar]",
+                        "[MateriellaAnlaggningstillgangar] + [FinansiellaAnlaggningstillgangar] + [Omsattningstillgangar]"],
+        "totalEquityAndLiabilities": ["[EgetKapital] + [ObeskattadeReserver] + [LangfristigaSkulder] + [KortfristigaSkulder]"],
+        "netProfit": ["[ResultatEfterFinansiellaPoster] + [Bokslutsdispositioner] + ([AretsResultat] - [ResultatForeSkatt])"],
+    }
+    for formula in bridges.get(row["key"], []):
+        check = {**metric, "key": "bridge_" + metric["key"], "variable": "bridge_" + metric["variable"],
+                 "concepts": [], "sourceFormula": formula, "sourceSign": 1, "sourceCheck": True}
+        bridge, _, bridge_amount = reader.read(check, end)
+        if bridge["status"] == "calculated" and abs(bridge["value"] - backend) <= 0.000001:
+            residual = bridge_amount.add(original_amount.scaled(-1))
+            if residual.low <= 0 <= residual.high:
+                row.setdefault("reconciliations", []).append({**bridge, "title": "Pyöristykseen sopiva osalukulaskelma",
+                    "note": "Ilmoitettujen osalukujen laskelma vastaa API:a, ja lähteen pyöristysvälit sopivat suoraan lähdelukuun. Tämä voi selittää eron; se ei vahvista backendin sisäistä kaavaa. Alkuperäinen ero säilyy."})
+                break
+    for explanation in row.get("reconciliations", []):
+        row["note"] += " " + explanation["note"]
 
 
 def compare(filing, bundle, website_html, period_end, config):
     """Return native SEK/people values and conservative statuses for both comparison legs."""
+    definitions = config.get("sourceDefinitions", {}) if isinstance(config, dict) else {}
     if isinstance(config, dict):
         config = [{"namespacePrefix": config.get("namespacePrefix"), **metric} for metric in config["metrics"]]
     md = bundle.get("modeldata", {})
@@ -324,10 +483,10 @@ def compare(filing, bundle, website_html, period_end, config):
         warnings.append(period_note)
     if consolidated:
         warnings.append("Backend company code has consolidation suffix K; manual review required.")
+    reader = SourceReader(filing, bundle, config, definitions, orgnr, consolidated)
     rows = []
     for metric in config:
-        official, tolerance = _official(metric, filing.get("facts", []), filing.get("documents", []), orgnr,
-                                         start, end, state == "reported", consolidated)
+        official, tolerance, _ = reader.read(metric, end)
         backend = _backend(metric, raw, state, period_note, md.get("currency"))
         if consolidated:
             backend.update(status="manual", note="Consolidated backend scope requires manual review.")
@@ -353,10 +512,12 @@ def compare(filing, bundle, website_html, period_end, config):
         note = "Both comparison legs match." if overall == "match" else "; ".join(dict.fromkeys(
             item["note"] for item in (official, backend, website) if item["note"]))
         rows.append({"key": metric["key"], "label": metric["label"], "variable": metric["variable"], "unit": metric["unit"],
+                     "sourceReviewRequired": metric.get("reviewRequired"),
                      "concepts": metric.get("concepts", []), "official": official, "backend": backend, "website": website,
                      "sourceBackendStatus": source_status, "backendWebsiteStatus": website_status,
                      "differenceSourceBackend": source_difference, "differenceBackendWebsite": website_difference,
                      "status": overall, "note": note})
+        _explain_difference(rows[-1], metric, reader, end)
     summary = {status: sum(r["status"] == status for r in rows) for status in ("match", "difference", "manual", "unavailable")}
     summary["total"] = len(rows)
     coverage = {leg: {status: sum(r[field] == status for r in rows)

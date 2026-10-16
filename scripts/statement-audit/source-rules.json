@@ -260,5 +260,206 @@
     "concepts": [
       "KortfristigaPlaceringar"
     ]
+  },
+  "cr_advance_payments_lt": {
+    "sourceFormula": "([PagaendeUtvecklingsarbetenForskottImmateriellaAnlaggningstillgangar]+[ForskottImmateriellaAnlaggningstillgangar])"
+  },
+  "cr_cash_and_bank_deposits": {
+    "sourceFormula": "(if([KassaBank]!=0,[KassaBank],[KassaBankExklRedovisningsmedel]+[Redovisningsmedel]))"
+  },
+  "cr_change_in_untaxed_reserves": {
+    "sourceFormula": "([ForandringPeriodiseringsfond]+[ForandringErsattningsfond]+[AndraBokslutsdispositioner]+[OvrigaBokslutsdispositioner]+if([Bokslutsdispositioner]!=0,[Bokslutsdispositioner]-([ForandringPeriodiseringsfond]+[ForandringErsattningsfond]+[AndraBokslutsdispositioner]+[OvrigaBokslutsdispositioner]+([ForandringOveravskrivningar])+([ErhallnaKoncernbidrag]-[LamnadeKoncernbidrag])),if(([ResultatForeSkatt]!=0)&&([ResultatEfterFinansiellaPoster]!=0),[ResultatForeSkatt]-[ResultatEfterFinansiellaPoster]-([ForandringPeriodiseringsfond]+[ForandringErsattningsfond]+[AndraBokslutsdispositioner]+[OvrigaBokslutsdispositioner]+([ForandringOveravskrivningar])+([ErhallnaKoncernbidrag]-[LamnadeKoncernbidrag])),0)))"
+  },
+  "cr_curr_other_receivables": {
+    "sourceFormula": "([OvrigaFordringarKortfristiga]+[AktuellSkattefodran])"
+  },
+  "cr_curr_owed_by_participating": {
+    "sourceFormula": "([FordringarIntresseforetagGemensamtStyrdaForetagKortfristiga]+[FordringarOvrigaforetagAgarintresseKortfristiga])"
+  },
+  "cr_curr_prepayments_and_accured_inc": {
+    "sourceFormula": "([ForutbetaldaKostnaderUpplupnaIntakter]+if(([KortfristigaFordringar]==0)||(([KortfristigaFordringar]-(([Kundfordringar])+([FordringarKoncernforetagKortfristiga])+([FordringarIntresseforetagGemensamtStyrdaForetagKortfristiga]+[FordringarOvrigaforetagAgarintresseKortfristiga])+([OvrigaFordringarKortfristiga]+[AktuellSkattefodran])+[ForutbetaldaKostnaderUpplupnaIntakter]))>=0.99*[UpparbetadEjFaktureradIntakt]),[UpparbetadEjFaktureradIntakt],0))"
+  },
+  "cr_current_advances_received": {
+    "sourceFormula": "([ForskottFranKunder]+if(([KortfristigaSkulder]==0)||(([KortfristigaSkulder]-(([ObligationslanKortfristiga])+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])+[ForskottFranKunder]))>=0.99*[FaktureradEjUpparbetadIntakt]),[FaktureradEjUpparbetadIntakt],0)+if(([KortfristigaSkulder]==0)||(([KortfristigaSkulder]-(([ObligationslanKortfristiga])+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])+[ForskottFranKunder]+if(([KortfristigaSkulder]==0)||(([KortfristigaSkulder]-(([ObligationslanKortfristiga])+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])+[ForskottFranKunder]))>=0.99*[FaktureradEjUpparbetadIntakt]),[FaktureradEjUpparbetadIntakt],0)))>=0.99*[PagaendeArbetenAnnansRakningKortfristigaSkulder]),[PagaendeArbetenAnnansRakningKortfristigaSkulder],0))"
+  },
+  "cr_current_loans_from_credit_ins": {
+    "sourceFormula": "(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))"
+  },
+  "cr_current_owed_to_participating": {
+    "sourceFormula": "([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])"
+  },
+  "cr_finished_goods": {
+    "sourceFormula": "([LagerFardigaVaror]+[LagerHandelsvaror]+[LagerFardigaVarorHandelsvaror])"
+  },
+  "cr_fv_liq_unused_financing_limits": {
+    "sourceFormula": "(if([CheckrakningskreditBeviljatBelopp]!=0,[CheckrakningskreditBeviljatBelopp]-([CheckrakningskreditKortfristig]+[CheckrakningskreditLangfristig]),0))"
+  },
+  "cr_group_contributions": {
+    "sourceFormula": "([ErhallnaKoncernbidrag]-[LamnadeKoncernbidrag])"
+  },
+  "cr_income_from_associates": {
+    "sourceFormula": "([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])"
+  },
+  "cr_income_from_group_members": {
+    "sourceFormula": "([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])"
+  },
+  "cr_income_from_non_current_investments": {
+    "sourceFormula": "([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])"
+  },
+  "cr_income_taxes": {
+    "sourceFormula": "(if([ResultatForeSkatt]!=0,[AretsResultat]-[ResultatForeSkatt],-([SkattAretsResultat]+[OvrigaSkatter])))"
+  },
+  "cr_input_appropriations_total": {
+    "sourceFormula": "(if([ObeskattadeReserver]!=0,[ObeskattadeReserver]-(([AckumuleradeOveravskrivningar])+([Periodiseringsfonder]+[Ersattningsfonder]+[AndraObeskattadeReserver]+[OvrigaObeskattadeReserver])),0))"
+  },
+  "cr_input_cash_equivalents_total": {
+    "sourceFormula": "(if([KortfristigaPlaceringar]!=0,[KortfristigaPlaceringar]-(([OvrigaKortfristigaPlaceringar])+([AndelarKoncernforetagKortfristiga])),0))"
+  },
+  "cr_input_current_assets_total": {
+    "sourceFormula": "(if([VarulagerMm]!=0,[VarulagerMm]-(([LagerVarorUnderTillverkning])+([LagerRavarorFornodenheter])+([OvrigaLagertillgangar]+if(([VarulagerMm]==0)||(([VarulagerMm]-(([LagerVarorUnderTillverkning])+([LagerRavarorFornodenheter])+([LagerFardigaVaror]+[LagerHandelsvaror]+[LagerFardigaVarorHandelsvaror])+([ForskottTillLeverantorer])+[OvrigaLagertillgangar]))>=0.99*[PagaendeArbetenAnnansRakningOmsattningstillgangar]),[PagaendeArbetenAnnansRakningOmsattningstillgangar],0))+([LagerFardigaVaror]+[LagerHandelsvaror]+[LagerFardigaVarorHandelsvaror])+([ForskottTillLeverantorer])),0))"
+  },
+  "cr_input_current_liabilities_total": {
+    "sourceFormula": "(if([KortfristigaSkulder]!=0,[KortfristigaSkulder]-(([ObligationslanKortfristiga])+([ForskottFranKunder]+if(([KortfristigaSkulder]==0)||(([KortfristigaSkulder]-(([ObligationslanKortfristiga])+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])+[ForskottFranKunder]))>=0.99*[FaktureradEjUpparbetadIntakt]),[FaktureradEjUpparbetadIntakt],0)+if(([KortfristigaSkulder]==0)||(([KortfristigaSkulder]-(([ObligationslanKortfristiga])+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])+[ForskottFranKunder]+if(([KortfristigaSkulder]==0)||(([KortfristigaSkulder]-(([ObligationslanKortfristiga])+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])+[ForskottFranKunder]))>=0.99*[FaktureradEjUpparbetadIntakt]),[FaktureradEjUpparbetadIntakt],0)))>=0.99*[PagaendeArbetenAnnansRakningKortfristigaSkulder]),[PagaendeArbetenAnnansRakningKortfristigaSkulder],0))+([Leverantorsskulder])+([Vaxelskulder])+([SkulderIntresseforetagGemensamtStyrdaForetagKortfristiga]+[SkulderOvrigaForetagAgarintresseKortfristiga])+([SkulderKoncernforetagKortfristiga])+(if([SkulderKreditinstitutKortfristiga]!=0,[SkulderKreditinstitutKortfristiga],[CheckrakningskreditKortfristig]+[OvrigaKortfristigaSkulderKreditinstitut]))+([OvrigaKortfristigaSkulder]+[Skatteskulder])+([UpplupnaKostnaderForutbetaldaIntakter])),0))"
+  },
+  "cr_input_intangible_assets_total": {
+    "sourceFormula": "(if([ImmateriellaAnlaggningstillgangar]!=0,[ImmateriellaAnlaggningstillgangar]-(([BalanseradeUtgifterUtvecklingsarbetenLiknandeArbeten])+([KoncessionerPatentLicenserVarumarkenLiknandeRattigheter]+[HyresratterLiknandeRattigheter])+([Goodwill])+([OvrigaImmateriellaAnlaggningstillgangar])+([PagaendeUtvecklingsarbetenForskottImmateriellaAnlaggningstillgangar]+[ForskottImmateriellaAnlaggningstillgangar])),0))"
+  },
+  "cr_input_investments_total": {
+    "sourceFormula": "(if([FinansiellaAnlaggningstillgangar]!=0,[FinansiellaAnlaggningstillgangar]-(([AndelarKoncernforetag])+([AndelarIntresseforetagGemensamtStyrdaForetag])+([AgarintressenOvrigaForetag])+([FordringarKoncernforetagLangfristiga])+([FordringarIntresseforetagGemensamtStyrdaForetagLangfristiga])+([FordringarOvrigaForetagAgarintresseLangfristiga]+[LanDelagareNarstaende]+[AndraLangfristigaFordringar])+([AndraLangfristigaVardepappersinnehav])+([UppskjutenSkattefordran])),0))"
+  },
+  "cr_input_non_current_liabilities_total": {
+    "sourceFormula": "(if([LangfristigaSkulder]!=0,[LangfristigaSkulder]-(([Obligationslan])+(if([SkulderKreditinstitutLangfristiga]!=0,[SkulderKreditinstitutLangfristiga],[CheckrakningskreditLangfristig]+[OvrigaLangfristigaSkulderKreditinstitut]))+([SkulderKoncernforetagLangfristiga])+([SkulderIntresseforetagGemensamtStyrdaForetagLangfristiga]+[SkulderOvrigaForetagAgarintresseLangfristiga])+([OvrigaLangfristigaSkulder])),0))"
+  },
+  "cr_input_short_term_receivables_total": {
+    "sourceFormula": "(if([KortfristigaFordringar]!=0,[KortfristigaFordringar]-(([Kundfordringar])+([FordringarKoncernforetagKortfristiga])+([FordringarIntresseforetagGemensamtStyrdaForetagKortfristiga]+[FordringarOvrigaforetagAgarintresseKortfristiga])+([ForutbetaldaKostnaderUpplupnaIntakter]+if(([KortfristigaFordringar]==0)||(([KortfristigaFordringar]-(([Kundfordringar])+([FordringarKoncernforetagKortfristiga])+([FordringarIntresseforetagGemensamtStyrdaForetagKortfristiga]+[FordringarOvrigaforetagAgarintresseKortfristiga])+([OvrigaFordringarKortfristiga]+[AktuellSkattefodran])+[ForutbetaldaKostnaderUpplupnaIntakter]))>=0.99*[UpparbetadEjFaktureradIntakt]),[UpparbetadEjFaktureradIntakt],0))+([OvrigaFordringarKortfristiga]+[AktuellSkattefodran])),0))"
+  },
+  "cr_input_tangibles_assets_total": {
+    "sourceFormula": "(if([MateriellaAnlaggningstillgangar]!=0,[MateriellaAnlaggningstillgangar]-(([ByggnaderMark])+([MaskinerAndraTekniskaAnlaggningar]+[InventarierVerktygInstallationer])+([PagaendeNyanlaggningarForskottMateriellaAnlaggningstillgangar])+([ForbattringsutgifterAnnansFastighet]+[OvrigaMateriellaAnlaggningstillgangar])),0))"
+  },
+  "cr_intangible_rights": {
+    "sourceFormula": "([KoncessionerPatentLicenserVarumarkenLiknandeRattigheter]+[HyresratterLiknandeRattigheter])"
+  },
+  "cr_interest_income": {
+    "sourceFormula": "([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])"
+  },
+  "cr_machinery_and_equipment": {
+    "sourceFormula": "([MaskinerAndraTekniskaAnlaggningar]+[InventarierVerktygInstallationer])"
+  },
+  "cr_minority_share_profit": {
+    "sourceFormula": "([ResultatHanforligInnehavareUtanBestammandeInflytande])"
+  },
+  "cr_net_income_from_associates": {
+    "sourceFormula": "([AndelarIntresseforetagGemensamtStyrdaForetagResultat]+[RealisationsresultatForsaljningIntresseforetagGemensamtStyrdaForetag])"
+  },
+  "cr_non_current_loans_from_credit_ins": {
+    "sourceFormula": "(if([SkulderKreditinstitutLangfristiga]!=0,[SkulderKreditinstitutLangfristiga],[CheckrakningskreditLangfristig]+[OvrigaLangfristigaSkulderKreditinstitut]))"
+  },
+  "cr_non_current_owed_to_participating": {
+    "sourceFormula": "([SkulderIntresseforetagGemensamtStyrdaForetagLangfristiga]+[SkulderOvrigaForetagAgarintresseLangfristiga])"
+  },
+  "cr_other_current_creditors": {
+    "sourceFormula": "([OvrigaKortfristigaSkulder]+[Skatteskulder])"
+  },
+  "cr_other_equity": {
+    "sourceFormula": "(if([EgetKapital]!=0,[EgetKapital]-(([Aktiekapital])+([OverkursfondBunden]+[Overkursfond]+[OvrigtTillskjutetKapital])+([Uppskrivningsfond])+([FondVerkligtVarde])+([Reservfond])+([Kapitalandelsfond]+[FondUtvecklingsutgifter]+[ReserverEgetKapital])+([EjRegistreratAktiekapital])+([BalanseratResultat]+if([AnnatEgetKapitalInklusivePeriodensResultat]!=0,[AnnatEgetKapitalInklusivePeriodensResultat]-[ReserverEgetKapital],[BalanseratResultatInklusivePeriodensResultat]))+([AretsResultatEgetKapital])+([EgetKapitalHanforligtInnehavareUtanBestammandeInflytande])),0))"
+  },
+  "cr_other_financial_expenses": {
+    "sourceFormula": "(if((if([FinansiellaPoster]!=0,[FinansiellaPoster]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),if(([ResultatEfterFinansiellaPoster]!=0)&&([Rorelseresultat]!=0),[ResultatEfterFinansiellaPoster]-[Rorelseresultat]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),0)))<0,if([FinansiellaPoster]!=0,[FinansiellaPoster]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),if(([ResultatEfterFinansiellaPoster]!=0)&&([Rorelseresultat]!=0),[ResultatEfterFinansiellaPoster]-[Rorelseresultat]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),0)),0))"
+  },
+  "cr_other_financial_income": {
+    "sourceFormula": "(if((if([FinansiellaPoster]!=0,[FinansiellaPoster]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),if(([ResultatEfterFinansiellaPoster]!=0)&&([Rorelseresultat]!=0),[ResultatEfterFinansiellaPoster]-[Rorelseresultat]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),0)))>0,if([FinansiellaPoster]!=0,[FinansiellaPoster]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),if(([ResultatEfterFinansiellaPoster]!=0)&&([Rorelseresultat]!=0),[ResultatEfterFinansiellaPoster]-[Rorelseresultat]-(([ResultatAndelarKoncernforetag]+[ResultatAndelarKoncernforetagInklNedskrivning])+([ResultatAndelarIntresseforetagGemensamtStyrda]+[ResultatAndelarIntresseforetagGemensamtStyrdaInklNedskrivning])+([ResultatOvrigaforetagAgarintresse]+[ResultatOvrigaforetagAgarintresseInklNedskrivning]+[ResultatOvrigaFinansiellaAnlaggningstillgangar]+[ResultatOvrigaFinansiellaAnlaggningstillgangarInklNedskrivning])+([OvrigaRanteintakterLiknandeResultatposter]+[OvrigaRanteintakterLiknandeResultatposterInklNedskrivning])+(-([NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar]))+(-([RantekostnaderLiknandeResultatposter]))),0)),0))"
+  },
+  "cr_other_oper_expenses": {
+    "sourceFormula": "(-([OvrigaExternaKostnader]+[OvrigaRorelsekostnader]+[NedskrivningarOmsattningstillgangarUtoverNormalaNedskrivningar]+[ForskningsUtvecklingskostnader]+[OvrigaRorelsekostnaderFunktionsindelad])+if([Rorelseresultat]!=0,[Rorelseresultat]-(([Nettoomsattning])+([ForandringLagerProdukterIArbeteFardigaVarorPagaendeArbetenAnnansRakning])+([AndelarIntresseforetagGemensamtStyrdaForetagResultat]+[RealisationsresultatForsaljningIntresseforetagGemensamtStyrdaForetag])+([AktiveratArbeteEgenRakning])+([OvrigaRorelseintakter]+if([Nettoomsattning]==0,([BruttoresultatKostnadsslagsindelad]+[BruttoresultatForkortadFunktionsindelad]),0))+(-([RavarorFornodenheterKostnader]+[HandelsvarorKostnader]))+(-([KostnadSaldaVaror]))+(-([Forsaljningskostnader]))+(if([Personalkostnader]!=0,-([Personalkostnader]-[SocialaKostnaderInklPensionskostnader]),0))+(if([Personalkostnader]!=0,-([SocialaKostnaderInklPensionskostnader]),0))+(-([Administrationskostnader]))+(-([AvskrivningarNedskrivningarMateriellaImmateriellaAnlaggningstillgangar]))+-([OvrigaExternaKostnader]+[OvrigaRorelsekostnader]+[NedskrivningarOmsattningstillgangarUtoverNormalaNedskrivningar]+[ForskningsUtvecklingskostnader]+[OvrigaRorelsekostnaderFunktionsindelad])),0))"
+  },
+  "cr_other_operating_income": {
+    "sourceFormula": "([OvrigaRorelseintakter]+if([Nettoomsattning]==0,([BruttoresultatKostnadsslagsindelad]+[BruttoresultatForkortadFunktionsindelad]),0))"
+  },
+  "cr_other_receivables": {
+    "sourceFormula": "([FordringarOvrigaForetagAgarintresseLangfristiga]+[LanDelagareNarstaende]+[AndraLangfristigaFordringar])"
+  },
+  "cr_other_reserves": {
+    "sourceFormula": "([Kapitalandelsfond]+[FondUtvecklingsutgifter]+[ReserverEgetKapital])"
+  },
+  "cr_other_stocks": {
+    "sourceFormula": "([OvrigaLagertillgangar]+if(([VarulagerMm]==0)||(([VarulagerMm]-(([LagerVarorUnderTillverkning])+([LagerRavarorFornodenheter])+([LagerFardigaVaror]+[LagerHandelsvaror]+[LagerFardigaVarorHandelsvaror])+([ForskottTillLeverantorer])+[OvrigaLagertillgangar]))>=0.99*[PagaendeArbetenAnnansRakningOmsattningstillgangar]),[PagaendeArbetenAnnansRakningOmsattningstillgangar],0))"
+  },
+  "cr_other_tangible_assets": {
+    "sourceFormula": "([ForbattringsutgifterAnnansFastighet]+[OvrigaMateriellaAnlaggningstillgangar])"
+  },
+  "cr_owner_share_profit": {
+    "sourceFormula": "([ResultatHanforligModerforetagetAktieagare])"
+  },
+  "cr_provisions": {
+    "sourceFormula": "(if([Avsattningar]!=0,[Avsattningar],if([AvsattningarForkortad]!=0,[AvsattningarForkortad],if([AvsattningarPensionerLiknandeForpliktelser]!=0,[AvsattningarPensionerLiknandeForpliktelser],[AvsattningarPensionerLiknandeForpliktelserEnligtLag]+[OvrigaAvsattningarPensionerLiknandeForpliktelser])+[UppskjutenSkatteskuld]+[AvsattningarOvrigSkatt]+[OvrigaAvsattningar])))"
+  },
+  "cr_purchases_during_fy": {
+    "sourceFormula": "(-([RavarorFornodenheterKostnader]+[HandelsvarorKostnader]))"
+  },
+  "cr_retained_earnings": {
+    "sourceFormula": "([BalanseratResultat]+if([AnnatEgetKapitalInklusivePeriodensResultat]!=0,[AnnatEgetKapitalInklusivePeriodensResultat]-[ReserverEgetKapital],[BalanseratResultatInklusivePeriodensResultat]))"
+  },
+  "cr_share_premium_account": {
+    "sourceFormula": "([OverkursfondBunden]+[Overkursfond]+[OvrigtTillskjutetKapital])"
+  },
+  "cr_social_security_expenses": {
+    "sourceFormula": "(if([Personalkostnader]!=0,-([SocialaKostnaderInklPensionskostnader]),0))"
+  },
+  "cr_untaxed_reserves": {
+    "sourceFormula": "([Periodiseringsfonder]+[Ersattningsfonder]+[AndraObeskattadeReserver]+[OvrigaObeskattadeReserver])"
+  },
+  "cr_wages_and_salaries": {
+    "sourceFormula": "(if([Personalkostnader]!=0,-([Personalkostnader]-[SocialaKostnaderInklPensionskostnader]),0))"
+  },
+  "gross_profit": {
+    "sourceFormula": "(if([Rorelseresultat]!=0,if([BruttoresultatFunktionsindelad]!=0,[BruttoresultatFunktionsindelad],if((([BruttoresultatKostnadsslagsindelad]+[BruttoresultatForkortadFunktionsindelad]))!=0,([BruttoresultatKostnadsslagsindelad]+[BruttoresultatForkortadFunktionsindelad]),if([KostnadSaldaVaror]!=0,[Nettoomsattning]-[KostnadSaldaVaror],[Nettoomsattning]+[ForandringLagerProdukterIArbeteFardigaVarorPagaendeArbetenAnnansRakning]+[AktiveratArbeteEgenRakning]+[OvrigaRorelseintakter]-[RavarorFornodenheterKostnader]-[HandelsvarorKostnader]))),0))"
+  },
+  "cr_investments_total": {
+    "sourceFormula": "[FinansiellaAnlaggningstillgangar] - [UppskjutenSkattefordran]"
+  },
+  "cr_short_term_receivables_total": {
+    "sourceFormula": "[KortfristigaFordringar] + [TecknatEjInbetaltKapital]",
+    "reviewRequired": "Välisumman maksamattoman osakepääoman luokittelu odottaa vielä backend-määritelmän varmistusta."
+  },
+  "ns_growth": {
+    "sourceFormula": "100*(v(\"ns\") / v(\"ns\",-1) - 1)"
+  },
+  "ebit_percent": {
+    "sourceFormula": "100*v(\"ebit\") / v(\"ns\")"
+  },
+  "cr_pre_tax_profit_less_eo_percent": {
+    "sourceFormula": "100*v(\"cr_pre_tax_profit_less_eo\") / v(\"ns\")"
+  },
+  "cr_ebitda": {
+    "sourceFormula": "v(\"ebit\") - v(\"cr_depreciation\")",
+    "reviewRequired": "EBITDA-vertailukaava: muiden CV-poisto- ja oikaisuerien lähteitä ei ole vahvistettu. Arvo on vain tarkistuksen apulaskelma."
+  },
+  "cr_long_term_receivables_total": {
+    "sourceFormula": "v(\"cr_lt_tax_assets\")",
+    "reviewRequired": "Pitkäaikaisten saamisten vertailukaava sisältää verosaamisen; erittelemättömän CV-erän alkuperäislähde puuttuu."
+  },
+  "cr_non_current_loans_from_credit_total": {
+    "sourceFormula": "v(\"cr_non_current_loans_from_credit_ins\")",
+    "reviewRequired": "Luottolaitosvelkojen lähdeosa on laskettu; CV-välisumman vaihto- ja erityislainojen lähteet ovat vielä varmistamatta."
+  },
+  "cr_current_loans_from_credit_total": {
+    "sourceFormula": "v(\"cr_current_loans_from_credit_ins\")",
+    "reviewRequired": "Luottolaitosvelkojen lähdeosa on laskettu; CV-välisumman vaihto- ja erityislainojen lähteet ovat vielä varmistamatta."
+  },
+  "cr_equity_ratio": {
+    "sourceFormula": "100*(v(\"cr_shareholders_equity\")+v(\"cr_appropriations_total\"))/if(v(\"cr_shareholders_equity\")+v(\"cr_appropriations_total\")<0,abs(v(\"cr_provisions\"))+abs(v(\"cr_non_current_liabilities_total\"))+abs(v(\"cr_current_liabilities_total\"))-v(\"cr_current_advances_received\"),v(\"cr_shareholders_equity\")+v(\"cr_appropriations_total\")+abs(v(\"cr_provisions\"))+abs(v(\"cr_non_current_liabilities_total\"))+abs(v(\"cr_current_liabilities_total\"))-v(\"cr_current_advances_received\"))",
+    "reviewRequired": "Soliditeetin vertailukaava: pääomalainojen ja konsernioikaisujen kaikkia CV-lähteitä ei ole vahvistettu."
+  },
+  "cr_quick_ratio": {
+    "sourceFormula": "100*(v(\"cr_short_term_receivables_total\")+v(\"cr_cash_and_bank_deposits\")+v(\"cr_cash_equivalents_total\"))/(v(\"cr_current_liabilities_total\")-v(\"cr_current_advances_received\"))",
+    "reviewRequired": "Kassalikviditeetin vertailukaava: muiden CV-rahoitusvarojen luokittelu ja saamisten välisumma odottavat varmistusta."
+  },
+  "cr_roe_percent_corrected": {
+    "sourceFormula": "100*if(v(\"bs_total_assets\",-1)<10,0.5,1)*2*v(\"cr_net_earnings\")/(if(v(\"cr_shareholders_equity\",-1)<10,v(\"bs_total_assets\",-1),v(\"cr_shareholders_equity\",-1))-v(\"minorities\",-1)+if(v(\"cr_shareholders_equity\")<10,v(\"bs_total_assets\"),v(\"cr_shareholders_equity\"))-v(\"minorities\"))",
+    "reviewRequired": "ROE:n vertailukaava: laskentatulos riippuu CV:n oman pääoman ja vähemmistöosuuden rajauksesta, joka on vielä varmistamatta."
+  },
+  "cr_input_long_term_receivables_total": {
+    "sourceCheck": false,
+    "sourceUnresolved": "Erittelemättömälle pitkäaikaiselle saamiselle ei löytynyt Bolagsverketin tuontisääntöä tai alkuperäistä lähdemääritelmää. Puuttumista ei vahvisteta nollaksi."
   }
 }

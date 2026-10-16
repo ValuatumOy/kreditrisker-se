@@ -162,6 +162,17 @@ def make_case(report, documents, source_error=None):
         if isinstance(document_index, int) and not isinstance(document_index, bool) and 0 <= document_index < len(documents) and fact.get("elementId"):
             href = documents[document_index]["path"] + "#" + quote(str(fact["elementId"]), safe="")
             label += f'<small><a href="{escape(href, quote=True)}" target="_blank" rel="noopener">Näytä lähdeluku</a></small>'
+        calculations = ([{**official, "title": "Lähdelaskelma"}] if official.get("formula") else []) + row.get("reconciliations", [])
+        for calculation in calculations:
+            label += '<details><summary>' + escape(calculation["title"]) + '</summary><code>' + escape(calculation["formula"]) + '</code>'
+            label += '<p>' + escape(calculation.get("note", "")) + '</p>'
+            for evidence in calculation.get("selectedFacts", []):
+                index = evidence.get("documentIndex")
+                if type(index) is int and 0 <= index < len(documents) and evidence.get("elementId"):
+                    href = documents[index]["path"] + "#" + quote(str(evidence["elementId"]), safe="")
+                    title = f'{evidence.get("localName")} · {evidence.get("instant") or evidence.get("end")} · {number(evidence.get("value"))} kr'
+                    label += '<small><a href="' + escape(href, quote=True) + '" target="_blank" rel="noopener">' + escape(title) + '</a></small>'
+            label += '</details>'
         unit = row.get("unit", official.get("unit", ""))
         label += '<small>' + escape({"SEK": "kr", "people": "hlö", "percent": "%"}.get(unit, str(unit))) + '</small>'
         body += '<tr><th scope="row">' + label + '</th>'
@@ -170,8 +181,13 @@ def make_case(report, documents, source_error=None):
             body += '<td class="num">' + number(cell.get("value"))
             if field == "official" and cell.get("sourceSign") == -1 and cell.get("selectedFact"):
                 body += '<small>Lähteessä ' + number(cell['selectedFact']['value']) + '; etumerkki muunnettu.</small>'
+            if field == "official" and cell.get("formula") and cell.get("value") is not None:
+                body += '<small>' + ('Laskettu lähteestä' if cell["status"] == "calculated" else 'Laskentaesimerkki · ei varmennettu') + '</small>'
             body += '</td>'
-        body += ''.join('<td>' + status(row.get(field)) + '</td>' for field in ("sourceBackendStatus", "backendWebsiteStatus", "status")) + '</tr>'
+        body += ''.join('<td>' + status(row.get(field)) + '</td>' for field in ("sourceBackendStatus", "backendWebsiteStatus"))
+        body += '<td>' + status(row.get("status"))
+        body += ''.join('<small>' + escape(note) + '</small>' for note in official.get("assumptions", []))
+        body += '</td></tr>'
     body += '</tbody></table></div><details><summary>Tarkistuksen ajankohta ja lähteet</summary>'
     for key, label in (("checkedAt", "Tarkistettu"), ("backendRetrievedAt", "Valuatumin luvut haettu"),
                        ("officialRetrievedAt", "Alkuperäinen haettu"), ("filingSha256", "Alkuperäisen ZIP-tiedoston SHA-256")):

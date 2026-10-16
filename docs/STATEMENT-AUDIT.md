@@ -2,12 +2,13 @@
 
 Työkalu helpottaa käsintarkistusta: alkuperäinen tilinpäätös näkyy vieressä,
 asiakirjan voi avata omalle ruudulle ja yrityssivulle sekä CV-järjestelmään pääsee linkeistä.
-63 rivin lähdesäännöt ja 120 mahdollisen taulukkorivin API–sivuvertailu
+111 rivin lähdesäännöt, kahdeksan erikseen merkittyä apulaskelmaa ja
+120 mahdollisen taulukkorivin API–sivuvertailu
 auttavat löytämään tarkistettavat kohdat. Vertailujen kattavuus näkyy erikseen.
 
 ## Käynnistä
 
-Tarvitset projektin Node-ympäristön ja Python 3:n. Projektin juuressa:
+Tarvitset projektin Node-ympäristön ja Python 3.10+:n. Projektin juuressa:
 
 ```powershell
 npm run audit:statements
@@ -78,15 +79,27 @@ Liitä CV-yrityssivun osoite, jos haluat avata järjestelmän toiselle ruudulle.
 - Vaihto-omaisuus, taseen loppusumma, oma pääoma, verottamattomat varaukset,
   pitkä- ja lyhytaikaiset velat, oma pääoma ja velat yhteensä sekä rahat ja pankkisaamiset.
 - Keskimääräinen henkilöstömäärä.
-- Lisäksi 49 yksityiskohtaista riviä: mm. myyntisaamiset, ostovelat, konsernisaamiset
-  ja -velat, osakepääoma, liikearvo, kehittämismenot, poistot ja korkokulut.
+- Lisäksi yksityiskohtaisia saamisia, velkoja, varoja, pääomia, kuluja ja
+  välisummien jäännöseriä sekä liikevaihdon kasvun ja kaksi tulosmarginaalia.
 
 Säännöt ovat tiedostossa `scripts/statement-audit/source-rules.json`. Suorat
-säännöt perustuvat 14.10.2026 luettuihin tuotannon lähdemäppäyksiin; kolme
+säännöt perustuvat 16.10.2026 uudelleen luettuihin tuotannon lähdemäppäyksiin
+(103 tuontimääritelmää, ei muutoksia 14.10. otokseen); kolme
 välisummaa vertaa vastaavaan suoraan iXBRL-käsitteeseen. Miljoonamuunnos ja
 kulujen etumerkit käsitellään erikseen. Alkuperäinen arvo, yksikkö ja lähdeankkuri
 säilyvät raportissa; etumerkin vaihto näytetään myös tarkistajalle.
-Ehdolliset laskelmat, jäännöserät ja tunnuslukujen lähdelaskenta ovat vielä tekemättä.
+Ehdolliset laskelmat ja jäännöserät luetaan rajatulla aritmetiikkatulkkilla;
+kaavoja ei suoriteta Python-koodina. `fact` ja `v` lukevat vain alkuperäisiä
+lähdelukuja, eivät API:n rahamääriä. Edellisen kauden laskenta tarvitsee tarkat,
+peräkkäiset kausitiedot ja vastaavat lähdeluvut.
+
+Puuttuva osaluku voidaan näyttää nollana vain selvästi merkityssä
+**Laskentaesimerkki · ei varmennettu** -laskelmassa. Tällainen tulos jää aina
+käsintarkistettavaksi. Virheellinen konteksti, yksikkö tai jäsentynyt nil-arvo
+estää laskennan. Kokonaan lähteettömästä kaavasta ei näytetä nollalukua.
+Osalukujen ilmoitetut tarkkuusvälit kulkevat laskennan mukana; saman lähdeluvun
+toistuminen ei kasvata sen pyöristysvaraa. Jos ehdon lopputulos voi muuttua
+pyöristysvälillä tai jakajan väli sisältää nollan, lukua ei vahvisteta.
 
 Vertailu kulkee alkuperäinen iXBRL → Valuatumin REST → julkaistun sivun HTML.
 CV-käyttöliittymää tai PDF-raporttia ei lueta automaattisesti; ne tarkistetaan linkistä käsin.
@@ -104,8 +117,13 @@ API–sivuvertailu kattaa 31 tuloslaskelmariviä, 82 taseriviä, kuusi tunnusluk
 henkilöstömäärän. Prosentit muunnetaan API:n suhdeluvuista prosenttiyksiköiksi;
 sallittu pyöristys vastaa sivun näyttötarkkuutta. Sivulta pois jätettyjä rivejä
 ei hyväksytä täsmääviksi. Samannimiset rivit yksilöidään `data-metric-key`-avaimella.
-57 riviltä puuttuu vielä alkuperäisen tilinpäätöksen vertailusääntö: ne saavat
-**Ei tarkistettu** -tilan lähdevertailussa, vaikka API ja sivu täsmäisivät.
+Yhdeltä riviltä (`cr_input_long_term_receivables_total`) puuttuu alkuperäisen
+tilinpäätöksen lähdemääritelmä: se saa **Ei tarkistettu** -tilan, vaikka API ja
+sivu täsmäisivät. Muuttujalle ei löytynyt Bolagsverketin tuontisääntöä.
+Kahdeksan apulaskelmaa jää aina käsintarkistettavaksi, kunnes niiden CV-rajaus
+varmistetaan: EBITDA, rahoituslaitosvelkojen kaksi välisummaa, pitkäaikaisten
+saamisten summa, lyhytaikaisten saamisten summa, soliditeetti, kassalikviditeetti
+ja oman pääoman tuotto. Epävarma määritelmä ja puuttuvat osat näkyvät rivillä.
 Liitetiedot, kaaviot ja CV:n käyttöliittymä eivät kuulu tähän taulukkotarkistukseen.
 Vihreä yksittäinen vertailu ei hyväksy koko tilinpäätöstä.
 REST-vastauksen hakupäivä ja verkkosivun tarkistushetki näytetään, koska tiedot voivat
@@ -180,7 +198,52 @@ Nykyistä palvelinta ei siis pidä sellaisenaan avata julkiseen verkkoon.
 Satunnaistarkistaja valitsisi yrityksen ja kauden; ylläpitäjä ajaisi erävertailut
 ja jättäisi erot sekä puuttuvat lähteet tarkistajan työlistaksi.
 
-## Uusintatarkistus 16.10.2026
+## Lähdelaskelmien laajennus 16.10.2026
+
+Aiemmista 57 puuttuvasta rivistä 44 sai tuotannon tuontisäännön mukaisen kaavan.
+Lisäksi neljä riviä sai riippumattoman vertailusäännön: rahoitusomaisuus ilman
+erikseen esitettävää laskennallista verosaamista, liikevaihdon kasvu sekä liike-
+ja voittomarginaali. Kahdeksalla muulla rivillä on näkyvä, käsintarkistukseen
+rajattu apulaskelma. Yksi erittelemätön saamiserä on edelleen ilman lähdemääritelmää.
+Määritellyn kaavan olemassaolo ei tarkoita, että sen kaikki osaluvut löytyisivät
+yrityksen tilinpäätöksestä tai että laskelma olisi vahvistettu.
+
+Neljä yritystä ja kahdeksan tilikautta tarkistettiin uudelleen tuoreella API-haulla.
+201 lähdevertailua täsmäsi, seitsemän eroa jäi näkyviin ja julkaistun CloudFrontin
+413 solua täsmäsivät API:in. Atean 2024 alkuperäinen puuttuu edelleen.
+
+Kaikille seitsemälle erolle löytyi tarkistusta tukeva selitys:
+
+- S M Entreprenadin 2025 lyhytaikaiset velat vastaavat uudemman 2026 asiakirjan
+  vertailulukua: 71 387 079 kr verrattuna alkuperäisen 73 365 587 kruunuun.
+- Brightecin neljä tasesumman eroa (molemmat puolet vuosina 2024 ja 2025)
+  vastaavat ilmoitettujen osalukujen 1 000 kr pyöristysjäännöksiä. Vuoden 2024
+  varat: 2 607 000 + 13 954 000 + 4 122 000 = 20 683 000 kr, mutta suora
+  loppusumma on 20 682 000 kr. Myös välisumma 16 560 000 kr eroaa kahden
+  ensimmäisen osan 16 561 000 kruunun summasta.
+- Brightecin 2025 tulos: lähteen rahoituserien jälkeinen tulos 3 032 000 kr,
+  tilinpäätössiirrot −263 000 kr ja tuontikaavan vero
+  (2 583 000 − 2 770 000) kr tuottavat 2 582 000 kr, joka on API:n luku.
+  Suora lähderivi on 2 583 000 kr. Yhteisten lähdelukujen pyöristys otetaan
+  selityslaskelmassa huomioon vain kerran.
+- Brightecin 2024 taseen tulos on tarkassa liitetiedossa 8 429 503 kr, mutta
+  API:n 8 430 000 kr vastaa saman asiakirjan pyöristettyä riviä ja uudemman
+  tilinpäätöksen vertailulukua. Tarkemman luvun 497 kr ero säilyy.
+
+Osalukulaskelmat ovat mahdollisia selityksiä, eivät todistus backendin sisäisestä
+toteutuksesta. Ne avautuvat raportissa omine kaavoineen ja lähdelinkkeineen.
+Alkuperäistä eroa tai sen toleranssia ei muuteta. Otoksesta ei syntynyt perustetta
+pyytää teknisiä muuttamaan näitä lukuja tai lähdemäppäyksiä.
+
+122 työkalutestiä kattavat myös väärät yritys-/konsernikontekstit, puuttuvien
+osien erottamisen virheellisistä faktoista, etumerkit, peräkkäiset kaudet,
+kaavatulkin rajauksen ja pyöristysvälin laskennan. Riippumaton tarkistus johti
+lisäksi suojauksiin, jotka säilyttävät käsintarkistusvaatimuksen välimuistissa
+ja estävät yhteisen lähdeluvun pyöristysvaran laskemisen kahdesti.
+Myös 57 sivustotestiä läpäisivät ja build tuotti 84 sivua. Uuden kollegapaketin
+742 lähdeankkuria tarkistettiin; API-tunnus ei sisälly pakettiin.
+
+## Aiempi uusintatarkistus 16.10.2026 (63 sääntöä)
 
 Yritysnumerohaku korjattiin API:n nykyiseen muotoon `556193-9215`.
 Tarkistaja voi edelleen kirjoittaa tunnuksen väliviivalla tai ilman sitä.

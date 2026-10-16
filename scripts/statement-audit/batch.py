@@ -125,20 +125,20 @@ def write_json(path, data):
 
 
 def comparative_evidence(report, bundle, config, newer_sources):
-    metrics = config.get("metrics", []) if isinstance(config, dict) else config
-    by_key = {metric["key"]: metric for metric in metrics}
     for row in report["rows"]:
         if row["sourceBackendStatus"] != "difference":
             continue
         for newer_end, source, downloaded in newer_sources:
             if newer_end <= report["periodEnd"]:
                 continue
-            checked = compare(source, bundle, "", report["periodEnd"], [by_key[row["key"]]])["rows"][0]
-            if checked["sourceBackendStatus"] != "match":
+            checked = next((item for item in compare(source, bundle, "", report["periodEnd"], config)["rows"]
+                            if item["key"] == row["key"]), None)
+            if checked is None or checked["sourceBackendStatus"] != "match":
                 continue
             row["newerComparativeEvidence"] = {"filingName": downloaded["name"],
                 "filingSha256": hashlib.sha256(downloaded["data"]).hexdigest(),
                 "periodEnd": newer_end, "fact": checked["official"]["selectedFact"]}
+            row["newerComparativeEvidence"]["facts"] = checked["official"].get("selectedFacts") or [checked["official"]["selectedFact"]]
             note = f"{row['label']}: API vastaa uudemman ({newer_end}) tilinpäätöksen vertailulukua ({checked['official']['value']}), mutta valitun alkuperäisen tilinpäätöksen luku on {row['official']['value']}. Ero säilytetään lähdeversioiden erona."
             row["note"] += " " + note
             report["warnings"].append(note)

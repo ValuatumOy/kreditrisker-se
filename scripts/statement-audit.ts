@@ -47,7 +47,7 @@ const coreMetrics = [
     { key: 'employees', label: 'Medelantal anställda', variable: 'cr_employees_adjusted', concepts: ['MedelantaletAnstallda'], kind: 'duration', unit: 'people', websiteGroup: 'Nyckeltal', zeroWhenAbsent: false },
 ]
 const known = new Map(coreMetrics.map(m => [m.key, m]))
-const sourceRules: Record<string, { concepts: string[]; sourceSign?: number }> = JSON.parse(
+const sourceRules: Record<string, { concepts?: string[]; sourceSign?: number; sourceFormula?: string; reviewRequired?: string; sourceCheck?: boolean; sourceUnresolved?: string }> = JSON.parse(
     fs.readFileSync(path.resolve('scripts/statement-audit/source-rules.json'), 'utf8'))
 const metrics = [
     ...INCOME_ROWS.map(r => known.get(r.key) ?? ({ key: r.key, label: r.label, variable: INCOME_VARS[r.key], concepts: [], kind: 'duration', unit: 'SEK', websiteGroup: 'Resultaträkning', zeroWhenAbsent: true, sourceCheck: false })),
@@ -55,10 +55,10 @@ const metrics = [
     ...Object.entries(RATIO_VARS).map(([key, variable]) => ({ key, label: FORMULAS[key as MetricKey].label, variable, concepts: [], kind: 'duration', unit: 'percent', displayDigits: key === 'quickRatio' ? 0 : 1, websiteGroup: 'Nyckeltal', zeroWhenAbsent: false, sourceCheck: false })),
     known.get('employees')!,
 ].map(metric => sourceRules[metric.variable]
-    ? { ...metric, ...sourceRules[metric.variable], sourceCheck: true }
+    ? { ...metric, sourceCheck: true, ...sourceRules[metric.variable] }
     : metric)
 const config = path.join(dir, 'config.json')
-fs.writeFileSync(config, JSON.stringify({ metrics, namespacePrefix: 'http://www.taxonomier.se/se/fr/gen-base/' }))
+fs.writeFileSync(config, JSON.stringify({ metrics, sourceDefinitions: sourceRules, namespacePrefix: 'http://www.taxonomier.se/se/fr/gen-base/' }))
 if (batch) {
     const child = spawn(process.env.SE_AUDIT_PYTHON ?? 'python', ['-u', path.resolve('scripts/statement-audit/batch.py'), '--config', config, ...process.argv.slice(3)], { stdio: 'inherit' })
     child.on('error', () => { console.error('Python 3 is required.'); process.exit(1) })
