@@ -260,7 +260,14 @@ def _official(metric, facts, documents, orgnr, start, end, metadata_ok, consolid
     if len({Decimal(str(i[3]["value"])) for i in intervals if i[2] == best_precision}) > 1:
         return {**out, "status": "manual", "note": "Equally precise official duplicates disagree; fact order cannot resolve them."}, None
     selected = min(intervals, key=lambda i: i[2])
-    return {**out, "value": selected[3]["value"], "selectedFact": selected[3], "status": "reported", "note": "Exact entity and period; most precise consistent official fact."}, selected[2]
+    sign = metric.get("sourceSign", 1)
+    if sign not in (1, -1):
+        raise ValueError("Source sign must be 1 or -1")
+    note = "Exact entity and period; most precise consistent official fact."
+    if sign == -1:
+        note += " Official expense sign reversed to the CV signed statement convention; original fact retained."
+    return {**out, "value": sign * selected[3]["value"], "sourceSign": sign,
+            "selectedFact": selected[3], "status": "reported", "note": note}, selected[2]
 
 
 def _backend(metric, raw, state, note, currency):

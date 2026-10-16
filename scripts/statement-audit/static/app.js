@@ -71,6 +71,8 @@ function renderReport() {
     el('warnings').hidden = !report?.warnings?.length
     for (const text of report?.warnings || []) { const p = document.createElement('p'); p.textContent = text; el('warnings').append(p) }
     if (!report) return
+    const sourceCount = report.rows.filter(row => row.sourceBackendStatus !== 'not_checked').length
+    el('scope-description').textContent = `API:n ja sivun vertailu kattaa ${report.rows.length} mahdollista taulukkoriviä. Alkuperäiseen tilinpäätökseen on ${sourceCount} rivin lähdesäännöt; ${report.rows.length - sourceCount} riviltä sääntö puuttuu. Sääntö ei yksin vahvista lukua: puuttuvat tai epäselvät lähdetiedot jäävät tarkistettaviksi. Kulujen etumerkit muunnetaan vertailussa Valuatumin esitystapaan.`
     const countsFor = (field) => report.rows.reduce((all, row) => { all[row[field]] = (all[row[field]] || 0) + 1; return all }, {})
     const summaryFor = (title, counts) => `${title}: ${counts.match || 0} täsmää · ${counts.difference || 0} eroa · ${(counts.manual || 0) + (counts.unavailable || 0)} tarkistettavaa${counts.not_checked ? ` · ${counts.not_checked} ilman lähdesääntöä` : ''}`
     el('summary').replaceChildren(...[['Alkuperäinen → API', countsFor('sourceBackendStatus')], ['API → nettisivu', countsFor('backendWebsiteStatus')]].map(([title, counts]) => { const p = document.createElement('p'); p.textContent = summaryFor(title, counts); return p }))
@@ -83,7 +85,13 @@ function renderReport() {
         const evidence = row.official?.selectedFact
         if (evidence) { const button = document.createElement('button'); button.type = 'button'; button.className = 'evidence'; button.textContent = 'Näytä lähdeluku'; button.addEventListener('click', () => showDocument(evidence.documentIndex, evidence.elementId)); name.append(button) }
         tr.append(name)
-        for (const field of ['official', 'backend', 'website']) { const td = document.createElement('td'); td.className = 'number'; td.textContent = format(row[field], row.unit); td.title = row[field]?.note || row[field]?.text || ''; tr.append(td) }
+        for (const field of ['official', 'backend', 'website']) {
+            const td = document.createElement('td'); td.className = 'number'; td.textContent = format(row[field], row.unit); td.title = row[field]?.note || row[field]?.text || ''
+            if (field === 'official' && row.official.sourceSign === -1 && evidence) {
+                const original = document.createElement('small'); original.textContent = `Lähteessä ${number.format(evidence.value)}; etumerkki muunnettu.`; td.append(original)
+            }
+            tr.append(td)
+        }
         const result = document.createElement('td'); result.className = `result ${row.status}`
         const strong = document.createElement('strong'); strong.textContent = labels[row.status] || row.status
         const detail = document.createElement('small'); detail.textContent = `Lähde → Valuatum: ${labels[row.sourceBackendStatus] || row.sourceBackendStatus}. Valuatum → sivu: ${labels[row.backendWebsiteStatus] || row.backendWebsiteStatus}.`

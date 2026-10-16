@@ -1,6 +1,6 @@
 import path from 'node:path'
 import { fetchBundle, type ApiCompany } from '../../src/lib/valuatum/api.ts'
-import { parseOrgnr } from '../../src/lib/orgnr.ts'
+import { formatOrgnr, parseOrgnr } from '../../src/lib/orgnr.ts'
 
 const [mode, query] = process.argv.slice(2)
 const base = process.env.PUBLIC_VALUATUM_API_BASE_URL
@@ -17,7 +17,7 @@ try {
     } else if (mode === 'search') {
         if (!query || query.length < 2 || query.length > 150) throw new Error('Kirjoita vähintään kaksi merkkiä.')
         const code = parseOrgnr(query)
-        const params = new URLSearchParams(code.ok ? { code: code.orgnr } : { name: query })
+        const params = new URLSearchParams(code.ok ? { code: formatOrgnr(code.orgnr) } : { name: query })
         const response = await fetch(`${base.replace(/\/$/, '')}/rest/company?${params}`, {
             headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(30_000),
         })

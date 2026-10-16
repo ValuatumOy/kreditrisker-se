@@ -2,7 +2,7 @@
 
 Työkalu helpottaa käsintarkistusta: alkuperäinen tilinpäätös näkyy vieressä,
 asiakirjan voi avata omalle ruudulle ja yrityssivulle sekä CV-järjestelmään pääsee linkeistä.
-14 pääluvun lähdevertailu ja 120 mahdollisen taulukkorivin API–sivuvertailu
+63 rivin lähdesäännöt ja 120 mahdollisen taulukkorivin API–sivuvertailu
 auttavat löytämään tarkistettavat kohdat. Vertailujen kattavuus näkyy erikseen.
 
 ## Käynnistä
@@ -78,6 +78,15 @@ Liitä CV-yrityssivun osoite, jos haluat avata järjestelmän toiselle ruudulle.
 - Vaihto-omaisuus, taseen loppusumma, oma pääoma, verottamattomat varaukset,
   pitkä- ja lyhytaikaiset velat, oma pääoma ja velat yhteensä sekä rahat ja pankkisaamiset.
 - Keskimääräinen henkilöstömäärä.
+- Lisäksi 49 yksityiskohtaista riviä: mm. myyntisaamiset, ostovelat, konsernisaamiset
+  ja -velat, osakepääoma, liikearvo, kehittämismenot, poistot ja korkokulut.
+
+Säännöt ovat tiedostossa `scripts/statement-audit/source-rules.json`. Suorat
+säännöt perustuvat 14.10.2026 luettuihin tuotannon lähdemäppäyksiin; kolme
+välisummaa vertaa vastaavaan suoraan iXBRL-käsitteeseen. Miljoonamuunnos ja
+kulujen etumerkit käsitellään erikseen. Alkuperäinen arvo, yksikkö ja lähdeankkuri
+säilyvät raportissa; etumerkin vaihto näytetään myös tarkistajalle.
+Ehdolliset laskelmat, jäännöserät ja tunnuslukujen lähdelaskenta ovat vielä tekemättä.
 
 Vertailu kulkee alkuperäinen iXBRL → Valuatumin REST → julkaistun sivun HTML.
 CV-käyttöliittymää tai PDF-raporttia ei lueta automaattisesti; ne tarkistetaan linkistä käsin.
@@ -95,7 +104,7 @@ API–sivuvertailu kattaa 31 tuloslaskelmariviä, 82 taseriviä, kuusi tunnusluk
 henkilöstömäärän. Prosentit muunnetaan API:n suhdeluvuista prosenttiyksiköiksi;
 sallittu pyöristys vastaa sivun näyttötarkkuutta. Sivulta pois jätettyjä rivejä
 ei hyväksytä täsmääviksi. Samannimiset rivit yksilöidään `data-metric-key`-avaimella.
-106 riviltä puuttuu vielä alkuperäisen tilinpäätöksen vertailusääntö: ne saavat
+57 riviltä puuttuu vielä alkuperäisen tilinpäätöksen vertailusääntö: ne saavat
 **Ei tarkistettu** -tilan lähdevertailussa, vaikka API ja sivu täsmäisivät.
 Liitetiedot, kaaviot ja CV:n käyttöliittymä eivät kuulu tähän taulukkotarkistukseen.
 Vihreä yksittäinen vertailu ei hyväksy koko tilinpäätöstä.
@@ -104,8 +113,9 @@ olla eri päivityksistä.
 
 Verkkosivun hyväksyminen edellyttää taulukon yritys- ja tilikausitietoja
 (`data-orgnr`, `data-period-start/end/months`, `data-consolidated`). Ne lisättiin
-yrityssivujen HTML:ään tätä työkalua varten. Vanha CloudFront-versio näyttää luvut,
-mutta sivuvertailu jää käsintarkistettavaksi, kunnes yrityssivut rakennetaan uudelleen.
+yrityssivujen HTML:ään tätä työkalua varten. CloudFrontin 16.10.2026 versiossa
+tiedot ovat mukana; kahdeksan kauden julkaistut luvut voitiin varmistaa.
+Vanha sivu ilman näitä tietoja jää edelleen käsintarkistettavaksi.
 
 ## Mistä alkuperäinen tiedosto tulee
 
@@ -169,6 +179,51 @@ sen asiakirja ja aktiivinen haku ovat nyt yhteisiä saman prosessin selaimille.
 Nykyistä palvelinta ei siis pidä sellaisenaan avata julkiseen verkkoon.
 Satunnaistarkistaja valitsisi yrityksen ja kauden; ylläpitäjä ajaisi erävertailut
 ja jättäisi erot sekä puuttuvat lähteet tarkistajan työlistaksi.
+
+## Uusintatarkistus 16.10.2026
+
+Yritysnumerohaku korjattiin API:n nykyiseen muotoon `556193-9215`.
+Tarkistaja voi edelleen kirjoittaa tunnuksen väliviivalla tai ilman sitä.
+Sama neljän yrityksen ja kahdeksan kauden otos haettiin uudelleen API:sta.
+Julkaistun CloudFrontin kaikki 413 vertailtavaa solua täsmäsivät API:in.
+
+Lähdesäännöt laajenivat 14:stä 63:een. Sääntöjen lukumäärä ei tarkoita,
+että kaikki nämä rivit löytyisivät jokaisesta asiakirjasta tai täsmäisivät.
+Puuttuvat ja epäselvät lähdeluvut pysyvät erillään hyväksytyistä. Otoksessa
+160 lähdelukua täsmäsi ja seitsemän eroa jäi näkyviin. Kaikkia uusia käsitteitä
+ei löytynyt näistä yrityksistä, joten koko sääntöjoukkoa ei ole vahvistettu
+oikealla asiakirjaesimerkillä.
+
+103 työkalutestiä ja 57 sivustotestiä läpäisivät. Sivuston build valmistui
+84 sivulla. Kollegapaketin 169 lähdeankkuria tarkistettiin. Riippumaton tarkistus
+kävi läpi etumerkit, yksiköt, kausityypit ja yrityskontekstin suojaukset.
+
+Erot ja niiden jatkokäsittely:
+
+- S M Entreprenadin 2025 lyhytaikaiset velat vastaavat uudemman tilinpäätöksen
+  vertailulukua. Alkuperäisen vuoden 2025 asiakirjan ero säilyy näkyvissä.
+- Brightecin kummankin vuoden tasesummien 1 000 kr erot sopivat osalukujen
+  erilliseen tuhansiin pyöristykseen. Esimerkiksi 2025 varojen osat ovat
+  2 707 000 + 10 709 000 + 8 922 000 = 22 338 000 kr, mutta asiakirjan suora
+  loppusumma on 22 337 000 kr. Toleranssia ei kasvatettu.
+- Brightecin 2025 tuloslaskelman tulos on lähteessä 2 583 000 kr ja API:ssa
+  2 582 000 kr. Lähteestä johdettu pyöristetty komponenttilaskelma
+  3 032 000 − 113 000 − 150 000 − 187 000 = 2 582 000 kr vastaa API:a.
+  Ero sopii pyöristykseen, mutta tämä ei todista API:n sisäistä laskentasääntöä.
+- Brightecin 2024 taseen tilikauden tulos on tarkassa liitetiedossa 8 429 503 kr,
+  mutta API vastaa tuhansiin pyöristettyä 8 430 000 kr riviä. Tarkemman luvun
+  497 kr ero säilytetään. Vuoden 2025 tarkka vastaava rivi täsmää.
+- Atean 2025 rahoitusomaisuuden suora välisummavertailu jätettiin pois:
+  lähteen 1 155 450 659 kr sisältää 7 029 119 kr laskennallista verosaamista,
+  kun API:n `cr_investments_total` 1 148 421 540 kr ei sisällä sitä.
+  Verosaaminen tarkistetaan omana rivinään. Suora vertailu antaisi väärän hälytyksen;
+  koko välisumman lähdelaskenta vaatii erillisen luokittelusäännön.
+- Lyhytaikaisten saamisten välisumman suora sääntö odottaa vielä maksamattoman
+  osakepääoman luokittelun varmistusta. Sen yksittäiset saamisrivit tarkistetaan.
+- Atean 2024 alkuperäinen ei edelleenkään löytynyt. Sen lähdelukuja ei hyväksytty.
+
+Kantaan tai tuotannon laskentasääntöihin ei tehty muutoksia. Jäljelle jäävät
+selvitykset ovat työlistaa, eivät päätös muuttaa lukuja tai lähettää kaikki teknisille.
 
 ## Moniyritystesti 14.10.2026
 

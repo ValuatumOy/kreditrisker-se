@@ -47,12 +47,16 @@ const coreMetrics = [
     { key: 'employees', label: 'Medelantal anställda', variable: 'cr_employees_adjusted', concepts: ['MedelantaletAnstallda'], kind: 'duration', unit: 'people', websiteGroup: 'Nyckeltal', zeroWhenAbsent: false },
 ]
 const known = new Map(coreMetrics.map(m => [m.key, m]))
+const sourceRules: Record<string, { concepts: string[]; sourceSign?: number }> = JSON.parse(
+    fs.readFileSync(path.resolve('scripts/statement-audit/source-rules.json'), 'utf8'))
 const metrics = [
     ...INCOME_ROWS.map(r => known.get(r.key) ?? ({ key: r.key, label: r.label, variable: INCOME_VARS[r.key], concepts: [], kind: 'duration', unit: 'SEK', websiteGroup: 'Resultaträkning', zeroWhenAbsent: true, sourceCheck: false })),
     ...BALANCE_ROWS.map(r => known.get(r.key) ?? ({ key: r.key, label: r.label, variable: BALANCE_VARS[r.key], concepts: [], kind: 'instant', unit: 'SEK', websiteGroup: 'Balansräkning', zeroWhenAbsent: true, sourceCheck: false })),
     ...Object.entries(RATIO_VARS).map(([key, variable]) => ({ key, label: FORMULAS[key as MetricKey].label, variable, concepts: [], kind: 'duration', unit: 'percent', displayDigits: key === 'quickRatio' ? 0 : 1, websiteGroup: 'Nyckeltal', zeroWhenAbsent: false, sourceCheck: false })),
     known.get('employees')!,
-]
+].map(metric => sourceRules[metric.variable]
+    ? { ...metric, ...sourceRules[metric.variable], sourceCheck: true }
+    : metric)
 const config = path.join(dir, 'config.json')
 fs.writeFileSync(config, JSON.stringify({ metrics, namespacePrefix: 'http://www.taxonomier.se/se/fr/gen-base/' }))
 if (batch) {

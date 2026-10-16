@@ -1,0 +1,264 @@
+{
+  "asset_revaluation_res": {
+    "concepts": [
+      "Uppskrivningsfond"
+    ]
+  },
+  "cr_advance_payments": {
+    "concepts": [
+      "ForskottTillLeverantorer"
+    ]
+  },
+  "cr_advance_payments_and_cons_in_prog": {
+    "concepts": [
+      "PagaendeNyanlaggningarForskottMateriellaAnlaggningstillgangar"
+    ]
+  },
+  "cr_amortization_financial_assets": {
+    "concepts": [
+      "NedskrivningarFinansiellaAnlaggningstillgangarKortfristigaPlaceringar"
+    ],
+    "sourceSign": -1
+  },
+  "cr_bills_of_exhange": {
+    "concepts": [
+      "Vaxelskulder"
+    ]
+  },
+  "cr_buildings": {
+    "concepts": [
+      "ByggnaderMark"
+    ]
+  },
+  "cr_change_in_accelerated_depreciations": {
+    "concepts": [
+      "ForandringOveravskrivningar"
+    ]
+  },
+  "cr_change_in_finished_goods_inv": {
+    "concepts": [
+      "ForandringLagerProdukterIArbeteFardigaVarorPagaendeArbetenAnnansRakning"
+    ]
+  },
+  "cr_costs_of_management": {
+    "concepts": [
+      "Administrationskostnader"
+    ],
+    "sourceSign": -1
+  },
+  "cr_costs_of_manufacturing": {
+    "concepts": [
+      "KostnadSaldaVaror"
+    ],
+    "sourceSign": -1
+  },
+  "cr_costs_of_marketing": {
+    "concepts": [
+      "Forsaljningskostnader"
+    ],
+    "sourceSign": -1
+  },
+  "cr_cumulative_accelerated_depreciations": {
+    "concepts": [
+      "AckumuleradeOveravskrivningar"
+    ]
+  },
+  "cr_curr_owed_by_group_member": {
+    "concepts": [
+      "FordringarKoncernforetagKortfristiga"
+    ]
+  },
+  "cr_curr_trade_debtors": {
+    "concepts": [
+      "Kundfordringar"
+    ]
+  },
+  "cr_current_accruals_and_deferred_income": {
+    "concepts": [
+      "UpplupnaKostnaderForutbetaldaIntakter"
+    ]
+  },
+  "cr_current_bonds": {
+    "concepts": [
+      "ObligationslanKortfristiga"
+    ]
+  },
+  "cr_current_owed_to_group_member": {
+    "concepts": [
+      "SkulderKoncernforetagKortfristiga"
+    ]
+  },
+  "cr_current_trade_creditors": {
+    "concepts": [
+      "Leverantorsskulder"
+    ]
+  },
+  "cr_current_unpaid_shares": {
+    "concepts": [
+      "TecknatEjInbetaltKapital"
+    ]
+  },
+  "cr_depreciation": {
+    "concepts": [
+      "AvskrivningarNedskrivningarMateriellaImmateriellaAnlaggningstillgangar"
+    ],
+    "sourceSign": -1
+  },
+  "cr_development_expenditure": {
+    "concepts": [
+      "BalanseradeUtgifterUtvecklingsarbetenLiknandeArbeten"
+    ]
+  },
+  "cr_fair_value_reserve": {
+    "concepts": [
+      "FondVerkligtVarde"
+    ]
+  },
+  "cr_goodwill": {
+    "concepts": [
+      "Goodwill"
+    ]
+  },
+  "cr_holdings_in_group_companies": {
+    "concepts": [
+      "AndelarKoncernforetag"
+    ]
+  },
+  "cr_holdings_in_group_member": {
+    "concepts": [
+      "AndelarKoncernforetagKortfristiga"
+    ]
+  },
+  "cr_interest_expenses": {
+    "concepts": [
+      "RantekostnaderLiknandeResultatposter"
+    ],
+    "sourceSign": -1
+  },
+  "cr_legal_reserve": {
+    "concepts": [
+      "Reservfond"
+    ]
+  },
+  "cr_lt_tax_assets": {
+    "concepts": [
+      "UppskjutenSkattefordran"
+    ]
+  },
+  "cr_manufacturing_for_own_use": {
+    "concepts": [
+      "AktiveratArbeteEgenRakning"
+    ]
+  },
+  "cr_minorities": {
+    "concepts": [
+      "ResultatHanforligInnehavareUtanBestammandeInflytande"
+    ],
+    "sourceSign": -1
+  },
+  "cr_non_current_bonds": {
+    "concepts": [
+      "Obligationslan"
+    ]
+  },
+  "cr_non_current_other_liabilities": {
+    "concepts": [
+      "OvrigaLangfristigaSkulder"
+    ]
+  },
+  "cr_non_current_owed_to_group_member": {
+    "concepts": [
+      "SkulderKoncernforetagLangfristiga"
+    ]
+  },
+  "cr_other_capitalised_lt_expen": {
+    "concepts": [
+      "OvrigaImmateriellaAnlaggningstillgangar"
+    ]
+  },
+  "cr_other_curr_investments": {
+    "concepts": [
+      "OvrigaKortfristigaPlaceringar"
+    ]
+  },
+  "cr_other_non_curr_investments": {
+    "concepts": [
+      "AndraLangfristigaVardepappersinnehav"
+    ]
+  },
+  "cr_other_restricted_equity": {
+    "concepts": [
+      "EjRegistreratAktiekapital"
+    ]
+  },
+  "cr_other_shares_and_ownership": {
+    "concepts": [
+      "AgarintressenOvrigaForetag"
+    ]
+  },
+  "cr_participating_interests": {
+    "concepts": [
+      "AndelarIntresseforetagGemensamtStyrdaForetag"
+    ]
+  },
+  "cr_profit_for_fy": {
+    "concepts": [
+      "AretsResultatEgetKapital"
+    ]
+  },
+  "cr_raw_materials": {
+    "concepts": [
+      "LagerRavarorFornodenheter"
+    ]
+  },
+  "cr_receivables_from_group_member": {
+    "concepts": [
+      "FordringarKoncernforetagLangfristiga"
+    ]
+  },
+  "cr_receivables_from_participating": {
+    "concepts": [
+      "FordringarIntresseforetagGemensamtStyrdaForetagLangfristiga"
+    ]
+  },
+  "cr_semifinished_products": {
+    "concepts": [
+      "LagerVarorUnderTillverkning"
+    ]
+  },
+  "ebit": {
+    "concepts": [
+      "Rorelseresultat"
+    ]
+  },
+  "minorities": {
+    "concepts": [
+      "EgetKapitalHanforligtInnehavareUtanBestammandeInflytande"
+    ]
+  },
+  "ns": {
+    "concepts": [
+      "Nettoomsattning"
+    ]
+  },
+  "share_cap": {
+    "concepts": [
+      "Aktiekapital"
+    ]
+  },
+  "cr_intangible_assets_total": {
+    "concepts": [
+      "ImmateriellaAnlaggningstillgangar"
+    ]
+  },
+  "cr_tangibles_assets_total": {
+    "concepts": [
+      "MateriellaAnlaggningstillgangar"
+    ]
+  },
+  "cr_cash_equivalents_total": {
+    "concepts": [
+      "KortfristigaPlaceringar"
+    ]
+  }
+}

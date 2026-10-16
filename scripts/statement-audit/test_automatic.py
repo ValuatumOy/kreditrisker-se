@@ -43,7 +43,10 @@ class AutomaticTest(unittest.TestCase):
 
             def do_GET(self):
                 owner.requests.append(self.path)
-                self.respond([{'companyCode': '5561939215', 'companyName': 'Test AB', 'companyId': 60,
+                if self.path.startswith('/rest/company?') and self.path != '/rest/company?code=556193-9215':
+                    self.respond([])
+                    return
+                self.respond([{'companyCode': '556193-9215', 'companyName': 'Test AB', 'companyId': 60,
                     'models': [{'followedModelId': 52, 'analystName': 'Data Import'}]}])
 
             def do_POST(self):
@@ -103,8 +106,9 @@ class AutomaticTest(unittest.TestCase):
         self.fail('Local test acquisition did not finish')
 
     def test_search_and_fresh_rest_through_real_node_client(self):
-        found = self.request('/api/search?q=556193-9215')
-        self.assertEqual(found[0]['fid'], '52')
+        for orgnr in ('556193-9215', '5561939215'):
+            found = self.request('/api/search?q=' + orgnr)
+            self.assertEqual(found[0]['fid'], '52')
         self.compare()
         state = self.finished()
         self.assertEqual(state['job']['status'], 'done')
@@ -114,7 +118,7 @@ class AutomaticTest(unittest.TestCase):
         self.assertEqual(state['report']['provenance']['officialRetrievedAt'], '2026-10-14T10:00:00+00:00')
         self.fetch.assert_called_once()
         self.assertIn('/rest/modeldata', self.requests)
-        self.assertTrue(any('/rest/company?code=5561939215' == item for item in self.requests))
+        self.assertEqual(self.requests.count('/rest/company?code=556193-9215'), 2)
 
     def test_wrong_rest_entity_fails_before_original_acquisition(self):
         self.model = copy.deepcopy(self.model)

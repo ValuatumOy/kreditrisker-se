@@ -166,7 +166,11 @@ def make_case(report, documents, source_error=None):
         label += '<small>' + escape({"SEK": "kr", "people": "hlö", "percent": "%"}.get(unit, str(unit))) + '</small>'
         body += '<tr><th scope="row">' + label + '</th>'
         for field in ("official", "backend", "website"):
-            body += '<td class="num">' + number(row.get(field, {}).get("value")) + '</td>'
+            cell = row.get(field, {})
+            body += '<td class="num">' + number(cell.get("value"))
+            if field == "official" and cell.get("sourceSign") == -1 and cell.get("selectedFact"):
+                body += '<small>Lähteessä ' + number(cell['selectedFact']['value']) + '; etumerkki muunnettu.</small>'
+            body += '</td>'
         body += ''.join('<td>' + status(row.get(field)) + '</td>' for field in ("sourceBackendStatus", "backendWebsiteStatus", "status")) + '</tr>'
     body += '</tbody></table></div><details><summary>Tarkistuksen ajankohta ja lähteet</summary>'
     for key, label in (("checkedAt", "Tarkistettu"), ("backendRetrievedAt", "Valuatumin luvut haettu"),

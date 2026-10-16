@@ -69,6 +69,25 @@ class CompareTest(unittest.TestCase):
                 self.assertEqual(row["sourceBackendStatus"], "difference")
                 self.assertEqual(row["status"], "difference")
 
+    def test_expense_sign_conversion_keeps_original_evidence_and_precision(self):
+        expense = {**SALES, "key": "interestExpenses", "variable": "cr_interest_expenses",
+                   "concepts": ["RantekostnaderLiknandeResultatposter"], "sourceSign": -1}
+        for value in (12000, -12000, 0):
+            with self.subTest(value=value):
+                source = fact(value, localName=expense['concepts'][0], decimals=-3)
+                row = self.row(source=filing(source), backend=bundle(cr_interest_expenses=-value / 1_000_000),
+                               metrics=[expense])
+                self.assertEqual(row['sourceBackendStatus'], 'match')
+                self.assertEqual(row['official']['value'], -value)
+                self.assertEqual(row['official']['selectedFact']['value'], value)
+                self.assertEqual(row['official']['selectedFact']['elementId'], source['elementId'])
+                wrong = self.row(source=filing(source), backend=bundle(cr_interest_expenses=(-value + 1000) / 1_000_000),
+                                 metrics=[expense])
+                self.assertEqual(wrong['sourceBackendStatus'], 'difference')
+        missing = self.row(source=filing(), backend=bundle(cr_interest_expenses=0), metrics=[expense])
+        self.assertEqual(missing['sourceBackendStatus'], 'unavailable')
+        self.assertIsNone(missing['official']['value'])
+
     def test_wrong_period_entity_dimension_namespace_unit(self):
         for changes in ({"start": "2025-01-01"}, {"end": "2025-06-30"}, {"entity": "5561939216"},
                         {"dimensions": {"axis": "group"}}, {"contextId": None}, {"namespace": ""},
