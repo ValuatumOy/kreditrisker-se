@@ -258,15 +258,37 @@ def _number(text, element, scope):
 
 
 def _kind(root, title, scopes):
-    namespaces = {uri for scope in scopes.values() for uri in scope.values()}
-    audit = any(uri.startswith("http://www.far.se/se/fr/ar/") for uri in namespaces)
-    annual = any(uri.startswith("http://www.taxonomier.se/se/fr/gen-base/") for uri in namespaces)
+    # Namespace declarations are often copied into XHTML templates and do not
+    # establish which taxonomy the filing actually uses. Inspect fact QNames
+    # and schema references instead.
+    fact_namespaces = set()
+    fact_elements = (list(root.iter(f"{{{IX}}}nonFraction"))
+                     + list(root.iter(f"{{{IX}}}nonNumeric"))
+                     + list(root.iter(f"{{{IX}}}fraction")))
+    for element in fact_elements:
+        concept = element.get("name", "")
+        try:
+            fact_namespaces.add(_qname(concept, scopes[element])[0])
+        except ValueError:
+            pass
+    schema_refs = [element.get("{http://www.w3.org/1999/xlink}href", "").casefold()
+                   for element in root.iter() if element.tag.endswith("}schemaRef")]
+    audit = any(uri.startswith("http://www.far.se/se/fr/ar/") for uri in fact_namespaces)
+    audit = audit or any("far.se/se/fr/ar/" in href for href in schema_refs)
+    annual_facts = any(uri.startswith("http://www.taxonomier.se/se/fr/gen-base/") for uri in fact_namespaces)
+    annual_schema = any(re.match(r"^https?://xbrl\.taxonomier\.se/se/fr/gaap/", href) for href in schema_refs)
     title = title.casefold()
-    audit = audit or "revisionsberättelse" in title or "revisionsberattelse" in title or "audit report" in title
-    annual = annual or "årsredovisning" in title or "arsredovisning" in title or "annual report" in title
-    if audit:
+    audit_title = "revisionsberättelse" in title or "revisionsberattelse" in title or "audit report" in title
+    annual_title = "årsredovisning" in title or "arsredovisning" in title or "annual report" in title
+    # Combined annual statements can include tagged audit opinions. Require
+    # both an annual GAAP schema and actual gen-base facts to identify those
+    # documents as annual; FAR facts alone never make a report annual.
+    annual_primary = annual_facts and annual_schema
+    if audit_title:
         return "audit"
-    return "annual" if annual else "unknown"
+    if audit:
+        return "annual" if annual_primary else "audit"
+    return "annual" if annual_primary or annual_title else "unknown"
 
 
 def _viewer_html(html, root, generated):

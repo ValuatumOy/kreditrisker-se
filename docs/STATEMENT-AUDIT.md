@@ -375,3 +375,9 @@ ja automaattinen Bolagsverket-haku löysi saman tilinpäätöksen hakemistojen j
 yritystiedoston välimuistia hyödyntäen. Käyttöliittymässä 13 päälukua täsmäsi,
 eroja oli 0 ja bruttotulos jäi käsintarkistettavaksi. Tiedostoja ei tuotu käsin.
 Paikallinen `.env` ja tunnus pysyvät Gitin ulkopuolella.
+
+## Laajennettu tarkistus 21.10.2026
+
+[Tulokset, kattavuus ja jatkotoimet](DATA-REVIEW-2026-10-21.md). Yhdistettyjen
+tilinpäätös–tilintarkastuskertomusten tunnistus korjattiin käyttämään varsinaisia
+faktoja ja GAAP-skeemaviittausta. Pelkkä käyttämätön audit-nimiavaruus ei sulje tilinpäätöstä pois.

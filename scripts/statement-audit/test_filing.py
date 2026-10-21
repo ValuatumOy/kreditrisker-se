@@ -207,6 +207,53 @@ class FilingTests(unittest.TestCase):
         self.assertEqual(result["documents"][0]["kind"], "unknown")
         self.assertTrue(result["warnings"])
 
+    def test_document_kind_uses_facts_not_unused_namespace_declarations(self):
+        data = document(numeric("123"), extra='xmlns:far="http://www.far.se/se/fr/ar/2017-09-30"')
+        self.assertEqual(filing.read_filing(data, "annual.xhtml")["documents"][0]["kind"], "annual")
+
+    def test_audit_fact_wins_over_annual_title(self):
+        body = '<ix:nonNumeric name="far:Revisionsberattelse" contextRef="duration">Opinion</ix:nonNumeric>'
+        data = document(body, title="Årsredovisning", extra='xmlns:far="http://www.far.se/se/fr/ar/2017-09-30"')
+        self.assertEqual(filing.read_filing(data, "report.xhtml")["documents"][0]["kind"], "audit")
+
+    def test_combined_annual_statement_with_audit_facts_uses_gaap_and_gen_base_evidence(self):
+        body = (numeric("123")
+                + '<ix:nonNumeric name="far:Revisionsberattelse" contextRef="duration">Opinion</ix:nonNumeric>'
+                + '<link:schemaRef xlink:type="simple" xlink:href="http://xbrl.taxonomier.se/se/fr/gaap/k2/risbs/2021-10-31/test.xsd"/>')
+        data = document(body, title="Company", extra=(
+            'xmlns:far="http://www.far.se/se/fr/ar/2017-09-30" '
+            'xmlns:link="http://www.xbrl.org/2003/linkbase" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink"'))
+        self.assertEqual(filing.read_filing(data, "combined.xhtml")["documents"][0]["kind"], "annual")
+
+    def test_audit_facts_with_gaap_reference_but_no_gen_base_facts_stay_audit(self):
+        body = ('<ix:nonNumeric name="far:Revisionsberattelse" contextRef="duration">Opinion</ix:nonNumeric>'
+                + '<link:schemaRef xlink:type="simple" xlink:href="http://xbrl.taxonomier.se/se/fr/gaap/k2/risbs/2021-10-31/test.xsd"/>')
+        data = document(body, title="Årsredovisning", extra=(
+            'xmlns:far="http://www.far.se/se/fr/ar/2017-09-30" '
+            'xmlns:link="http://www.xbrl.org/2003/linkbase" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink"'))
+        self.assertEqual(filing.read_filing(data, "audit.xhtml")["documents"][0]["kind"], "audit")
+
+    def test_stray_gen_base_fact_without_gaap_schema_stays_audit(self):
+        body = (numeric("123")
+                + '<ix:nonNumeric name="far:Revisionsberattelse" contextRef="duration">Opinion</ix:nonNumeric>')
+        data = document(body, title="Company", extra='xmlns:far="http://www.far.se/se/fr/ar/2017-09-30"')
+        self.assertEqual(filing.read_filing(data, "audit.xhtml")["documents"][0]["kind"], "audit")
+
+    def test_explicit_audit_title_wins_over_annual_facts_and_gaap_schema(self):
+        body = (numeric("123")
+                + '<ix:nonNumeric name="far:Revisionsberattelse" contextRef="duration">Opinion</ix:nonNumeric>'
+                + '<link:schemaRef xlink:type="simple" xlink:href="http://xbrl.taxonomier.se/se/fr/gaap/k2/risbs/2021-10-31/test.xsd"/>')
+        data = document(body, title="Revisionsberättelse", extra=(
+            'xmlns:far="http://www.far.se/se/fr/ar/2017-09-30" '
+            'xmlns:link="http://www.xbrl.org/2003/linkbase" '
+            'xmlns:xlink="http://www.w3.org/1999/xlink"'))
+        self.assertEqual(filing.read_filing(data, "audit.xhtml")["documents"][0]["kind"], "audit")
+
+    def test_audit_title_remains_audit_without_audit_facts(self):
+        self.assertEqual(self.read(numeric("123"), title="Revisionsberättelse")["documents"][0]["kind"], "audit")
+
     def test_original_html_and_inserted_evidence_ids(self):
         body = '<!-- <ix:nonFraction>fake</ix:nonFraction> --><script><![CDATA["<ix:nonFraction>"]]></script>' + numeric("123", id="existing") + numeric("456") + numeric("789", id="")
         data = document(body)
