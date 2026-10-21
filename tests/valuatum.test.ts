@@ -92,6 +92,41 @@ test('zero/missing gross profit keeps omitted sales at zero; explicit sales alwa
     }
 })
 
+test('function-format costs do not turn unreported depreciation into a zero or a verified EBITDA', () => {
+    for (const depreciation of [undefined, 0, -1.016804]) {
+        const b = bundle()
+        const row = b.modeldata.dataMap['2025']
+        row[INCOME_VARS.costOfGoodsSold] = -56.535179
+        row[INCOME_VARS.ebitda] = 2.36588
+        delete row[INCOME_VARS.depreciation]
+        if (depreciation !== undefined) row[INCOME_VARS.depreciation] = depreciation
+        const res = mapBundle(b, opts)
+        assert.ok(res.ok)
+        const p = res.record.periods[0]
+        if (depreciation === undefined) {
+            assert.deepEqual(p.income.depreciation, { status: 'missing', reason: 'not_in_source' })
+            assert.deepEqual(p.income.ebitda, { status: 'missing', reason: 'not_in_source' })
+        } else {
+            assert.equal(numeric(p.income.depreciation), Math.round(depreciation * 1e6))
+            assert.equal(numeric(p.income.ebitda), 2_365_880)
+        }
+        assert.deepEqual(validateRecord(res.record).errors, [])
+    }
+})
+
+test('omitted functional cost rows cannot bypass missing-depreciation checks beside equipment', () => {
+    const b = bundle()
+    const row = b.modeldata.dataMap['2025']
+    for (const key of ['depreciation', 'costOfGoodsSold', 'sellingExpenses', 'administrativeExpenses'] as const)
+        delete row[INCOME_VARS[key]]
+    row[BALANCE_VARS.machineryAndEquipment] = 4.786172
+    row[INCOME_VARS.ebitda] = 2.36588
+    const res = mapBundle(b, opts)
+    assert.ok(res.ok)
+    assert.deepEqual(res.record.periods[0].income.ebitda, { status: 'missing', reason: 'not_in_source' })
+    assert.deepEqual(res.record.periods[0].income.depreciation, { status: 'missing', reason: 'not_in_source' })
+})
+
 test('uncertain sales do not become a zero claim or a sales-ranking value; summary names gross profit', () => {
     const b = bundle()
     const row = b.modeldata.dataMap['2025']

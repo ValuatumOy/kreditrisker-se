@@ -267,6 +267,16 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
         const income = values(INCOME_VARS, UNIT, true)
         if (get(INCOME_VARS.netSales) === undefined && (get(INCOME_VARS.grossProfit) ?? 0) !== 0)
             income.netSales = { status: 'missing', reason: 'not_in_source' }
+        const costsByFunction = ['costOfGoodsSold', 'sellingExpenses', 'administrativeExpenses']
+            .some((key) => (get(INCOME_VARS[key as keyof IncomeStatement]) ?? 0) !== 0)
+        const assetsWithUnreportedDepreciation = ['machineryAndEquipment', 'constructionInProgress', 'otherTangibleAssets', 'intangibleAssets']
+            .some((key) => (get(BALANCE_VARS[key as keyof BalanceSheet]) ?? 0) !== 0)
+        // Function-format and abbreviated accounts can include depreciation within
+        // other costs. An omitted separate depreciation input does not establish zero.
+        if (get(INCOME_VARS.depreciation) === undefined && (costsByFunction || assetsWithUnreportedDepreciation || income.netSales.status === 'missing')) {
+            income.depreciation = { status: 'missing', reason: 'not_in_source' }
+            income.ebitda = { status: 'missing', reason: 'not_in_source' }
+        }
         periods.push({
             start: startDate.toISOString().slice(0, 10),
             end,

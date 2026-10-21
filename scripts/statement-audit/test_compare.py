@@ -69,6 +69,32 @@ class CompareTest(unittest.TestCase):
                 self.assertEqual(row["sourceBackendStatus"], "difference")
                 self.assertEqual(row["status"], "difference")
 
+    def test_reported_gross_profit_variants_keep_scope_and_conflict_checks(self):
+        rules = json.loads(Path(__file__).with_name("source-rules.json").read_text(encoding="utf-8"))
+        metric = {**SALES, "key": "grossProfit", "variable": "cr_gross_profit", **rules["cr_gross_profit"]}
+        for concept in metric["concepts"]:
+            source = fact(21485735, localName=concept)
+            row = self.row(source=filing(source), backend=bundle(cr_gross_profit=21.485735), metrics=[metric])
+            self.assertEqual(row["sourceBackendStatus"], "match")
+            self.assertEqual(row["official"]["selectedFact"]["localName"], concept)
+            wrong_period = {**source, "start": "2024-07-01", "end": "2025-06-30"}
+            self.assertNotEqual(self.row(source=filing(wrong_period), metrics=[metric])["sourceBackendStatus"], "match")
+        first = fact(21485735, localName=metric["concepts"][0])
+        second = fact(21485735, localName=metric["concepts"][1])
+        self.assertEqual(self.row(source=filing(first, second), metrics=[metric])["sourceBackendStatus"], "manual")
+        self.assertEqual(self.row(source=filing(), metrics=[metric])["sourceBackendStatus"], "manual")
+
+    def test_incomplete_production_ratio_dependencies_do_not_fall_back_to_partial_candidates(self):
+        rules = json.loads(Path(__file__).with_name("source-rules.json").read_text(encoding="utf-8"))
+        for variable in ("cr_ebitda", "cr_quick_ratio", "cr_equity_ratio",
+                         "cr_non_current_loans_from_credit_total", "cr_current_loans_from_credit_total"):
+            metric = {**SALES, "key": variable, "variable": variable, **rules[variable]}
+            report = compare(filing(fact()), bundle(**{variable: 1}), "", END,
+                             {"metrics": [metric], "sourceDefinitions": rules})
+            row = report["rows"][0]
+            self.assertEqual(row["sourceBackendStatus"], "manual")
+            self.assertIsNone(row["official"]["value"], variable)
+
     def test_expense_sign_conversion_keeps_original_evidence_and_precision(self):
         expense = {**SALES, "key": "interestExpenses", "variable": "cr_interest_expenses",
                    "concepts": ["RantekostnaderLiknandeResultatposter"], "sourceSign": -1}

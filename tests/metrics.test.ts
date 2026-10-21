@@ -28,11 +28,22 @@ test('key ratios are the CV values as the source gives them', () => {
 
 test('every Bokslut row has a CV variable and every statement field a row', () => {
     assert.deepEqual(INCOME_ROWS.map((r) => r.key).sort(), Object.keys(INCOME_VARS).sort())
-    assert.deepEqual(BALANCE_ROWS.map((r) => r.key).sort(), Object.keys(BALANCE_VARS).sort())
+    assert.deepEqual(BALANCE_ROWS.map((r) => r.key).sort(), Object.keys(BALANCE_VARS).filter((key) => key !== 'longTermReceivables').sort())
 })
 
 test('real sample: the Bokslut rows add up to their subtotals', () => {
     for (const p of samplePeriods()) assert.deepEqual(statementGaps(p), [])
+})
+
+test('separate deferred tax and unspecified receivables stay out of inventory and inside total assets', () => {
+    const [p] = samplePeriods()
+    const source = p.source
+    const originalAssets = numeric(p.balance.totalAssets)!
+    p.balance.deferredTaxAssets = { status: 'reported', value: 705_550, source }
+    p.balance.longTermReceivablesUnspecified = { status: 'reported', value: 123_456, source }
+    p.balance.longTermReceivables = { status: 'reported', value: 829_006, source }
+    p.balance.totalAssets = { status: 'reported', value: originalAssets + 829_006, source }
+    assert.deepEqual(statementGaps(p), [])
 })
 
 test('gross-profit reconciliation distinguishes full cost-format and function-format inputs', () => {

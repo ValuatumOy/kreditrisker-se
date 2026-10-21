@@ -411,6 +411,14 @@
   "cr_wages_and_salaries": {
     "sourceFormula": "(if([Personalkostnader]!=0,-([Personalkostnader]-[SocialaKostnaderInklPensionskostnader]),0))"
   },
+  "cr_gross_profit": {
+    "concepts": [
+      "Bruttoresultat",
+      "BruttoresultatFunktionsindelad",
+      "BruttoresultatKostnadsslagsindelad",
+      "BruttoresultatForkortadFunktionsindelad"
+    ]
+  },
   "gross_profit": {
     "sourceFormula": "(if([Rorelseresultat]!=0,if([BruttoresultatFunktionsindelad]!=0,[BruttoresultatFunktionsindelad],if((([BruttoresultatKostnadsslagsindelad]+[BruttoresultatForkortadFunktionsindelad]))!=0,([BruttoresultatKostnadsslagsindelad]+[BruttoresultatForkortadFunktionsindelad]),if([KostnadSaldaVaror]!=0,[Nettoomsattning]-[KostnadSaldaVaror],[Nettoomsattning]+[ForandringLagerProdukterIArbeteFardigaVarorPagaendeArbetenAnnansRakning]+[AktiveratArbeteEgenRakning]+[OvrigaRorelseintakter]-[RavarorFornodenheterKostnader]-[HandelsvarorKostnader]))),0))"
   },
@@ -431,35 +439,44 @@
     "sourceFormula": "100*v(\"cr_pre_tax_profit_less_eo\") / v(\"ns\")"
   },
   "cr_ebitda": {
-    "sourceFormula": "v(\"ebit\") - v(\"cr_depreciation\")",
-    "reviewRequired": "EBITDA-vertailukaava: muiden CV-poisto- ja oikaisuerien lähteitä ei ole vahvistettu. Arvo on vain tarkistuksen apulaskelma."
+    "sourceFormula": "if(v(\"history\")!=0,v(\"ebit\")-v(\"cr_depreciation\")-v(\"cr_reduction_non_current_assets\")-v(\"impairment_charges\")-v(\"dep_gwa\")-v(\"cr_leasing_asset_depreciation\"),v(\"ebit\")-v(\"cr_depreciation\")-v(\"cr_reduction_non_current_assets\")-v(\"cr_leasing_asset_depreciation\"))",
+    "reviewRequired": "Tuotannon kaavan historia-/ennustejako sekä lisäpoistojen, arvonalennusten, liikearvon ja leasingpoistojen lähteet puuttuvat. Pelkkä EBIT + poistot ei vahvista EBITDA:a."
   },
   "cr_long_term_receivables_total": {
     "sourceFormula": "v(\"cr_lt_tax_assets\")",
     "reviewRequired": "Pitkäaikaisten saamisten vertailukaava sisältää verosaamisen; erittelemättömän CV-erän alkuperäislähde puuttuu."
   },
   "cr_non_current_loans_from_credit_total": {
-    "sourceFormula": "v(\"cr_non_current_loans_from_credit_ins\")",
+    "sourceFormula": "v(\"cr_non_current_loans_from_credit_ins\")+v(\"convertibles\")+v(\"cr_non_current_special_loan\")",
     "reviewRequired": "Luottolaitosvelkojen lähdeosa on laskettu; CV-välisumman vaihto- ja erityislainojen lähteet ovat vielä varmistamatta."
   },
   "cr_current_loans_from_credit_total": {
-    "sourceFormula": "v(\"cr_current_loans_from_credit_ins\")",
+    "sourceFormula": "v(\"cr_current_loans_from_credit_ins\")+v(\"cr_current_convertibles\")+v(\"cr_current_special_loan\")",
     "reviewRequired": "Luottolaitosvelkojen lähdeosa on laskettu; CV-välisumman vaihto- ja erityislainojen lähteet ovat vielä varmistamatta."
   },
   "cr_equity_ratio": {
-    "sourceFormula": "100*(v(\"cr_shareholders_equity\")+v(\"cr_appropriations_total\"))/if(v(\"cr_shareholders_equity\")+v(\"cr_appropriations_total\")<0,abs(v(\"cr_provisions\"))+abs(v(\"cr_non_current_liabilities_total\"))+abs(v(\"cr_current_liabilities_total\"))-v(\"cr_current_advances_received\"),v(\"cr_shareholders_equity\")+v(\"cr_appropriations_total\")+abs(v(\"cr_provisions\"))+abs(v(\"cr_non_current_liabilities_total\"))+abs(v(\"cr_current_liabilities_total\"))-v(\"cr_current_advances_received\"))",
+    "sourceFormula": "100*v(\"cr_equity_ratio_opo\")/if(v(\"cr_equity_ratio_opo\")<0,v(\"cr_equity_ratio_abs_liab\")-v(\"cr_current_advances_received\"),v(\"cr_equity_ratio_opo\")+v(\"cr_equity_ratio_abs_liab\")-v(\"cr_current_advances_received\"))",
     "reviewRequired": "Soliditeetin vertailukaava: pääomalainojen ja konsernioikaisujen kaikkia CV-lähteitä ei ole vahvistettu."
   },
   "cr_quick_ratio": {
-    "sourceFormula": "100*(v(\"cr_short_term_receivables_total\")+v(\"cr_cash_and_bank_deposits\")+v(\"cr_cash_equivalents_total\"))/(v(\"cr_current_liabilities_total\")-v(\"cr_current_advances_received\"))",
-    "reviewRequired": "Kassalikviditeetin vertailukaava: muiden CV-rahoitusvarojen luokittelu ja saamisten välisumma odottavat varmistusta."
+    "sourceFormula": "100*(v(\"cr_short_term_receivables_total\")+v(\"fin_ass_ib_total\")+v(\"cr_non_liquid_fin_assets\"))/(v(\"cr_current_liabilities_total\")-v(\"cr_current_advances_received\"))",
+    "reviewRequired": "Tuotannon kaavan fin_ass_ib_total- ja cr_non_liquid_fin_assets-erien itsenäinen lähdekartoitus puuttuu. Kassaa ja lyhytaikaisia sijoituksia ei oleteta samaksi kokonaisuudeksi."
   },
   "cr_roe_percent_corrected": {
-    "sourceFormula": "100*if(v(\"bs_total_assets\",-1)<10,0.5,1)*2*v(\"cr_net_earnings\")/(if(v(\"cr_shareholders_equity\",-1)<10,v(\"bs_total_assets\",-1),v(\"cr_shareholders_equity\",-1))-v(\"minorities\",-1)+if(v(\"cr_shareholders_equity\")<10,v(\"bs_total_assets\"),v(\"cr_shareholders_equity\"))-v(\"minorities\"))",
-    "reviewRequired": "ROE:n vertailukaava: laskentatulos riippuu CV:n oman pääoman ja vähemmistöosuuden rajauksesta, joka on vielä varmistamatta."
+    "sourceFormula": "100*if(v(\"bs_total_assets\",-1)<10,0.5,1)*2*v(\"cr_net_earnings\")/(if(v(\"cr_shareholders_equity\",-1)<10,v(\"bs_total_assets\",-1),v(\"cr_shareholders_equity\",-1))-v(\"minorities\",-1)+if(v(\"cr_shareholders_equity\")<10,v(\"bs_total_assets\"),v(\"cr_shareholders_equity\"))-v(\"minorities\"))"
   },
   "cr_input_long_term_receivables_total": {
     "sourceCheck": false,
     "sourceUnresolved": "Erittelemättömälle pitkäaikaiselle saamiselle ei löytynyt Bolagsverketin tuontisääntöä tai alkuperäistä lähdemääritelmää. Puuttumista ei vahvisteta nollaksi."
+  },
+  "cr_equity_ratio_opo": {
+    "sourceFormula": "v(\"cr_shareholders_equity\")+v(\"cr_untaxed_reserves\")+v(\"cr_capital_loan_sum\")+v(\"cr_capital_loan_sum_st\")+v(\"cr_cumulative_accelerated_depreciations\")+v(\"cr_consolidation_difference\")"
+  },
+  "cr_equity_ratio_abs_liab": {
+    "sourceFormula": "abs(v(\"cr_provisions\"))+abs(v(\"cr_non_current_liabilities_total\")-v(\"cr_capital_loan_sum\"))+abs(v(\"cr_current_liabilities_total\")-v(\"cr_capital_loan_sum_st\"))"
+  },
+  "history": {
+    "sourceCheck": false,
+    "sourceUnresolved": "Tuotannon historia-/ennustevalitsimen arvoa ei johdeta puuttuvasta tilinpäätösrivistä eikä oleteta nollaksi."
   }
 }
