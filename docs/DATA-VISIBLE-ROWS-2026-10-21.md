@@ -1,5 +1,7 @@
 # Ruotsin puuttuvien tilinpäätösrivien jatkotarkistus 21.10.2026
 
+**Myöhempi loppukierros:** [avoimien kohtien tutkinta ja uudet korjaukset](DATA-OPEN-ITEMS-2026-10-21.md). Alla oleva avoimien kohtien lista kuvaa tämän aiemman julkaisun tilannetta; esimerkiksi Magnus Thorin henkilöstö ja varauskomponentit käsitellään jatkomuistiossa.
+
 Korjaukset ovat [PR:ssä 86](https://bitbucket.org/valuatum/profinder-environment/pull-requests/86), joka yhdistettiin masteriin commitilla `772eb5f` (koodi `3fe5414`). Korjaus koskee tilinpäätösten lukemista Valuatumiin. Kyse ei ole nettisivulle käsin vaihdetuista luvuista.
 
 ## Mitä korjattiin ja miksi
