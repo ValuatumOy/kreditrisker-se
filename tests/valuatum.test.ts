@@ -117,6 +117,19 @@ test('rejects bundles that are not Swedish companies', () => {
     assert.equal(mapBundle(c, opts).ok, false)
 })
 
+test('employees use reported headcount and never a payroll-based estimate', () => {
+    const b = bundle()
+    b.modeldata.dataMap['2025'].cr_employees = 193
+    b.modeldata.dataMap['2025'].cr_employees_adjusted = 1984.19128
+    delete b.modeldata.dataMap['2024'].cr_employees
+    b.modeldata.dataMap['2024'].cr_employees_adjusted = 1993.77464
+    const res = mapBundle(b, opts)
+    assert.ok(res.ok)
+    assert.equal(numeric(res.record.periods[0].employees), 193)
+    assert.deepEqual(res.record.periods[1].employees, { status: 'missing', reason: 'not_in_source' })
+    assert.doesNotMatch(summarize(publishCompany(res.record, undefined, '2026-10-21')).join(' '), /1[\s\u00a0]?984|1[\s\u00a0]?994/)
+})
+
 test('real Swedish sample: fiscal dates, SEK units and the CV ratios', () => {
     const sample: Bundle = JSON.parse(fs.readFileSync(path.join(ROOT, 'data', 'sample', 'api-cache', '52.json'), 'utf8'))
     const res = mapBundle(sample, opts)

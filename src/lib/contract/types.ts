@@ -280,7 +280,7 @@ export interface FiscalPeriod {
     income: IncomeStatement
     balance: BalanceSheet
     ratios: KeyRatios
-    employees: Value // cr_employees_adjusted
+    employees: Value // cr_employees: reported headcount, excluding payroll-based estimates
 }
 
 /** Output of a credit model. Displayed only when validated for Sweden. */

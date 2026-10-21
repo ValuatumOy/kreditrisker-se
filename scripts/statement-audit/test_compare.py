@@ -11,7 +11,7 @@ ORGNR = "5561939215"
 NS = "http://www.taxonomier.se/se/fr/gen-base/2024-01-01"
 SALES = {"key": "netSales", "label": "Nettoomsättning", "variable": "ns", "concepts": ["Nettoomsattning"],
          "kind": "duration", "unit": "SEK", "zeroWhenAbsent": True}
-EMPLOYEES = {"key": "employees", "label": "Medelantal anställda", "variable": "cr_employees_adjusted",
+EMPLOYEES = {"key": "employees", "label": "Medelantal anställda", "variable": "cr_employees",
              "concepts": ["MedelantaletAnstallda"], "kind": "duration", "unit": "people", "zeroWhenAbsent": False}
 
 
@@ -176,7 +176,7 @@ class CompareTest(unittest.TestCase):
 
     def test_people_unit_and_rounding(self):
         source = filing(fact(52.2, localName="MedelantaletAnstallda", unit="se-k3-type:AntalPersoner", decimals=1))
-        row = self.row(source=source, backend=bundle(cr_employees_adjusted=52.2),
+        row = self.row(source=source, backend=bundle(cr_employees=52.2),
                        site=html("52", EMPLOYEES["label"], group="Nyckeltal"), metrics=[EMPLOYEES])
         self.assertEqual(row["status"], "match")
 

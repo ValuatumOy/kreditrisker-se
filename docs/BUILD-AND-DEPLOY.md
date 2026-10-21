@@ -348,6 +348,10 @@ See [STATEMENT-AUDIT.md](STATEMENT-AUDIT.md) for the manual two-screen workflow,
 the 14-value reconciliation and its limits. This tool is not part of the public build.
 
 Remaining backend/method questions:
+- Headcount on the site uses reported `cr_employees` as of 2026-10-21. `cr_employees_adjusted`
+  may fall back to a payroll estimate (Magnus Thor 2023: 1,984.19128 instead of the visible
+  source headcount 193). Missing reported headcount stays missing on the site. CV and
+  Swedish reports must distinguish this estimate from an imported source headcount.
 - Decide Swedish ratio definitions in the shared backend so CV, the site and reports agree.
 - Verify the 51 CONVERTIBLE changes have reached CV and reports, and complete backend Swedish
   translations. The site's labels are already locally defined in Swedish.

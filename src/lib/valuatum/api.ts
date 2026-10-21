@@ -44,7 +44,7 @@ export interface ApiCompany {
 }
 
 /** Bumped whenever USED_VARS changes, so older cache files are fetched again. */
-export const CACHE_VERSION = 4
+export const CACHE_VERSION = 5
 
 export interface Bundle {
     cacheVersion?: number

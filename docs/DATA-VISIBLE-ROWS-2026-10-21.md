@@ -34,6 +34,14 @@ Tarkistuksen aineisto ja ennen/jälkeen-vastaukset ovat paikallisessa `artifacts
 
 Laajaa sivugenerointia tai raporttien yleistä lukuhyväksyntää ei anneta tällä perusteella. Nämä julkaisut päivittävät vain neljä olemassa olevaa yrityssivua.
 
+## Erillinen henkilöstölukujen havainto
+
+Sivun silmämääräinen tarkistus paljasti Magnus Thorin vanhoissa vuosissa vielä 1 984 / 1 994 työntekijän luvut. Raaka-API vahvisti, että ne olivat `cr_employees_calc`-arvioita, joita `cr_employees_adjusted` käytti ilmoitetun henkilöstömäärän puuttuessa. Vuoden 2023 henkilöstökulut 99 209 564 SEK / 50 000 tuottavat arvion 1 984,19128. Alkuperäisen tilinpäätöksen näkyvä henkilöstötaulukko ilmoittaa 193 työntekijää vuodelle 2023 ja 207 vuodelle 2022, mutta näitä rivejä ei ole tuotu henkilöstön varsinaiseen syötekenttään.
+
+Sivusto käyttää nyt `cr_employees`-syötekenttää. Jos ilmoitettu henkilöstömäärä puuttuu, sivulla näytetään puuttuva tieto; palkkakuluihin perustuvaa arviota ei esitetä ilmoitettuna henkilöstömääränä. Vuosien 2025/2024 aidot 202/195 työntekijää säilyvät. Sama muutos koskee tarkistustyökalun vertailukenttää. API-välimuistin versio nostettiin, jotta vanha arvioita sisältävä aineisto ei jää käyttöön. S M Entreprenadin olemassa oleva testinäyte haettiin uudelleen, ja ilmoitettu henkilöstömäärä 52 vahvistui.
+
+58 sivustotestiä ja 129 tarkistustyökalun testiä läpäisivät. Paikallinen rakentaminen onnistui (84 sivua). Lähteestä puuttuvia koneellisia henkilöstömerkintöjä tai backendin arviointikaavaa ei muutettu. Niiden vaikutus CV:hen ja tuleviin raportteihin pitää huomioida erikseen.
+
 ## Yrityssivujen jälkitarkistus
 
 [Jenkins-ajo 16](https://ci.valuatum.com/job/SweCompanyDirectory-ProdUpdate/16/) julkaisi nämä neljä olemassa olevaa yrityssivua onnistuneesti. Hylättyjä tai poistettuja yrityksiä ei ollut. Hakemiston kaikki 832 yritystä, nimet ja polut säilyivät täsmälleen samoina.

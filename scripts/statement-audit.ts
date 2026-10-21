@@ -44,7 +44,7 @@ const vars: Record<string, string> = { ...INCOME_VARS, ...BALANCE_VARS }
 const labels = new Map([...INCOME_ROWS, ...BALANCE_ROWS].map((r) => [r.key, r.label]))
 const coreMetrics = [
     ...definitions.map(([key, concept, kind]) => ({ key, label: labels.get(key), variable: vars[key], concepts: [concept], kind, unit: 'SEK', websiteGroup: kind === 'duration' ? 'Resultaträkning' : 'Balansräkning', zeroWhenAbsent: true })),
-    { key: 'employees', label: 'Medelantal anställda', variable: 'cr_employees_adjusted', concepts: ['MedelantaletAnstallda'], kind: 'duration', unit: 'people', websiteGroup: 'Nyckeltal', zeroWhenAbsent: false },
+    { key: 'employees', label: 'Medelantal anställda', variable: 'cr_employees', concepts: ['MedelantaletAnstallda'], kind: 'duration', unit: 'people', websiteGroup: 'Nyckeltal', zeroWhenAbsent: false },
 ]
 const known = new Map(coreMetrics.map(m => [m.key, m]))
 const sourceRules: Record<string, { concepts?: string[]; sourceSign?: number; sourceFormula?: string; reviewRequired?: string; sourceCheck?: boolean; sourceUnresolved?: string }> = JSON.parse(

@@ -32,7 +32,7 @@ const UNIT = 1e6
 // subtotal the filing does not break down. In the income statement each subtotal is the
 // previous one plus the items between; associates' share of the result belongs above
 // EBITDA, although the CV lists it below depreciation.
-// The key ratios are the CV overview tables 442, 444 and 445 and employees the volume table 17088.
+// The key ratios are the CV overview tables 442, 444 and 445; headcount uses the reported input.
 
 /** Contract field -> REST variable name. */
 export const INCOME_VARS = {
@@ -169,7 +169,8 @@ export const RATIO_VARS = {
     returnOnEquity: 'cr_roe_percent_corrected',
 } as const satisfies Record<keyof KeyRatios, string>
 
-const EMPLOYEES = 'cr_employees_adjusted'
+// The adjusted count can be a payroll-based estimate when no headcount was imported.
+const EMPLOYEES = 'cr_employees'
 const PERIOD_MONTHS = 'cr_fiscal_period_length'
 /** Period end as a number, e.g. 20251231. */
 const PERIOD_END = 'cr_fiscal_year_end'
