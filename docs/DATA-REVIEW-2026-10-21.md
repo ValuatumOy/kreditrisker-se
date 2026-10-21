@@ -3,6 +3,8 @@
 **Laajaa sivugenerointia ei vielä suositella.** Julkaistut luvut vastaavat API:a,
 mutta kolmessa yrityksessä vahvistui merkittävä lähteen tulkintavirhe.
 
+**Päivitys tarkistuksen jälkeen:** [Näiden kolmen yrityksen tuontikorjaus ja varmennus](DATA-IMPORT-FIX-2026-10-21.md). Alla oleva otos ja havainnot kuvaavat korjausta edeltänyttä tilannetta. Muut avoimet kohdat säilyvät avoimina.
+
 ## Otos ja kattavuus
 
 - 30 uutta yritystä: 20 satunnaisesti (siemen 20261021, julkaistun 832 yrityksen indeksistä) ja 10 kohdennetusti. Lisäksi 3 aiemmin tarkistettua yritystä uusintatestiin.
