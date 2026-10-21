@@ -50,10 +50,13 @@ Muutos on mainissa, commit 526b422.
 
 Alkuperäisten tiedostojen ristiriitaiset tunnisteet eivät katoa: raaka lähdevertailu voi edelleen
 merkitä STCC:n liitetietosijoituksen eroksi ja Muntersin/FilmLancen oman pääoman rivit
-käsintarkistukseen. STCC:n vuoden 2024 alkuperäisessä tiedostossa sijoitus oli pitkäaikainen; vuoden 2025 vertailusarakkeessa se luokitellaan lyhytaikaiseksi. Tuonti käyttää uudempaa vertailuluokittelua, joten ero vanhaan lähteeseen säilyy raportissa. Edellä luetellut korjatut arvot tarkistettiin nimenomaan varsinaisesta taseesta,
+käsintarkistukseen. STCC:n vuoden 2024 alkuperäisen tiedoston varsinainen tase luokittelee sijoituksen jo lyhytaikaiseksi (3 640 727 SEK; vuoden 2023 vertailuluku 2 229 494 SEK), vaikka liitetiedon tunniste sanoo pitkäaikainen. Aiempi tämän muistion tulkinta vuoden 2024 pitkäaikaisesta luokittelusta oli virheellinen; se korjattiin laajennetun lähdetarkistuksen yhteydessä. Ero on taseen ja liitetiedon luokitteluristiriita, ei osoitettu muutos lähdeversioiden välillä. Edellä luetellut korjatut arvot tarkistettiin nimenomaan varsinaisesta taseesta,
 ei valitsemalla automaattisesti jompikumpi ristiriitaisista faktoista. STCC:n vastattavien
 loppusumman yhden kruunun ero on edelleen lähteen osien ja ilmoitetun summan ristiriita.
 Näitä havaintoja ei muutettu vihreiksi toleranssia kasvattamalla.
 
 Laajennetun otoksen muut avoimet tapaukset ja tunnuslukujen lähdeosat säilyvät avoimina.
 Kolmen yrityksen korjaus ei ole hyväksyntä kaikkien yritysten kaikille luvuille.
+
+Saman päivän jatkotarkistus, loput 27 tase-erolistan yritystä ja avoimet kohdat:
+[DATA-BALANCE-REVIEW-2026-10-21.md](DATA-BALANCE-REVIEW-2026-10-21.md).
