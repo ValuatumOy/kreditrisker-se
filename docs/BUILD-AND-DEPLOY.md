@@ -122,7 +122,7 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 
 1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
    then `scripts/select-batch.ts` picks the batch from `COMPANIES` (no file upload; empty = changed, `all` = every company)
-2. Fetch (restores the index state from `STATE_URI`, a private S3 key)
+2. Fetch (restores the index state from `STATE_URI`, a private S3 key; uses `SE_API_REFRESH=1` so the selected batch always reads fresh REST data instead of a previous workspace cache)
 3. Build (`SE_DATA_SOURCE=build`)
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
    save the new index state, invalidate CloudFront

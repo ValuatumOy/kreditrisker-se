@@ -110,7 +110,7 @@ The fields below are already set for a production run; leave them as they are.''
                 sh '''#!/bin/bash
                     set -e
                     aws s3 cp "$STATE_URI" "$SE_INDEX_IN" || echo "No previous index state; starting empty."
-                    npm run fetch
+                    SE_API_REFRESH=1 npm run fetch
                 '''
             }
         }
