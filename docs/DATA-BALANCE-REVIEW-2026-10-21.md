@@ -1,5 +1,7 @@
 # Ruotsin tase-erolistan tarkistus 21.10.2026
 
+**Myöhempi jatkotarkistus samana päivänä:** [Livsmedelin tase-erittelyt sekä Magnus Thorin, Café Levinskyn ja Raw Sushin tuloslaskelmat](DATA-VISIBLE-ROWS-2026-10-21.md). Alla kuvataan aiemman 27 yrityksen tarkistuksen tilanne; uudemmat korjaukset ja edelleen avoimet kohdat on eroteltu jatkotarkistuksessa.
+
 Tarkistimme kaikki 27 alkuperäisen tase-erolistan yritystä ja niiden 115 järjestelmässä olevaa tilikautta. Alkuperäinen tiedosto oli käytettävissä 83 tilikaudelta; lisäksi käytimme uudempien raporttien vertailusarakkeita. Puuttuvia lähteitä ei lasketa varmennetuiksi. Selitettävissä olevat tuontivirheet korjattiin tuontipalveluun. Taseen täsmääminen ei yksin vahvista kaikkia tuloslaskelman eriä tai tunnuslukuja.
 
 ## Yrityskohtaiset tulokset
