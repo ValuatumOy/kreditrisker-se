@@ -42,6 +42,16 @@ Sivusto käyttää nyt `cr_employees`-syötekenttää. Jos ilmoitettu henkilöst
 
 58 sivustotestiä ja 129 tarkistustyökalun testiä läpäisivät. Paikallinen rakentaminen onnistui (84 sivua). Lähteestä puuttuvia koneellisia henkilöstömerkintöjä tai backendin arviointikaavaa ei muutettu. Niiden vaikutus CV:hen ja tuleviin raportteihin pitää huomioida erikseen.
 
+Korjaus on sivuston commitissa [`73e8c09`](https://bitbucket.org/valuatum/kreditrisker-se/commits/73e8c092dcd260318aaeba14d4b229ead3b4b20c). [Jenkins-ajo 17](https://ci.valuatum.com/job/SweCompanyDirectory-ProdUpdate/17/) päivitti vain hakemistossa jo olleet 832 yritystä, onnistui eikä hylännyt tai poistanut yrityksiä. Yritysjoukko, nimet ja polut säilyivät täsmälleen samoina; myös niiden hubisivut rakennettiin uudelleen.
+
+Julkaistu HTML haettiin kaikilta 832 yritykseltä, ja kaikkien **3 415 näkyvän tilikauden** henkilöstömäärä tai puuttuvan tiedon merkintä tarkistettiin tuoreesta raaka-API:sta: **3 415 täsmäystä, 0 eroa**. Ilmoitettu henkilöstömäärä oli saatavilla 1 776 tilikaudelle ja puuttui 1 639:ltä. Näistä 371 tilikaudella, 151 yrityksessä, vanha kenttä tarjosi laskennallisen arvion, joka oli täsmälleen sama kuin `cr_employees_calc`. Nämä arviot eivät enää näy ilmoitettuina henkilöstömäärinä. Puuttuva ilmoitettu määrä ei muutu vahvistetuksi nollaksi.
+
+API-pyyntö `includeEstimates:false` palautti silti nämä historialliset henkilöstöarviot. Asetusta ei voi käyttää henkilöstötiedon lähdemerkintänä. Tämä tarkistus vahvistaa sivun käyttävän ilmoitetun määrän kenttää; se ei vahvista kaikkien yritysten alkuperäisiä henkilöstölukuja eikä korjaa CV:n/arvioraporttien käyttämiä laskennallisia kenttiä. Magnus Thorin näkyvien 193/207 henkilön lähderivien koneellinen lukeminen jää erilliseksi tuonnin jatkotyöksi.
+
+Henkilöstökorjauksen jälkeen neljän korjatun yrityksen kaikkien 21 API-tilikauden sivuvertailu tehtiin vielä uudelleen uudella vertailukentällä: **1 054 vertailukelpoista riviä täsmäsi, eroja 0**. Muut 1 466 mahdollista riviä jäivät vertailukelvottomiksi. Vanhojen henkilöstöarvioiden poistumista ei laskettu lähdevarmennukseksi.
+
+Lopuksi tuontijono oli tyhjä, ECS-käsittelijän tavoite- ja ajossa olevien tehtävien määrä 0, ja tuontia varten käytetty EC2-palvelin oli sammunut (`terminated`). Pysyviä skaalausasetuksia ei muutettu. Henkilöstön koko joukon tarkistusevidenssi: paikallinen `artifacts/open-followup/employees-verified.json`.
+
 ## Yrityssivujen jälkitarkistus
 
 [Jenkins-ajo 16](https://ci.valuatum.com/job/SweCompanyDirectory-ProdUpdate/16/) julkaisi nämä neljä olemassa olevaa yrityssivua onnistuneesti. Hylättyjä tai poistettuja yrityksiä ei ollut. Hakemiston kaikki 832 yritystä, nimet ja polut säilyivät täsmälleen samoina.
