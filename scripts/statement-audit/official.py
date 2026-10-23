@@ -78,10 +78,10 @@ class OfficialFilings:
         except (urllib.error.URLError, TimeoutError, OSError) as exc:
             raise ValueError("Tilinpäätöksen haku Bolagsverketistä epäonnistui. Yritä uudelleen.") from exc
 
-    def _listing(self):
+    def _listing(self, refresh=False):
         path = self.cache_dir / "archives.json"
         cached = _read_json(path)
-        if isinstance(cached, dict) and 0 <= time.time() - cached.get("fetchedAt", 0) < LIST_TTL:
+        if not refresh and isinstance(cached, dict) and 0 <= time.time() - cached.get("fetchedAt", 0) < LIST_TTL:
             return cached["archives"]
         archives, marker, seen = {}, None, set()
         for _ in range(MAX_LIST_PAGES):

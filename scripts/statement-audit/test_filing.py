@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 import filing
+from compare import SourceReader, _official
 
 
 CONTEXT = '''<xbrli:context id="duration"><xbrli:entity><xbrli:identifier scheme="test">556193-9215</xbrli:identifier></xbrli:entity><xbrli:period><xbrli:startDate>2025-07-01</xbrli:startDate><xbrli:endDate>2026-06-30</xbrli:endDate></xbrli:period></xbrli:context>'''
@@ -44,6 +45,90 @@ class FilingTests(unittest.TestCase):
         self.assertEqual(first["decimals"], -3)
         self.assertEqual(result["facts"][2]["unit"], "se-k3-type:AntalPersoner")
         self.assertEqual(result["warnings"], [])
+
+    def test_gross_profit_label_invalidates_sales_semantics_after_numeric_parsing(self):
+        for label in ("Bruttoresultat", "Bruttoresultat, tkr"):
+            for value in ("123", "0"):
+                with self.subTest(label=label, value=value):
+                    body = f'<table><tr><td><p>{label}</p></td><td>{numeric(value, id="sales")}</td></tr></table>'
+                    result = self.read(body)
+                    fact = result["facts"][0]
+                    self.assertEqual(fact["value"], int(value))
+                    self.assertEqual(fact["text"], value)
+                    self.assertEqual(fact["elementId"], "sales")
+                    self.assertEqual(fact["contextId"], "duration")
+                    self.assertEqual(fact["entity"], "556193-9215")
+                    self.assertEqual(fact["end"], "2026-06-30")
+                    self.assertEqual(fact["documentIndex"], 0)
+                    self.assertEqual(fact["literalSourceLabel"], label)
+                    self.assertEqual(fact["error"], fact["semanticIssue"])
+                    self.assertIn("gross-profit", fact["semanticIssue"])
+                    self.assertEqual(len(result["warnings"]), 1)
+
+    def test_sales_label_check_uses_only_the_first_literal_label_cell(self):
+        bodies = [
+            f'<tr><td>Nettoomsättning</td><td>{numeric("123")}</td></tr>',
+            f'<tr><td>Nettoomsättning, inklusive Bruttoresultat</td><td>{numeric("123")}</td></tr>',
+            f'<tr><td>Bruttoresultat och övrigt</td><td>{numeric("123")}</td></tr>',
+            f'<tr><td></td><td>Bruttoresultat</td><td>{numeric("123")}</td></tr>',
+            f'<tr><td>Nettoomsättning</td><td>Bruttoresultat {numeric("123")}</td></tr>',
+            f'<tr><td>Bruttoresultat {numeric("123")}</td></tr>',
+            f'<tr><td>Bruttoresultat</td><td>10</td></tr><tr><td>Nettoomsättning</td><td>{numeric("123")}</td></tr>',
+        ]
+        for body in bodies:
+            with self.subTest(body=body):
+                fact = self.read('<table>' + body + '</table>')["facts"][0]
+                self.assertEqual(fact["value"], 123)
+                self.assertNotIn("error", fact)
+                self.assertNotIn("literalSourceLabel", fact)
+
+    def test_tagged_gross_profit_label_is_not_a_literal_label(self):
+        label = '<ix:nonNumeric name="test:Label" contextRef="duration">Bruttoresultat</ix:nonNumeric>'
+        fact = self.read(f'<table><tr><td>{label}</td><td>{numeric("123")}</td></tr></table>')["facts"][1]
+        self.assertEqual(fact["value"], 123)
+        self.assertNotIn("error", fact)
+
+    def test_nested_tables_do_not_supply_an_outer_gross_profit_label(self):
+        bodies = [
+            f'<tr><td><table><tr><td>Bruttoresultat</td></tr></table></td><td>{numeric("123")}</td></tr>',
+            f'<tr><td>Bruttoresultat</td><td><table><tr><td>{numeric("123")}</td></tr></table></td></tr>',
+            f'<tr><td>Bruttoresultat</td><td><table><tr><td>Nettoomsättning</td><td>{numeric("123")}</td></tr></table></td></tr>',
+        ]
+        for body in bodies:
+            with self.subTest(body=body):
+                fact = self.read('<table>' + body + '</table>')["facts"][0]
+                self.assertEqual(fact["value"], 123)
+                self.assertNotIn("error", fact)
+
+    def test_semantic_sales_error_makes_direct_and_growth_references_manual(self):
+        prior = CONTEXT.replace('id="duration"', 'id="prior"').replace("2025-07-01", "2024-07-01").replace("2026-06-30", "2025-06-30")
+        source = self.read(f'<table><tr><td>Bruttoresultat</td><td>{numeric("123")}</td><td>{numeric("100", contextRef="prior")}</td></tr></table>', contexts=CONTEXT + prior)
+        sales = {"key": "netSales", "variable": "ns", "concepts": ["Nettoomsattning"], "kind": "duration", "unit": "SEK"}
+        official, tolerance = _official(sales, source["facts"], source["documents"], "5561939215", "2025-07-01", "2026-06-30", True, False)
+        self.assertEqual(official["status"], "manual")
+        self.assertIsNone(official["value"])
+        self.assertIsNone(tolerance)
+        self.assertIn("semanticIssue", official["facts"][0])
+        self.assertNotIn("invalid or missing context", official["note"])
+        bundle = {"modeldata": {"dataMap": {
+            "2026": {"cr_fiscal_year_end": 20260630, "cr_fiscal_period_length": 12},
+            "2025": {"cr_fiscal_year_end": 20250630, "cr_fiscal_period_length": 12},
+        }}}
+        growth = {"key": "revenueGrowth", "variable": "ns_growth", "kind": "duration", "unit": "percent", "sourceFormula": '100*(v("ns") / v("ns",-1) - 1)'}
+        computed, _, amount = SourceReader(source, bundle, [sales], {}, "5561939215", False).read(growth, "2026-06-30")
+        self.assertEqual(computed["status"], "manual")
+        self.assertIsNone(computed["value"])
+        self.assertIsNone(amount)
+        self.assertEqual([fact["value"] for fact in source["facts"]], [123, 100])
+
+    def test_semantic_error_with_valid_context_does_not_poison_other_periods(self):
+        prior = CONTEXT.replace('id="duration"', 'id="prior"').replace("2025-07-01", "2024-07-01").replace("2026-06-30", "2025-06-30")
+        body = f'<table><tr><td>Bruttoresultat</td><td>{numeric("123")}</td></tr><tr><td>Nettoomsättning</td><td>{numeric("100", contextRef="prior")}</td></tr></table>'
+        source = self.read(body, contexts=CONTEXT + prior)
+        metric = {"key": "netSales", "concepts": ["Nettoomsattning"], "kind": "duration", "unit": "SEK"}
+        official, _ = _official(metric, source["facts"], source["documents"], "5561939215", "2024-07-01", "2025-06-30", True, False)
+        self.assertEqual(official["status"], "reported")
+        self.assertEqual(official["value"], 100)
 
     def test_decimal_transformation_registry(self):
         cases = [
@@ -134,14 +219,65 @@ class FilingTests(unittest.TestCase):
     def test_known_company_group_general_segments_preserve_scope(self):
         for version in ("2020-12-01", "2021-10-31"):
             for name, expected in (("JuridiskPerson", "company"), ("Koncern", "group"), ("Generell", "general")):
-                with self.subTest(version=version, scope=expected):
-                    contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment><se-gen-base:RedovisningInformation{name}Segment/></xbrli:segment></xbrli:entity>')
+                canonical = f"RedovisningInformation{name}Segment"
+                for local_name in (canonical, canonical.lower()):
+                    with self.subTest(version=version, scope=expected, local_name=local_name):
+                        contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment><se-gen-base:{local_name}/></xbrli:segment></xbrli:entity>')
+                        xml = document(numeric("123"), contexts=contexts).replace(b"gen-base/2020-12-01", f"gen-base/{version}".encode())
+                        fact = filing.read_filing(xml, "scope.xhtml")["facts"][0]
+                        self.assertEqual(fact["reportingScope"], expected)
+                        self.assertEqual(fact["entity"], "556193-9215")
+                        self.assertEqual(fact["value"], 123)
+                        self.assertEqual(fact["dimensions"], {})
+                        self.assertNotIn("error", fact)
+
+    def test_lowercase_scope_aliases_require_exact_known_namespaces_and_names(self):
+        for name in ("juridiskperson", "koncern", "generell"):
+            local_name = f"redovisninginformation{name}segment"
+            for namespace in ("urn:test", "http://www.taxonomier.se/se/fr/gen-base/2017-09-30",
+                              "http://www.taxonomier.se/se/fr/gen-base/2024-09-12"):
+                with self.subTest(name=local_name, namespace=namespace):
+                    marker = f'<alias:{local_name} xmlns:alias="{namespace}"/>'
+                    contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment>{marker}</xbrli:segment></xbrli:entity>')
+                    fact = self.read(numeric("123"), contexts=contexts)["facts"][0]
+                    self.assertIsNone(fact["value"])
+                    self.assertIsNone(fact["reportingScope"])
+                    self.assertIn("Unsupported context", fact["error"])
+        for name in ("redovisninginformationunknownsegment", "REDOVISNINGINFORMATIONJURIDISKPERSONSEGMENT",
+                     "redovisningInformationJuridiskPersonSegment"):
+            with self.subTest(name=name):
+                contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment><se-gen-base:{name}/></xbrli:segment></xbrli:entity>')
+                self.assertIn("error", self.read(numeric("123"), contexts=contexts)["facts"][0])
+
+    def test_lowercase_scope_aliases_reject_mixed_or_ambiguous_segments(self):
+        for version in ("2020-12-01", "2021-10-31"):
+            marker = '<se-gen-base:redovisninginformationjuridiskpersonsegment/>'
+            members = [
+                marker + '<se-gen-base:redovisninginformationkoncernsegment/>',
+                marker + '<se-gen-base:RedovisningInformationJuridiskPersonSegment/>',
+                marker + marker,
+                marker + '<xbrldi:explicitMember dimension="test:Group">test:Parent</xbrldi:explicitMember>',
+                'unknown scope' + marker, marker + 'unknown scope',
+                '<se-gen-base:redovisninginformationjuridiskpersonsegment test:extra="company"/>',
+                '<se-gen-base:redovisninginformationjuridiskpersonsegment><test:Child/></se-gen-base:redovisninginformationjuridiskpersonsegment>',
+                '<se-gen-base:redovisninginformationjuridiskpersonsegment>company</se-gen-base:redovisninginformationjuridiskpersonsegment>',
+            ]
+            for member in members:
+                with self.subTest(version=version, member=member):
+                    contexts = CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment>{member}</xbrli:segment></xbrli:entity>')
                     xml = document(numeric("123"), contexts=contexts).replace(b"gen-base/2020-12-01", f"gen-base/{version}".encode())
                     fact = filing.read_filing(xml, "scope.xhtml")["facts"][0]
-                    self.assertEqual(fact["reportingScope"], expected)
-                    self.assertEqual(fact["value"], 123)
-                    self.assertEqual(fact["dimensions"], {})
-                    self.assertNotIn("error", fact)
+                    self.assertIsNone(fact["value"])
+                    self.assertIsNone(fact["reportingScope"])
+                    self.assertIn("error", fact)
+            for contexts in (
+                    CONTEXT.replace('</xbrli:context>', f'<xbrli:scenario>{marker}</xbrli:scenario></xbrli:context>'),
+                    CONTEXT.replace('</xbrli:entity>', f'<xbrli:segment>{marker}</xbrli:segment><xbrli:segment>{marker}</xbrli:segment></xbrli:entity>')):
+                with self.subTest(version=version, contexts=contexts):
+                    xml = document(numeric("123"), contexts=contexts).replace(b"gen-base/2020-12-01", f"gen-base/{version}".encode())
+                    fact = filing.read_filing(xml, "scope.xhtml")["facts"][0]
+                    self.assertIsNone(fact["value"])
+                    self.assertIn("error", fact)
 
     def test_unknown_mixed_and_ambiguous_scope_segments_are_excluded(self):
         marker = '<se-gen-base:RedovisningInformationJuridiskPersonSegment/>'
@@ -283,6 +419,55 @@ class FilingTests(unittest.TestCase):
                 with self.subTest(declaration=declaration, encoding=encoding):
                     with self.assertRaisesRegex(ValueError, "DTD"):
                         filing.read_filing(text.encode(encoding), "sample.xhtml")
+
+    def test_plain_html_doctype_in_prolog_preserves_original_evidence_and_facts(self):
+        plain = document(numeric("123"))
+        original = plain.decode("utf-8").replace('<html ', '<!DOCTYPE html>\n<html ', 1)
+        expected = filing.read_filing(plain, "sample.xhtml")["facts"]
+        for encoding in ("utf-8", "utf-8-sig", "utf-16", "utf-32"):
+            with self.subTest(encoding=encoding):
+                data = original.encode(encoding)
+                with patch.object(filing.ET, "iterparse", wraps=filing.ET.iterparse) as parser:
+                    result = filing.read_filing(data, "sample.xhtml")
+                self.assertNotIn("<!DOCTYPE", parser.call_args.args[0].getvalue())
+                doc = result["documents"][0]
+                self.assertEqual(doc["html"], filing._decode(data))
+                self.assertEqual(doc["sha256"], hashlib.sha256(data).hexdigest())
+                self.assertIn("<!DOCTYPE html>", doc["viewerHtml"])
+                self.assertEqual(result["facts"], expected)
+
+    def test_plain_html_doctype_without_xml_declaration_is_supported(self):
+        data = document(numeric("123")).split(b"?>", 1)[1]
+        result = filing.read_filing(b'<!DOCTYPE html>\n' + data, "sample.xhtml")
+        self.assertEqual(result["facts"][0]["value"], 123)
+
+    def test_doctype_allowlist_never_allows_subsets_external_ids_or_entity_declarations(self):
+        declarations = [
+            '<!DOCTYPE html []>', '<!DOCTYPE html [<!ENTITY a "boom">]>',
+            '<!DOCTYPE html SYSTEM "file:///secret">',
+            '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "https://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">',
+            '<!DOCTYPE html>\n<!ENTITY a "boom">', '<!DOCTYPE html>\n<!DOCTYPE html>',
+            '<!DOCTYPE html>\n<!DOCTYPE html [<!ENTITY % a SYSTEM "https://example.invalid/evil">%a;]>',
+            '<!doctype html>', '<!DOCTYPE HTML>', '<!DOCTYPE html SYSTEM "about:legacy-compat">',
+        ]
+        for declaration in declarations:
+            text = document().decode("utf-8").replace('<html ', declaration + '<html ', 1)
+            for encoding in ("utf-8", "utf-16"):
+                with self.subTest(declaration=declaration, encoding=encoding), patch.object(filing.ET, "iterparse") as parser:
+                    with self.assertRaisesRegex(ValueError, "DTD"):
+                        filing.read_filing(text.encode(encoding), "sample.xhtml")
+                    parser.assert_not_called()
+
+    def test_plain_doctype_inside_document_is_rejected(self):
+        for body in ('<!DOCTYPE html>', '<!-- <!DOCTYPE html> -->', '<![CDATA[<!DOCTYPE html>]]>'):
+            with self.subTest(body=body), self.assertRaisesRegex(ValueError, "DTD"):
+                self.read(body)
+
+    def test_plain_doctype_does_not_enable_html_named_entities(self):
+        for entity in ("&nbsp;", "&unknown;"):
+            data = document(numeric("123") + f'<p>{entity}</p>').replace(b'<html ', b'<!DOCTYPE html><html ', 1)
+            with self.subTest(entity=entity), self.assertRaisesRegex(ValueError, "Invalid XHTML"):
+                filing.read_filing(data, "sample.xhtml")
 
     def test_malformed_xml_and_non_xhtml_are_rejected(self):
         for data in [b"<html>", b"<html/>", document().replace(b"</html>", b""), b"<html xmlns='urn:bad'/>" ]:
