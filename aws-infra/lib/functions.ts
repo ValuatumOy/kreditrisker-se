@@ -29,38 +29,3 @@ function handler(event) {
     return r
 }`
 }
-
-/**
- * /api/search?q=... -> CloudSearch /2013-01-01/search with a structured query:
- * digits search the orgnr prefix, words must all prefix-match the name or a
- * former name. Clients cannot send their own CloudSearch parameters.
- */
-export function searchRewriteCode(): string {
-    return `
-function handler(event) {
-    var r = event.request
-    var raw = r.querystring.q ? decodeURIComponent(r.querystring.q.value.replace(/\\+/g, ' ')) : ''
-    var size = r.querystring.size && /^[0-9]{1,2}$/.test(r.querystring.size.value) ? r.querystring.size.value : '8'
-    var digits = raw.replace(/[\\s-]/g, '')
-    var query
-    if (/^[0-9]{2,10}$/.test(digits)) {
-        query = "(prefix field=orgnr '" + digits + "')"
-    } else {
-        var words = raw.toLowerCase().replace(/[^0-9a-zåäöéüæø ]+/g, ' ').split(' ').filter(function (w) { return w.length > 0 && ['ab', 'hb', 'kb', 'publ'].indexOf(w) === -1 }).slice(0, 6)
-        if (!words.length || words.join('').length < 2) {
-            return { statusCode: 200, statusDescription: 'OK', headers: { 'content-type': { value: 'application/json' } }, body: '{"hits":{"found":0,"hit":[]}}' }
-        }
-        var on = function (field) { return '(and ' + words.map(function (w) { return "(prefix field=" + field + " '" + w + "')" }).join(' ') + ')' }
-        query = '(or ' + on('name') + ' ' + on('former') + ')'
-    }
-    r.uri = '/2013-01-01/search'
-    r.querystring = {
-        q: { value: encodeURIComponent(query) },
-        'q.parser': { value: 'structured' },
-        size: { value: size },
-        sort: { value: encodeURIComponent('_score desc,sales desc') },
-        'return': { value: 'orgnr,name,former,kommun,sni,path,status,year,fresh' },
-    }
-    return r
-}`
-}

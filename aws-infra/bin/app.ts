@@ -3,8 +3,6 @@
 // created outside CDK are passed as context (cdk.json or -c key=value):
 //
 //   hostedZoneId          Route 53 zone of kreditrisker.se (created when the domain is bought)
-//   searchEndpointTest    CloudSearch search host (scripts/create-cloudsearch-domain.sh)
-//   searchEndpointProd
 //   checkoutApiTest       CheckoutStack API host, once report sales are switched on
 //   checkoutApiProd
 //   siteUrlTest           the Test site's origin (its CloudFront domain), for Stripe redirects
@@ -34,7 +32,6 @@ new SiteStack(app, 'KreditriskerSiteStackTest', {
     crossRegionReferences: true,
     description: 'Test - kreditrisker.se static site (CloudFront domain only)',
     environmentName: 'Test',
-    searchEndpoint: ctx('searchEndpointTest'),
     checkoutApiDomain: ctx('checkoutApiTest'),
 })
 
@@ -46,7 +43,7 @@ new SiteStack(app, 'KreditriskerSiteStackProd', {
     domain: cert ? DOMAIN : undefined,
     hostedZoneId,
     certificate: cert?.certificate,
-    searchEndpoint: ctx('searchEndpointProd'),
+    search: true,
     checkoutApiDomain: ctx('checkoutApiProd'),
     // Jenkins agent sweden-build (profinder-environment jenkins/new-environment.sh): the role that can reach sweden-db
     buildRoleName: 'sweden-process-role',
