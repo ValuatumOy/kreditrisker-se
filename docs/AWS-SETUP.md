@@ -1,7 +1,7 @@
 # AWS setup for kreditrisker.se
 
 Everything is code in `aws-infra/` (CDK, account 892885731254, eu-west-1),
-except the domain purchase and the first search package. Do the steps in this order. Nothing here sells reports
+except the domain purchase and the first search image. Do the steps in this order. Nothing here sells reports
 or makes the site indexable; those stay behind the launch gates.
 
 ## 1. Domain
@@ -11,27 +11,42 @@ hosted zone; note its id (`Z...`).
 
 ## 2. Search
 
-`/api/search` is a Lambda (`search/handler.ts`, Node 22, arm64, 1 GB) whose
-package holds an SQLite database of the whole directory
-(`src/lib/search-db.ts`). CloudFront calls it through a Function URL with
-origin access control, and a rule pings it every 5 minutes to keep one
-instance warm. Jenkins rebuilds the package every run and uploads it to the
-state bucket at `search/search.zip`; the Lambda's code points at that fixed key,
-so deploying the stack again never reverts it.
+`/api/search` is a Lambda (`search/handler.ts`, Node 22, x86_64, 1 GB) run from
+a container image that holds an SQLite database of the whole directory
+(`src/lib/search-db.ts`, `search/Dockerfile`). CloudFront calls it through a
+Function URL with origin access control, and a rule pings it every 5 minutes
+to keep one instance warm. Jenkins rebuilds the image every run, pushes it to
+the `KreditriskerSearchRepoStackProd` repository as `:latest` and points the
+Lambda at its digest; the stack only names the tag, so deploying it again never
+reverts the image. x86_64 because the `sweden-build` agent is x86_64.
 
-CloudFormation needs the package before it can create the Lambda, so the
-first time (state bucket from an earlier deploy, index state from a Jenkins run):
+CloudFormation needs an image before it can create the Lambda, so the first
+time (repository stack, then one image, then the site stack; index state from a
+Jenkins run):
 
 ```bash
+cd aws-infra && npx cdk deploy -e KreditriskerSearchRepoStackProd && cd ..
+repo=<SearchRepositoryUri, i.e. 892885731254.dkr.ecr.eu-west-1.amazonaws.com/<repository>>
 aws s3 cp s3://<state bucket>/index.jsonl data/build/index.jsonl
 node scripts/search-db.ts
-aws s3 cp data/build/search/search.zip s3://<state bucket>/search/search.zip
+aws ecr get-login-password | docker login --username AWS --password-stdin "${repo%%/*}"
+docker build --platform linux/amd64 -t "$repo:latest" -f search/Dockerfile data/build/search
+docker push "$repo:latest"
 ```
 
-Limits: the unzipped package must stay under Lambda's 250 MB (all ~825k
-aktiebolag come to ~180 MB; `scripts/search-db.ts` stops above 245 MB).
-Roll back with `aws lambda update-function-code --s3-object-version` of an
-older `search/search.zip` (the bucket keeps them 30 days).
+Limits: Lambda images can be up to 10 GB, so the database size is bounded by
+memory rather than packaging (all ~825k aktiebolag come to ~180 MB and use
+~250 MB of the 1 GB; ~1.18M companies, 290 MB, use ~350 MB). Raise
+`memorySize` before the database nears ~700 MB.
+
+Timing (measured 2026-10-26, 180 MB database): after an image update the
+function is ready in ~10 s and the first ping, which reads the whole database
+while Lambda's image cache is still cold, takes 5-11 s (the Jenkins stage
+does it, hence the 60 s timeout). Later instances read it in 0.3-1.3 s and
+answer a first search in ~0.3 s. After the read, searches take 1-140 ms.
+
+Roll back with `aws lambda update-function-code --image-uri <repo>@<older digest>`
+(the repository keeps the last 5 images: `aws ecr describe-images`).
 
 ## 3. Site, certificate and DNS
 
@@ -48,7 +63,8 @@ npx cdk deploy KreditriskerCertStack KreditriskerSiteStackTest KreditriskerSiteS
 
 The outputs give the Jenkins values: `SiteBucketName` (BUILD_BUCKET),
 `DistributionId` (CLOUDFRONT_DISTRIBUTION_ID), `StateUri` (STATE_URI) and
-`SearchFunctionName` (SEARCH_FUNCTION, Prod only). The
+`SearchFunctionName` (SEARCH_FUNCTION, Prod only) and `SearchRepositoryUri`
+(SEARCH_REPOSITORY, Prod only). The
 Test site runs on its `*.cloudfront.net` domain and always sends
 `X-Robots-Tag: noindex`.
 

@@ -71,6 +71,7 @@ The fields below are already set for a production run; leave them as they are.''
                     env.STATE_URI = out('StateUri')
                     env.SE_SITE_ORIGIN = out('SiteOrigin')
                     env.SEARCH_FUNCTION = out('SearchFunctionName')
+                    env.SEARCH_REPOSITORY = out('SearchRepositoryUri')
                     echo "bucket ${env.BUILD_BUCKET}, distribution ${env.CLOUDFRONT_DISTRIBUTION_ID}, site ${env.SE_SITE_ORIGIN}"
                 }
                 sh '''#!/bin/bash
@@ -140,22 +141,26 @@ The fields below are already set for a production run; leave them as they are.''
         }
 
         stage('Update search') {
-            // The package goes to a fixed key in the state bucket; the Lambda is pointed at that exact
-            // object version, so rolling back is update-function-code with an older --s3-object-version.
-            when { expression { params.DEPLOY && params.UPDATE_SEARCH && env.SEARCH_FUNCTION } }
+            // The image goes to the search repository as :latest; the Lambda is pointed at its digest, so rolling
+            // back is update-function-code with an older digest (the repository keeps the last 5 images).
+            when { expression { params.DEPLOY && params.UPDATE_SEARCH && env.SEARCH_FUNCTION && env.SEARCH_REPOSITORY } }
             steps {
                 sh '''#!/bin/bash
                     set -e
                     node scripts/search-db.ts
-                    bucket=$(echo "$STATE_URI" | sed -E 's|^s3://([^/]+)/.*|\\1|')
-                    version=$(aws s3api put-object --bucket "$bucket" --key search/search.zip --body data/build/search/search.zip --query VersionId --output text)
-                    aws lambda update-function-code --function-name "$SEARCH_FUNCTION" \\
-                        --s3-bucket "$bucket" --s3-key search/search.zip --s3-object-version "$version" > /dev/null
+                    aws ecr get-login-password | docker login --username AWS --password-stdin "${SEARCH_REPOSITORY%%/*}"
+                    # plain single-platform image: Lambda does not take buildx's attestation manifests
+                    BUILDX_NO_DEFAULT_ATTESTATIONS=1 docker build --platform linux/amd64 -t "$SEARCH_REPOSITORY:latest" -f search/Dockerfile data/build/search
+                    docker push -q "$SEARCH_REPOSITORY:latest"
+                    image=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$SEARCH_REPOSITORY:latest" | grep "^$SEARCH_REPOSITORY@")
+                    docker image rm "$SEARCH_REPOSITORY:latest" > /dev/null
+                    aws lambda update-function-code --function-name "$SEARCH_FUNCTION" --image-uri "$image" > /dev/null
                     aws lambda wait function-updated-v2 --function-name "$SEARCH_FUNCTION"
-                    # the first call reads the new database into memory, so no visitor waits for it
-                    aws lambda invoke --function-name "$SEARCH_FUNCTION" --cli-binary-format raw-in-base64-out \\
+                    # The first call reads the new database into memory, so no visitor waits for it. On a new image
+                    # Lambda's image cache is still cold and this takes ~10 s (180 MB); later instances read in ~1 s.
+                    aws lambda invoke --cli-read-timeout 90 --function-name "$SEARCH_FUNCTION" --cli-binary-format raw-in-base64-out \\
                         --payload '{"ping":true}' ping.json > /dev/null
-                    echo "search: package version $version, ping $(cat ping.json)"
+                    echo "search: image $image, ping $(cat ping.json)"
                     aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/api/search*" > /dev/null
                 '''
             }

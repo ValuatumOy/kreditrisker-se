@@ -126,8 +126,9 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 3. Build (`SE_DATA_SOURCE=build`)
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
    save the new index state, invalidate CloudFront
-5. Update search: `scripts/search-db.ts` builds the search Lambda package from
-   the whole index, the job uploads it and points the Lambda at it (docs/AWS-SETUP.md)
+5. Update search: `scripts/search-db.ts` builds the search database from the
+   whole index, the job builds `search/Dockerfile` (the agent needs Docker), pushes
+   the image and points the Lambda at it (docs/AWS-SETUP.md)
 
 The first full build, and any full rebuild: `COMPANIES=all`.
 

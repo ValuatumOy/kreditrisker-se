@@ -1,6 +1,7 @@
 import * as cdk from 'aws-cdk-lib'
 import * as acm from 'aws-cdk-lib/aws-certificatemanager'
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront'
+import * as ecr from 'aws-cdk-lib/aws-ecr'
 import * as events from 'aws-cdk-lib/aws-events'
 import * as eventsTargets from 'aws-cdk-lib/aws-events-targets'
 import * as iam from 'aws-cdk-lib/aws-iam'
@@ -13,8 +14,8 @@ import * as s3 from 'aws-cdk-lib/aws-s3'
 import { Construct } from 'constructs'
 import { siteRequestCode } from './functions'
 
-/** Search Lambda package in the state bucket, written by Jenkins (scripts/search-db.ts). */
-export const SEARCH_CODE_KEY = 'search/search.zip'
+/** Tag of the search image that Jenkins pushes every night (search/Dockerfile, scripts/search-db.ts). */
+export const SEARCH_IMAGE_TAG = 'latest'
 
 export interface SiteStackProps extends cdk.StackProps {
     environmentName: 'Test' | 'Prod'
@@ -24,9 +25,9 @@ export interface SiteStackProps extends cdk.StackProps {
     hostedZoneId?: string
     /** us-east-1 certificate for domain + www (CertStack). */
     certificate?: acm.ICertificate
-    /** Company search Lambda behind /api/search. Its package must be in the state bucket at
-     *  SEARCH_CODE_KEY before the first deploy (docs/AWS-SETUP.md). */
-    search?: boolean
+    /** Company search Lambda behind /api/search, run from this repository's SEARCH_IMAGE_TAG image, which
+     *  must exist before the first deploy (SearchRepoStack, docs/AWS-SETUP.md). */
+    searchRepository?: ecr.IRepository
     /** Report checkout HTTP API host (CheckoutStack output), for /api/* except search. */
     checkoutApiDomain?: string
     /** IAM role of the Jenkins build agent (an existing role, not managed here): gets write access to both buckets,
@@ -40,7 +41,7 @@ export interface SiteStackProps extends cdk.StackProps {
  * build state (the directory index carried between nightly runs).
  *
  *   /*                 S3, with /path/ -> /path/index.html and apex -> www
- *   /api/search        search Lambda (SQLite database in its package, search/handler.ts)
+ *   /api/search        search Lambda (SQLite database in its image, search/handler.ts)
  *   /api/*             report checkout API (same origin, so no CORS)
  */
 export class SiteStack extends cdk.Stack {
@@ -86,20 +87,20 @@ export class SiteStack extends cdk.Stack {
 
         const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {}
         let searchFunction: lambda.Function | undefined
-        if (props.search) {
-            // Jenkins replaces the code every night (update-function-code from SEARCH_CODE_KEY); the key never
-            // changes, so a later deploy of this stack leaves that code alone.
-            searchFunction = new lambda.Function(this, 'Search', {
-                description: `${props.environmentName} - kreditrisker.se company search (code: Jenkins, state bucket ${SEARCH_CODE_KEY})`,
-                runtime: lambda.Runtime.NODEJS_22_X,
-                architecture: lambda.Architecture.ARM_64,
+        if (props.searchRepository) {
+            // Jenkins pushes a new image every night and points the function at its digest (update-function-code);
+            // the tag here never changes, so a later deploy of this stack leaves that image alone.
+            // x86_64 because the Jenkins agent that builds the image is x86_64.
+            // The timeout covers the first ping on a new image, which reads the whole database from Lambda's
+            // image cache while it is still cold (~11 s for 180 MB, ~20 s for 290 MB); searches take < 1 s.
+            searchFunction = new lambda.DockerImageFunction(this, 'Search', {
+                description: `${props.environmentName} - kreditrisker.se company search (image: Jenkins, ${props.searchRepository.repositoryName}:${SEARCH_IMAGE_TAG})`,
+                code: lambda.DockerImageCode.fromEcr(props.searchRepository, { tagOrDigest: SEARCH_IMAGE_TAG }),
+                architecture: lambda.Architecture.X86_64,
                 memorySize: 1024,
-                timeout: cdk.Duration.seconds(10),
-                handler: 'handler.handler',
-                code: lambda.Code.fromBucket(stateBucket, SEARCH_CODE_KEY),
+                timeout: cdk.Duration.seconds(60),
                 logGroup: new logs.LogGroup(this, 'SearchLogs', { retention: logs.RetentionDays.ONE_MONTH, removalPolicy: cdk.RemovalPolicy.DESTROY }),
             })
-            cdk.Annotations.of(this).acknowledgeWarning('@aws-cdk/aws-lambda:codeFromBucketObjectVersionNotSpecified', 'on purpose: Jenkins updates the code')
             // Keeps one instance warm, and fully read into memory, between searches.
             new events.Rule(this, 'SearchPing', {
                 schedule: events.Schedule.rate(cdk.Duration.minutes(5)),
@@ -191,8 +192,26 @@ export class SiteStack extends cdk.Stack {
             value: names ? `https://www.${props.domain}` : `https://${distribution.distributionDomainName}`,
             description: 'Jenkins SE_SITE_ORIGIN (canonical URLs, sitemaps)',
         })
-        if (searchFunction) new cdk.CfnOutput(this, 'SearchFunctionName', { value: searchFunction.functionName, description: 'Jenkins SEARCH_FUNCTION' })
+        if (searchFunction) {
+            new cdk.CfnOutput(this, 'SearchFunctionName', { value: searchFunction.functionName, description: 'Jenkins SEARCH_FUNCTION' })
+            new cdk.CfnOutput(this, 'SearchRepositoryUri', { value: props.searchRepository!.repositoryUri, description: 'Jenkins SEARCH_REPOSITORY' })
+        }
         new cdk.CfnOutput(this, 'StateUri', { value: `s3://${stateBucket.bucketName}/index.jsonl`, description: 'Jenkins STATE_URI' })
+    }
+}
+
+/** Image repository of the search Lambda, in its own stack: the first image must be pushed before
+ *  SiteStack can create the function. Keeps the last few images for rolling back. */
+export class SearchRepoStack extends cdk.Stack {
+    readonly repository: ecr.Repository
+    constructor(scope: Construct, id: string, props: cdk.StackProps & { buildRoleName: string }) {
+        super(scope, id, props)
+        this.repository = new ecr.Repository(this, 'Repository', {
+            lifecycleRules: [{ description: 'rollback window', maxImageCount: 5 }],
+            removalPolicy: cdk.RemovalPolicy.RETAIN,
+        })
+        // Jenkins pushes; update-function-code also checks that the caller can read the image
+        this.repository.grantPullPush(iam.Role.fromRoleName(this, 'BuildRole', props.buildRoleName))
     }
 }
 

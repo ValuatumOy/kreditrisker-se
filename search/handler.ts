@@ -1,8 +1,9 @@
 // Search Lambda: GET /api/search?q=...&size=... (CloudFront -> Function URL) -> SearchHit[].
-// The database ships next to the handler (scripts/search-db.ts). A scheduled { ping: true }
-// keeps an instance warm and, the first time, reads the whole file so later queries never
-// wait on the disk (a fresh instance answers light queries in ~0.2 s but common words in
-// ~1 s until their pages are cached).
+// The database ships next to the handler in the image (scripts/search-db.ts, search/Dockerfile).
+// A scheduled { ping: true } keeps an instance warm and, the first time, reads the whole file
+// so later queries never wait on the disk (a fresh instance answers its first search in
+// ~0.3 s, the next ones in up to ~0.4 s, until their pages are cached; on a just-pushed image
+// the first read is much slower, which the Jenkins ping after the update absorbs).
 
 import fs from 'node:fs'
 import { openSearchDb, searchDb } from '../src/lib/search-db.ts'
