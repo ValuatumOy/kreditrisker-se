@@ -126,13 +126,14 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 3. Build (`SE_DATA_SOURCE=build`)
 4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
    save the new index state, invalidate CloudFront
+5. Update search: `scripts/search-db.ts` builds the search Lambda package from
+   the whole index, the job uploads it and points the Lambda at it (docs/AWS-SETUP.md)
 
-The first full build, and any full rebuild: `COMPANIES=all`. It also re-uploads
-every company to search.
+The first full build, and any full rebuild: `COMPANIES=all`.
 
 Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
-the full directory set `PUBLIC_SE_SEARCH_ENDPOINT` to a search API returning
-`SearchHit[]` (CloudSearch as on the Finnish site; not built yet).
+the full directory `PUBLIC_SE_SEARCH_ENDPOINT` is `/api/search`, the search
+Lambda, which returns the same `SearchHit[]`.
 
 ## Variable mapping (company view variables, 2026-10-12)
 

@@ -1,6 +1,10 @@
 // Company search shared by the build (index generation) and the browser.
 // Static builds ship /sok/index.json; at national scale set
-// PUBLIC_SE_SEARCH_ENDPOINT to a search API that returns the same SearchHit[].
+// PUBLIC_SE_SEARCH_ENDPOINT to the search API (/api/search: the search Lambda,
+// search/handler.ts), which returns the same SearchHit[].
+
+import { periodLabel } from './format.ts'
+import type { IndexRow } from './publish.ts'
 
 export interface SearchHit {
     /** orgnr, 10 digits */
@@ -23,6 +27,18 @@ export interface SearchHit {
     fr?: string
 }
 
+/** The hit for a directory row (static index and search database alike). */
+export function toSearchHit(c: IndexRow): SearchHit {
+    const h: SearchHit = { o: c.o, n: c.n, p: c.p }
+    if (c.f) h.f = c.f
+    if (c.k) h.k = c.k.name
+    if (c.s) h.s = c.s.label
+    if (c.st !== 'active') h.st = c.st
+    if (c.per) h.y = periodLabel(c.per)
+    if (c.fr !== 'current') h.fr = c.fr
+    return h
+}
+
 export function norm(s: string): string {
     return s
         .toLocaleLowerCase('sv-SE')
@@ -35,7 +51,7 @@ export function norm(s: string): string {
         .trim()
 }
 
-const LEGAL_SUFFIX = /\b(ab|hb|kb|publ|aktiebolag|handelsbolag)\b/g
+export const LEGAL_SUFFIX = /\b(ab|hb|kb|publ|aktiebolag|aktiebolaget|handelsbolag)\b/g
 
 /** Ranked match: orgnr prefix, then name prefix, then all tokens, then former names. */
 export function searchIndex(index: SearchHit[], query: string, limit = 8): SearchHit[] {
@@ -60,15 +76,14 @@ export function searchIndex(index: SearchHit[], query: string, limit = 8): Searc
         .map((x) => x.h)
 }
 
-/** CloudSearch response (via /api/search, see aws-infra/lib/functions.ts) to SearchHit[]. */
-export function fromCloudSearch(body: unknown): SearchHit[] {
-    const hits = (body as { hits?: { hit?: { fields?: Record<string, string | string[]> }[] } })?.hits?.hit ?? []
-    const one = (v?: string | string[]) => (Array.isArray(v) ? v[0] : v) || undefined
-    return hits.flatMap(({ fields: f = {} }) => {
-        const h: SearchHit = { o: one(f.orgnr) ?? '', n: one(f.name) ?? '', p: one(f.path) ?? '' }
+/** Search API response to SearchHit[]: keeps only well-formed hits that link inside the site. */
+export function fromSearchApi(body: unknown): SearchHit[] {
+    if (!Array.isArray(body)) return []
+    const str = (v: unknown) => (typeof v === 'string' && v ? v : undefined)
+    return body.flatMap((x: Record<string, unknown>) => {
+        const h: SearchHit = { o: str(x?.o) ?? '', n: str(x?.n) ?? '', p: str(x?.p) ?? '' }
         if (!h.o || !h.n || !h.p.startsWith('/foretag/')) return []
-        const opt = { f: one(f.former), k: one(f.kommun), s: one(f.sni), st: one(f.status), y: one(f.year), fr: one(f.fresh) }
-        for (const [k, v] of Object.entries(opt)) if (v) (h as unknown as Record<string, string>)[k] = v
+        for (const k of ['f', 'k', 's', 'st', 'y', 'fr'] as const) if (str(x[k])) h[k] = str(x[k])
         return [h]
     })
 }
@@ -78,7 +93,7 @@ export async function findCompanies(endpoint: string | undefined, q: string, lim
     if (endpoint) {
         if (q.trim().length < 2) return []
         const res = await fetch(`${endpoint}?q=${encodeURIComponent(q)}&size=${Math.min(limit, 99)}`).catch(() => null)
-        return res?.ok ? fromCloudSearch(await res.json()) : []
+        return res?.ok ? fromSearchApi(await res.json().catch(() => null)) : []
     }
     const index = staticIndex ? await staticIndex() : await fetch('/sok/index.json').then((r) => (r.ok ? r.json() : [])).catch(() => [])
     return searchIndex(index, q, limit)

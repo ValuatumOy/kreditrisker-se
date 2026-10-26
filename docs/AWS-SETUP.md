@@ -1,8 +1,7 @@
 # AWS setup for kreditrisker.se
 
 Everything is code in `aws-infra/` (CDK, account 892885731254, eu-west-1),
-except the two things CloudFormation cannot create: the domain purchase and
-the CloudSearch domain. Do the steps in this order. Nothing here sells reports
+except the domain purchase and the first search package. Do the steps in this order. Nothing here sells reports
 or makes the site indexable; those stay behind the launch gates.
 
 ## 1. Domain
@@ -12,21 +11,34 @@ hosted zone; note its id (`Z...`).
 
 ## 2. Search
 
+`/api/search` is a Lambda (`search/handler.ts`, Node 22, arm64, 1 GB) whose
+package holds an SQLite database of the whole directory
+(`src/lib/search-db.ts`). CloudFront calls it through a Function URL with
+origin access control, and a rule pings it every 5 minutes to keep one
+instance warm. Jenkins rebuilds the package every run and uploads it to the
+state bucket at `search/search.zip`; the Lambda's code points at that fixed key,
+so deploying the stack again never reverts it.
+
+CloudFormation needs the package before it can create the Lambda, so the
+first time (state bucket from an earlier deploy, index state from a Jenkins run):
+
 ```bash
-./scripts/create-cloudsearch-domain.sh sweden-companies-test
-./scripts/create-cloudsearch-domain.sh sweden-companies-prod
+aws s3 cp s3://<state bucket>/index.jsonl data/build/index.jsonl
+node scripts/search-db.ts
+aws s3 cp data/build/search/search.zip s3://<state bucket>/search/search.zip
 ```
 
-The script prints each domain's search and document endpoints.
+Limits: the unzipped package must stay under Lambda's 250 MB (all ~825k
+aktiebolag come to ~180 MB; `scripts/search-db.ts` stops above 245 MB).
+Roll back with `aws lambda update-function-code --s3-object-version` of an
+older `search/search.zip` (the bucket keeps them 30 days).
 
 ## 3. Site, certificate and DNS
 
 Put the values in `aws-infra/cdk.json` under `context` (or pass `-c`):
 
 ```json
-"hostedZoneId": "Z...",
-"searchEndpointTest": "search-sweden-companies-test-....eu-west-1.cloudsearch.amazonaws.com",
-"searchEndpointProd": "search-sweden-companies-prod-....eu-west-1.cloudsearch.amazonaws.com"
+"hostedZoneId": "Z..."
 ```
 
 ```bash
@@ -35,7 +47,8 @@ npx cdk deploy KreditriskerCertStack KreditriskerSiteStackTest KreditriskerSiteS
 ```
 
 The outputs give the Jenkins values: `SiteBucketName` (BUILD_BUCKET),
-`DistributionId` (CLOUDFRONT_DISTRIBUTION_ID) and `StateUri` (STATE_URI). The
+`DistributionId` (CLOUDFRONT_DISTRIBUTION_ID), `StateUri` (STATE_URI) and
+`SearchFunctionName` (SEARCH_FUNCTION, Prod only). The
 Test site runs on its `*.cloudfront.net` domain and always sends
 `X-Robots-Tag: noindex`.
 
@@ -48,10 +61,8 @@ credential (username `git`). Nothing in the Jenkinsfile needs editing: bucket,
 distribution, state URI and site origin are read from the
 `KreditriskerSiteStackProd` outputs at run time, the agent is `sweden-build`
 (it reaches sweden-db) and the API token is the Secret text credential
-`kreditrisker-se-api-token`. Set `CLOUDSEARCH_DOC_ENDPOINT` in the Jenkinsfile
-once the CloudSearch domain exists; until then the search stage is skipped.
-First load: `COMPANIES=all` (it also re-uploads every company to search once
-the search domain exists).
+`kreditrisker-se-api-token`. First load: `COMPANIES=all`. Every run rebuilds
+the search from the whole directory.
 
 ## 5. Report checkout (only when reports are launched)
 

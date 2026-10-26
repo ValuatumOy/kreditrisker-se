@@ -2,7 +2,7 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { searchRewriteCode, siteRequestCode } from '../aws-infra/lib/functions.ts'
+import { siteRequestCode } from '../aws-infra/lib/functions.ts'
 
 const load = (code: string) => new Function(`${code}; return handler`)() as (e: unknown) => any
 const req = (uri: string, query: Record<string, string> = {}, host = 'www.kreditrisker.se') => ({
@@ -19,19 +19,4 @@ test('site request: index rewrite, trailing slash, apex redirect', () => {
     assert.equal(slash.headers.location.value, '/kommuner/?q=x')
     const apex = h(req('/metod/', {}, 'kreditrisker.se'))
     assert.equal(apex.headers.location.value, 'https://www.kreditrisker.se/metod/')
-})
-
-test('search rewrite: orgnr prefix, all-words name match, no client-supplied CloudSearch params', () => {
-    const h = load(searchRewriteCode())
-    const byNumber = h(req('/api/search', { q: '556987-65' }))
-    assert.equal(byNumber.uri, '/2013-01-01/search')
-    assert.equal(decodeURIComponent(byNumber.querystring.q.value), "(prefix field=orgnr '55698765')")
-    const byName = h(req('/api/search', { q: "Testbolaget%20Norr'land%20AB", 'q.parser': 'lucene', 'return': '_all' }))
-    const q = decodeURIComponent(byName.querystring.q.value)
-    assert.equal(q, "(or (and (prefix field=name 'testbolaget') (prefix field=name 'norr') (prefix field=name 'land')) (and (prefix field=former 'testbolaget') (prefix field=former 'norr') (prefix field=former 'land')))")
-    assert.equal(byName.querystring['q.parser'].value, 'structured')
-    assert.ok(!byName.querystring.return.value.includes('_all'))
-    const tooShort = h(req('/api/search', { q: 'a' }))
-    assert.equal(tooShort.statusCode, 200)
-    assert.equal(JSON.parse(tooShort.body).hits.found, 0)
 })
