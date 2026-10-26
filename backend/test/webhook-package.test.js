@@ -15,8 +15,6 @@ const fulfillment = require('../src/lib/fulfillment');
 const emailService = require('../src/lib/email');
 const { handler } = require('../src/handlers/webhook');
 
-const { reportName } = require('../src/lib/products').getProduct('se_credit_risk');
-
 const signer = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 const REQUEST_ID = '11111111-2222-4333-8444-555555555555';
@@ -28,7 +26,8 @@ const BUNDLE_META = {
   fulfillReportType: 'se_credit_risk',
   requestId: REQUEST_ID,
   fid: '12345',
-  companyName: 'JYSK A/S',
+  businessId: '556036-9208',
+  companyName: 'Älvsjö Konditori & Bageri AB',
 };
 
 function completedSession(overrides = {}, metaOverrides = {}) {
@@ -103,10 +102,12 @@ test('a bundle purchase grants, reserves, and claims the request-keyed order', a
   assert.equal(emailService.sendCreditGrantEmail.mock.callCount(), 0);
   // Build params from the granted product, not the generator-less bundle.
   assert.deepEqual(order.params, {
-    fid: '12345',
+    companyCode: '556036-9208',
+    aspQueryKey: 'Sweden',
     lang: 'sv',
-    reportName,
     currency: 'SEK',
+    country: 'SE',
+    aiTexts: true,
   });
 
   assert.deepEqual(

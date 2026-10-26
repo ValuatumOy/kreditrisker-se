@@ -33,9 +33,13 @@ const REPORT_LANG_DISCLOSURE = {
 const REST_LANG_CODES = { sv: 'sv', en: 'en' };
 
 // Swedish catalog. A product is sold only once it has a Stripe product id
-// (prices live in Stripe, never in code) - see getProduct(). Fill the ids, the
-// Swedish report names and the bankruptcy-risk model only after launch gates
-// 4-6 (docs/LAUNCH-GATES.md): no Finnish or Danish model output is reused.
+// (prices live in Stripe, never in code) - see getProduct().
+//
+// Both reports are rendered by the report engine under the `Sweden` customer
+// (aspQueryKey), whose secret points at sweden.valuatum.com. Until there are
+// enough Swedish companies for models and statistics of their own, the ratings
+// come from the Finnish ValuBooster model that sweden.valuatum.com runs, and
+// the scatter and industry comparison from Finnish companies.
 const PRODUCTS = {
   se_ai_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_AI || '',
@@ -52,7 +56,7 @@ const PRODUCTS = {
     },
     generator: 'reportEngine',
     templateName: 'luottomuistio',
-    aspQueryKey: 'CreditAnalysis',
+    aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
     reportCountry: 'SE',
     bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
@@ -72,9 +76,16 @@ const PRODUCTS = {
       sv: 'Företagsspecifik kreditriskrapport (PDF).',
       en: 'Company-specific credit risk report (PDF).',
     },
-    generator: 'valuatumRest',
-    reportName: process.env.SE_BASIC_REPORT_NAME || 'credit_risk_report_se',
+    // The engine's rebuild of the Jasper credit risk report. aiTexts adds its
+    // three short LLM texts (key observations and chart interpretation on the
+    // summary page, the balance-sheet commentary), as the FI site does.
+    generator: 'reportEngine',
+    templateName: 'staattinen_luottomuistio',
+    aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
+    reportCountry: 'SE',
+    bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
+    aiTexts: true,
   },
 
   se_credit_risk_bundle: {
@@ -182,6 +193,7 @@ function buildReportParams(product, { businessId, fid, fiscalYear, reportLang })
     ...(typeof product.includeFraud === 'boolean'
       ? { includeFraud: product.includeFraud }
       : {}),
+    ...(typeof product.aiTexts === 'boolean' ? { aiTexts: product.aiTexts } : {}),
     ...(fiscalYear ? { fiscalYear: String(fiscalYear) } : {}),
   };
 }

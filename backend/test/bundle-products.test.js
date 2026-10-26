@@ -6,7 +6,7 @@ const assert = require('node:assert/strict')
 process.env.CREDITS_TABLE = 'test-credits'
 process.env.ORDERS_TABLE = 'test-orders'
 
-const { getProduct, grantFor } = require('../src/lib/products')
+const { getProduct, grantFor, buildReportParams } = require('../src/lib/products')
 const { parsePackageCheckout } = require('../src/handlers/create-checkout')
 const { parseRedeemRequest } = require('../src/handlers/redeem')
 
@@ -45,6 +45,30 @@ test('both bundles price from their own Stripe product, not a hardcoded amount',
     assert.equal(getProduct('se_ai_credit_risk_bundle').priceCents, undefined)
 })
 
+test('both reports are engine jobs under the Sweden customer', () => {
+    for (const [reportType, templateName, extra] of [
+        ['se_credit_risk', 'staattinen_luottomuistio', { aiTexts: true }],
+        ['se_ai_credit_risk', 'luottomuistio', { includeFraud: true }],
+    ]) {
+        const product = getProduct(reportType)
+        assert.equal(product.generator, 'reportEngine')
+        assert.equal(product.templateName, templateName)
+        const params = buildReportParams(product, {
+            businessId: '556036-9208',
+            fid: '38',
+            reportLang: 'sv',
+        })
+        assert.deepEqual(params, {
+            companyCode: '556036-9208',
+            aspQueryKey: 'Sweden',
+            lang: 'sv',
+            currency: 'SEK',
+            country: 'SE',
+            ...extra,
+        })
+    }
+})
+
 test('package checkout requires a stable request, email and matching report type', () => {
     const basic = getProduct('se_credit_risk_bundle')
     const valid = {
@@ -52,6 +76,7 @@ test('package checkout requires a stable request, email and matching report type
         email: ' Buyer@Example.com ',
         fulfillReportType: 'se_credit_risk',
         fid: '133268',
+        businessId: '556036-9208',
     }
     assert.deepEqual(parsePackageCheckout(basic, valid), {
         packageCheckout: {
@@ -60,6 +85,11 @@ test('package checkout requires a stable request, email and matching report type
             fulfillReportType: 'se_credit_risk',
         },
     })
+    // Both reports are rendered by the engine, which needs the org number.
+    assert.equal(
+        parsePackageCheckout(basic, { ...valid, businessId: '' }).error,
+        'Missing company identifier'
+    )
     assert.equal(
         parsePackageCheckout(basic, { ...valid, email: 'bad@' }).error,
         'Invalid email'
