@@ -116,7 +116,9 @@ export class CheckoutStack extends cdk.Stack {
         // through the poller's execution role. Create once before the first
         // deploy of a new environment:
         //   aws secretsmanager create-secret --name kreditrisker-se-<env> \
-        //     --secret-string '{"STRIPE_SECRET_KEY":"sk_...","STRIPE_WEBHOOK_SECRET":"whsec_...","VALUATUM_REST_URL":"https://...","VALUATUM_REST_TOKEN":"..."}'
+        //     --secret-string '{"STRIPE_SECRET_KEY":"sk_...","STRIPE_WEBHOOK_SECRET":"whsec_..."}'
+        // VALUATUM_REST_URL / VALUATUM_REST_TOKEN are needed only by a product
+        // with generator 'valuatumRest'; both Swedish reports use the engine.
         const appSecret = secretsmanager.Secret.fromSecretNameV2(
             this,
             'ReportCheckoutSecrets',
