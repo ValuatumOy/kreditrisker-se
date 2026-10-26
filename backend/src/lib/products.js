@@ -76,13 +76,16 @@ const PRODUCTS = {
       sv: 'Företagsspecifik kreditriskrapport (PDF).',
       en: 'Company-specific credit risk report (PDF).',
     },
-    // The engine's rebuild of the Jasper credit risk report; no LLM call.
+    // The engine's rebuild of the Jasper credit risk report. aiTexts adds its
+    // three short LLM texts (key observations and chart interpretation on the
+    // summary page, the balance-sheet commentary), as the FI site does.
     generator: 'reportEngine',
     templateName: 'staattinen_luottomuistio',
     aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
     reportCountry: 'SE',
     bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
+    aiTexts: true,
   },
 
   se_credit_risk_bundle: {
@@ -190,6 +193,7 @@ function buildReportParams(product, { businessId, fid, fiscalYear, reportLang })
     ...(typeof product.includeFraud === 'boolean'
       ? { includeFraud: product.includeFraud }
       : {}),
+    ...(typeof product.aiTexts === 'boolean' ? { aiTexts: product.aiTexts } : {}),
     ...(fiscalYear ? { fiscalYear: String(fiscalYear) } : {}),
   };
 }

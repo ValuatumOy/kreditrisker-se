@@ -46,9 +46,9 @@ test('both bundles price from their own Stripe product, not a hardcoded amount',
 })
 
 test('both reports are engine jobs under the Sweden customer', () => {
-    for (const [reportType, templateName, includeFraud] of [
-        ['se_credit_risk', 'staattinen_luottomuistio', undefined],
-        ['se_ai_credit_risk', 'luottomuistio', true],
+    for (const [reportType, templateName, extra] of [
+        ['se_credit_risk', 'staattinen_luottomuistio', { aiTexts: true }],
+        ['se_ai_credit_risk', 'luottomuistio', { includeFraud: true }],
     ]) {
         const product = getProduct(reportType)
         assert.equal(product.generator, 'reportEngine')
@@ -64,7 +64,7 @@ test('both reports are engine jobs under the Sweden customer', () => {
             lang: 'sv',
             currency: 'SEK',
             country: 'SE',
-            ...(includeFraud ? { includeFraud } : {}),
+            ...extra,
         })
     }
 })
