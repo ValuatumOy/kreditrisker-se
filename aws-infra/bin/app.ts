@@ -13,7 +13,7 @@
 // Without hostedZoneId the sites run on their *.cloudfront.net domains.
 
 import * as cdk from 'aws-cdk-lib'
-import { CertStack, SiteStack } from '../lib/site-stack'
+import { CertStack, SearchRepoStack, SiteStack } from '../lib/site-stack'
 import { CheckoutStack } from '../lib/checkout-stack'
 
 const env = { account: '892885731254', region: 'eu-west-1' }
@@ -35,6 +35,14 @@ new SiteStack(app, 'KreditriskerSiteStackTest', {
     checkoutApiDomain: ctx('checkoutApiTest'),
 })
 
+// Jenkins agent sweden-build (profinder-environment jenkins/new-environment.sh): the role that can reach sweden-db
+const buildRoleName = 'sweden-process-role'
+const searchRepo = new SearchRepoStack(app, 'KreditriskerSearchRepoStackProd', {
+    env,
+    description: 'Prod - kreditrisker.se search Lambda images (Jenkins pushes one every night)',
+    buildRoleName,
+})
+
 new SiteStack(app, 'KreditriskerSiteStackProd', {
     env,
     crossRegionReferences: true,
@@ -43,10 +51,9 @@ new SiteStack(app, 'KreditriskerSiteStackProd', {
     domain: cert ? DOMAIN : undefined,
     hostedZoneId,
     certificate: cert?.certificate,
-    search: true,
+    searchRepository: searchRepo.repository,
     checkoutApiDomain: ctx('checkoutApiProd'),
-    // Jenkins agent sweden-build (profinder-environment jenkins/new-environment.sh): the role that can reach sweden-db
-    buildRoleName: 'sweden-process-role',
+    buildRoleName,
 })
 
 for (const environmentName of ['Test', 'Prod'] as const) {
