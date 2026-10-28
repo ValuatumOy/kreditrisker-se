@@ -83,8 +83,8 @@ the search from the whole directory.
 ## 5. Report checkout (only when reports are launched)
 
 Complete the legal, privacy, report-content, payment, delivery and consumer-terms
-launch gates first. Swedish model validation is required before presenting model
-scores; until then both Swedish products request their omission.
+launch gates first. Swedish reports use the Finnish credit-risk model; verify its
+outputs for Swedish companies as part of the report review before opening sales.
 
 1. Create the Stripe products with SEK, one-time, VAT-exclusive default prices:
    29 kr for the basic report and 69 kr for the AI report. The backend checks
@@ -103,10 +103,8 @@ scores; until then both Swedish products request their omission.
    redeploy `KreditriskerSiteStackProd` so `/api/*` reaches it.
 5. In Stripe, point a webhook at the direct `…/api/webhook` URL (not through
    CloudFront) and store its signing secret in the secret above.
-6. Deploy the report-engine version that supports `omitUnvalidatedCreditModel`
-   before enabling this checkout. Both Swedish products request this policy to
-   omit unvalidated model output; an older engine may silently ignore it.
-   Verify a generated report before enabling sales.
+6. Deploy the reviewed report-engine version and verify generated Swedish
+   reports, including their credit-model and fraud-analysis outputs, before sales.
 7. Once content, payment, delivery and legal checks pass, set CDK context
    `checkoutEnabledProd=1` and `termsVersionProd` to the approved terms version,
    then deploy the checkout stack. Without this switch

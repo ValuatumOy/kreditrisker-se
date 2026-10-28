@@ -64,7 +64,6 @@ test('both reports are engine jobs under the Sweden customer', () => {
             lang: 'sv',
             currency: 'SEK',
             country: 'SE',
-            omitUnvalidatedCreditModel: true,
             ...extra,
         })
     }

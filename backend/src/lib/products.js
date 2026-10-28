@@ -37,9 +37,9 @@ const PRICE_TARGETS = require('./report-price-targets.json');
 // (the allowed Stripe price must also match the approved target) - see getProduct().
 //
 // Both reports are rendered by the report engine under the `Sweden` customer
-// (aspQueryKey), whose secret points at sweden.valuatum.com. Until there are
-// enough Swedish companies for models and statistics of their own, Finnish
-// credit-model outputs are omitted. Industry comparisons use Finnish companies.
+// (aspQueryKey), whose secret points at sweden.valuatum.com. Swedish reports
+// use the Finnish credit-risk model and Finnish industry
+// comparisons until Swedish alternatives are available.
 const PRODUCTS = {
   se_ai_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_AI || '',
@@ -60,7 +60,6 @@ const PRODUCTS = {
     aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
     reportCountry: 'SE',
-    omitUnvalidatedCreditModel: true,
     bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
     includeFraud: true,
   },
@@ -87,7 +86,6 @@ const PRODUCTS = {
     aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
     reportCountry: 'SE',
-    omitUnvalidatedCreditModel: true,
     bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
     aiTexts: true,
   },
@@ -191,7 +189,6 @@ function buildReportParams(product, { businessId, fid, fiscalYear, reportLang })
     lang: contentLang,
     ...(product.reportCurrency ? { currency: product.reportCurrency } : {}),
     ...(product.reportCountry ? { country: product.reportCountry } : {}),
-    ...(product.omitUnvalidatedCreditModel ? { omitUnvalidatedCreditModel: true } : {}),
     ...(product.bankruptcyRiskModel
       ? { bankruptcyRiskModel: product.bankruptcyRiskModel }
       : {}),
