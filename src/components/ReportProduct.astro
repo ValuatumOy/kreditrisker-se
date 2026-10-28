@@ -28,7 +28,7 @@ const path = product === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'
                 <ul class="rpp__list">{forWhom.map((x) => <li>{x}</li>)}</ul>
             </section>
             <section>
-                <h2>Planerat innehåll</h2>
+                <h2>{state.kind === 'available' ? 'Innehåll' : 'Planerat innehåll'}</h2>
                 <dl class="rpp__inc">
                     {
                         includes.map((x, i) => (
@@ -50,12 +50,12 @@ const path = product === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'
         <aside class="rpp__side">
             <div class="rpp__box">
                 <p class="small muted">Status</p>
-                <p class="rpp__state"><span class="tag tag--warn">{STATE_LABEL[state.kind]}</span></p>
+                <p class="rpp__state"><span class:list={['tag', state.kind === 'available' ? 'tag--ok' : 'tag--warn']}>{STATE_LABEL[state.kind]}</span></p>
                 {state.kind === 'unavailable' && <p class="small">{UNAVAILABLE_TEXT[state.reason]}</p>}
                 <dl class="rpp__facts small">
-                    <div><dt>Pris</dt><dd>{price ? `${price.amountSek.toLocaleString('sv-SE')} kr` : 'Inte fastställt'}</dd></div>
-                    <div><dt>Leverans</dt><dd>PDF. Leveranstid anges vid lansering.</dd></div>
-                    <div><dt>Betalning</dt><dd>Inte öppen</dd></div>
+                    <div><dt>Pris</dt><dd>{price ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms` : 'Inte fastställt'}</dd></div>
+                    <div><dt>Leverans</dt><dd>{state.kind === 'available' ? 'PDF via e-post.' : 'PDF. Leveranstid anges vid lansering.'}</dd></div>
+                    <div><dt>Betalning</dt><dd>{state.kind === 'available' ? 'Öppen' : 'Inte öppen'}</dd></div>
                 </dl>
                 <a class="btn btn--quiet" href={`/rapporter/exempel/#${product === 'basic' ? 'basrapport' : 'ai-rapport'}`}>
                     <Icon name="doc" /> Se exempel

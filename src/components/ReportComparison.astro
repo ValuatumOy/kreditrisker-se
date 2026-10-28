@@ -31,7 +31,7 @@ const rows: [string, Cell, Cell][] = [
 ---
 
 <figure class="fig rc">
-    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">Basrapport och AI-rapport <span class="fig__sub">– planerat innehåll</span></span></div>
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">Basrapport och AI-rapport {basic.kind !== 'available' && ai.kind !== 'available' && <span class="fig__sub">– planerat innehåll</span>}</span></div>
     <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, jämförelse av rapporterna`}>
         <table class="data">
             <thead>
@@ -74,7 +74,9 @@ const rows: [string, Cell, Cell][] = [
         </table>
     </div>
     <figcaption class="fig__src">
-        <b>Anm.</b> Innehållet är preliminärt och fastställs när rapporterna för svenska företag är färdigutvecklade och granskade. Inga betyg, prognoshorisonter eller priser från den finska tjänsten gäller för Sverige. <a href="/rapporter/">Mer om rapporterna</a>.
+        <b>Anm.</b> {basic.kind === 'available' || ai.kind === 'available'
+            ? 'Branschjämförelserna använder för närvarande finska företag och kan bygga på en bredare branschgrupp.'
+            : 'Innehållet är preliminärt. Branschjämförelserna använder för närvarande finska företag och kan bygga på en bredare branschgrupp.'} <a href="/rapporter/">Mer om rapporterna</a>.
     </figcaption>
 </figure>
 

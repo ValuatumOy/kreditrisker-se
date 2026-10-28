@@ -45,6 +45,7 @@ const states: { label: string; value: Value; fmt: 'sek' | 'pct'; means: string }
     { label: 'Ej jämförbar', value: { status: 'incomparable', reason: 'period_length' }, fmt: 'pct', means: 'T.ex. tillväxt efter ett 18-månadersår.' },
 ]
 const reports = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, null) }))
+const reportsAvailable = reports.some(({ s }) => s.kind === 'available')
 const explore = [
     { href: '/branscher/', title: 'Branscher', text: 'Företag efter huvudbransch (SNI).', n: `${site.industries.length}` },
     { href: '/kommuner/', title: 'Kommuner', text: 'Företag efter säteskommun.', n: `${site.municipalities.length}` },
@@ -236,8 +237,8 @@ const statement =
         <div class="reports__shade" aria-hidden="true"></div>
         <div class="shell reports__inner">
             <div class="section__head">
-                <h2 class="reveal">Rapporterna <span class="tone">kommer senare.</span></h2>
-                <p class="reveal" style="--d:1">Rapporterna om svenska företag är under utveckling. Vi visar inga priser och tar inga beställningar förrän allt är granskat.</p>
+                <h2 class="reveal">{reportsAvailable ? 'Rapporter om svenska företag.' : <>Rapporterna <span class="tone">kommer senare.</span></>}</h2>
+                <p class="reveal" style="--d:1">{reportsAvailable ? 'Välj en rapport på företagets sida.' : 'Rapporterna om svenska företag är under utveckling. Vi visar inga priser och tar inga beställningar förrän allt är granskat.'}</p>
             </div>
             <div class="reports__grid">
                 {
@@ -245,7 +246,7 @@ const statement =
                         <article class="rcard reveal" style={`--d:${i}`} data-spotlight>
                             <div class="rcard__top">
                                 <h3>{p === 'basic' ? 'Basrapport' : 'AI-rapport'}</h3>
-                                <span class="tag tag--warn">{STATE_LABEL[s.kind]}</span>
+                                <span class:list={['tag', s.kind === 'available' ? 'tag--ok' : 'tag--warn']}>{STATE_LABEL[s.kind]}</span>
                             </div>
                             <p class="rcard__lede">
                                 {p === 'basic' ? 'Bokslut, nyckeltal och branschjämförelse samlade i en PDF.' : 'Basrapporten plus en skriven analys och en genomgång av offentliga källor.'}
@@ -261,7 +262,7 @@ const statement =
                                 ))}
                             </ul>
                             <div class="rcard__foot">
-                                <span class="rcard__price">Pris: inte fastställt</span>
+                                <span class="rcard__price">{s.kind === 'available' && s.price ? `${s.price.amountSek.toLocaleString('sv-SE')} kr inkl. moms` : 'Pris: inte fastställt'}</span>
                                 <a class="btn" href={p === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'}>
                                     Läs mer
                                 </a>

@@ -38,6 +38,10 @@ export interface CheckoutStackProps extends cdk.StackProps {
      * _AI_BUNDLE). A product without an id is not sold (backend/src/lib/products.js).
      */
     stripeProducts?: Record<string, string>
+    /** Explicit switch for new Checkout sessions; outstanding orders still finish. */
+    checkoutEnabled?: boolean
+    /** Version of the approved purchase terms accepted before checkout. */
+    termsVersion?: string
 }
 
 /**
@@ -53,6 +57,7 @@ export class CheckoutStack extends cdk.Stack {
         props: CheckoutStackProps
     ) {
         super(scope, id, props)
+        if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
 
         const descriptionPrefix = `${props.environmentName} - Kreditrisker.se`
 
@@ -179,6 +184,8 @@ export class CheckoutStack extends cdk.Stack {
             NODE_OPTIONS: '--enable-source-maps',
             CONTACT_EMAIL: props.contactEmail ?? '',
             ...props.stripeProducts,
+            REPORT_CHECKOUT_ENABLED: props.checkoutEnabled ? '1' : '0',
+            REPORT_TERMS_VERSION: props.termsVersion ?? '',
         }
 
         const makeFn = (
@@ -251,11 +258,21 @@ export class CheckoutStack extends cdk.Stack {
                 },
             },
         })
+        const invokeViaUrlPolicy = new iam.PolicyStatement({
+            actions: ['lambda:InvokeFunction'],
+            resources: [REPORT_ENGINE[props.environmentName].arn],
+            conditions: {
+                Bool: { 'lambda:InvokedViaFunctionUrl': 'true' },
+            },
+        })
         webhookFn.addToRolePolicy(invokePolicy)
+        webhookFn.addToRolePolicy(invokeViaUrlPolicy)
         pollerFn.addToRolePolicy(invokePolicy)
+        pollerFn.addToRolePolicy(invokeViaUrlPolicy)
         // /api/redeem starts a package-funded report itself, so it submits jobs
         // exactly like the webhook does for a paid one.
         redeemFn.addToRolePolicy(invokePolicy)
+        redeemFn.addToRolePolicy(invokeViaUrlPolicy)
 
         // Send report/alert mail. The poller is the only Lambda that emails, so
         // create-checkout and webhook deliberately get no SES permission. Scoped

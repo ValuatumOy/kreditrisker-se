@@ -1,10 +1,13 @@
 ---
 import Page from '../layouts/Page.astro'
+import { FLAGS } from '../config/site.ts'
 
 const faq: { q: string; a: string }[] = [
     {
         q: 'Vad kostar det att se ett företag?',
-        a: 'Inget. Profilerna med registeruppgifter, bokslut och nyckeltal är gratis. Det är bara rapporterna som ska kosta, och de säljs inte ännu.',
+        a: FLAGS.checkout
+            ? 'Profilerna med registeruppgifter, bokslut och nyckeltal är gratis. Rapporterna är betalda.'
+            : 'Profilerna med registeruppgifter, bokslut och nyckeltal är gratis. Rapporterna säljs inte ännu.',
     },
     {
         q: 'Är detta en kreditupplysning?',
@@ -40,7 +43,7 @@ const faq: { q: string; a: string }[] = [
     },
     {
         q: 'Hur betalar jag för en rapport, och när kommer den?',
-        a: 'När rapporterna lanseras betalar du i Stripes betalfönster, till exempel med kort. Beloppet reserveras först och dras när rapporten är klar, och rapporten skickas som PDF till din e-post, oftast inom några minuter. Kan rapporten inte tas fram debiteras du inget.',
+        a: `${FLAGS.checkout ? 'Du betalar' : 'När rapporterna lanseras betalar du'} i Stripes betalfönster, till exempel med kort. Beloppet reserveras först och dras när rapporten är klar. Rapporten skickas som PDF till din e-post. Kan rapporten inte tas fram släpps reservationen.`,
     },
     {
         q: 'Använder ni kakor?',

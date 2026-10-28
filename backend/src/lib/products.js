@@ -31,20 +31,21 @@ const REPORT_LANG_DISCLOSURE = {
 };
 
 const REST_LANG_CODES = { sv: 'sv', en: 'en' };
+const PRICE_TARGETS = require('./report-price-targets.json');
 
 // Swedish catalog. A product is sold only once it has a Stripe product id
-// (prices live in Stripe, never in code) - see getProduct().
+// (the allowed Stripe price must also match the approved target) - see getProduct().
 //
 // Both reports are rendered by the report engine under the `Sweden` customer
 // (aspQueryKey), whose secret points at sweden.valuatum.com. Until there are
-// enough Swedish companies for models and statistics of their own, the ratings
-// come from the Finnish ValuBooster model that sweden.valuatum.com runs, and
-// the scatter and industry comparison from Finnish companies.
+// enough Swedish companies for models and statistics of their own, Finnish
+// credit-model outputs are omitted. Industry comparisons use Finnish companies.
 const PRODUCTS = {
   se_ai_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_AI || '',
     currency: 'sek',
-    taxBehavior: 'inclusive',
+    taxBehavior: 'exclusive',
+    expectedUnitAmount: PRICE_TARGETS.ai,
     taxCode: 'txcd_10000000',
     name: {
       sv: 'AI-kreditriskrapport',
@@ -59,6 +60,7 @@ const PRODUCTS = {
     aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
     reportCountry: 'SE',
+    omitUnvalidatedCreditModel: true,
     bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
     includeFraud: true,
   },
@@ -66,7 +68,8 @@ const PRODUCTS = {
   se_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_BASIC || '',
     currency: 'sek',
-    taxBehavior: 'inclusive',
+    taxBehavior: 'exclusive',
+    expectedUnitAmount: PRICE_TARGETS.basic,
     taxCode: 'txcd_10000000',
     name: {
       sv: 'Kreditriskrapport',
@@ -84,6 +87,7 @@ const PRODUCTS = {
     aspQueryKey: 'Sweden',
     reportCurrency: 'SEK',
     reportCountry: 'SE',
+    omitUnvalidatedCreditModel: true,
     bankruptcyRiskModel: process.env.SE_BANKRUPTCY_RISK_MODEL || undefined,
     aiTexts: true,
   },
@@ -187,6 +191,7 @@ function buildReportParams(product, { businessId, fid, fiscalYear, reportLang })
     lang: contentLang,
     ...(product.reportCurrency ? { currency: product.reportCurrency } : {}),
     ...(product.reportCountry ? { country: product.reportCountry } : {}),
+    ...(product.omitUnvalidatedCreditModel ? { omitUnvalidatedCreditModel: true } : {}),
     ...(product.bankruptcyRiskModel
       ? { bankruptcyRiskModel: product.bankruptcyRiskModel }
       : {}),

@@ -86,6 +86,8 @@ async function fulfillSingleReport(session, product) {
         reportType,
         lang: normalizeLang(meta.lang),
         reportLang: normalizeReportLang(meta.reportLang),
+        acceptedTermsVersion: meta.acceptedTermsVersion || '',
+        termsAcceptedAt: meta.termsAcceptedAt || '',
         params,
         companyName: meta.companyName || '',
         internalTest: meta.internalTest === 'true',

@@ -107,6 +107,7 @@ test('a bundle purchase grants, reserves, and claims the request-keyed order', a
     lang: 'sv',
     currency: 'SEK',
     country: 'SE',
+    omitUnvalidatedCreditModel: true,
     aiTexts: true,
   });
 

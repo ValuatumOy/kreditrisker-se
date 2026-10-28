@@ -3,23 +3,25 @@ import Page from '../../layouts/Page.astro'
 import ReportComparison from '../../components/ReportComparison.astro'
 import StateFlow from '../../components/StateFlow.astro'
 import Icon from '../../components/Icon.astro'
+import { staticReportState } from '../../lib/reports/availability.ts'
+const reportsAvailable = ['basic', 'ai'].some((product) => staticReportState(product as 'basic' | 'ai', null).kind === 'available')
 ---
 
 <Page
     title="Kreditriskrapporter"
     h1="Basrapport och AI-rapport"
-    description="Två rapporter om svenska företag från Valuatum: en basrapport byggd på bokslut och nyckeltal, och en AI-rapport med skriven analys. Under utveckling."
+    description="Två rapporter om svenska företag från Valuatum: en basrapport byggd på bokslut och nyckeltal, och en AI-rapport med skriven analys."
     path="/rapporter/"
-    lede="Rapporterna samlar det du behöver för att bedöma en kund eller leverantör innan du ger kredit. Båda är under utveckling för svenska företag och kan inte beställas ännu."
+    lede={reportsAvailable ? 'Rapporterna samlar det du behöver för att bedöma en kund eller leverantör innan du ger kredit.' : 'Rapporterna samlar det du behöver för att bedöma en kund eller leverantör innan du ger kredit. Båda är under utveckling för svenska företag och kan inte beställas ännu.'}
 >
     <div class="rr">
-        <div class="notice" role="note">
+        {!reportsAvailable && <div class="notice" role="note">
             <Icon name="info" />
             <p>
                 <strong>Inte lanserade.</strong> Innan rapporterna säljs ska datalicenser, modellvalidering, betalning och leverans vara på plats och granskade. Priser anges först när de
                 är fastställda.
             </p>
-        </div>
+        </div>}
 
         <ReportComparison no="Tabell 1" />
 

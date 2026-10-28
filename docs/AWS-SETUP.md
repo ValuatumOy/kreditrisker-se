@@ -82,9 +82,15 @@ the search from the whole directory.
 
 ## 5. Report checkout (only when reports are launched)
 
-Launch gates 4 to 7 first: validated Swedish model, report content, prices, terms.
+Complete the legal, privacy, report-content, payment, delivery and consumer-terms
+launch gates first. Swedish model validation is required before presenting model
+scores; until then both Swedish products request their omission.
 
-1. Create the Stripe products (SEK, VAT-inclusive default price) and the secret:
+1. Create the Stripe products with SEK, one-time, VAT-exclusive default prices:
+   29 kr for the basic report and 69 kr for the AI report. The backend checks
+   these amounts and tax treatment against `backend/src/lib/report-price-targets.json`.
+   Verify Stripe Tax, registrations, and customer-facing total prices before launch.
+   Create the secret:
    ```bash
    aws secretsmanager create-secret --name kreditrisker-se-prod \
      --secret-string '{"STRIPE_SECRET_KEY":"sk_...","STRIPE_WEBHOOK_SECRET":"whsec_...","VALUATUM_REST_URL":"https://...","VALUATUM_REST_TOKEN":"..."}'
@@ -97,9 +103,21 @@ Launch gates 4 to 7 first: validated Swedish model, report content, prices, term
    redeploy `KreditriskerSiteStackProd` so `/api/*` reaches it.
 5. In Stripe, point a webhook at the direct `…/api/webhook` URL (not through
    CloudFront) and store its signing secret in the secret above.
-6. Build with `PUBLIC_SE_REPORT_ADAPTER=http`, `PUBLIC_SE_REPORT_API=/api/`,
-   `SE_CHECKOUT=1` and the products set to `live`, with `VERIFIED_PRICES` in
-   `src/config/site.ts` matching Stripe.
+6. Deploy the report-engine version that supports `omitUnvalidatedCreditModel`
+   before enabling this checkout. Both Swedish products request this policy to
+   omit unvalidated model output; an older engine may silently ignore it.
+   Verify a generated report before enabling sales.
+7. Once content, payment, delivery and legal checks pass, set CDK context
+   `checkoutEnabledProd=1` and `termsVersionProd` to the approved terms version,
+   then deploy the checkout stack. Without this switch
+   the API refuses new sessions even if Stripe product IDs are configured;
+   existing orders can still be fulfilled.
+8. Build with `PUBLIC_SE_REPORT_ADAPTER=http`, `PUBLIC_SE_REPORT_API=/api/`,
+   `SE_CHECKOUT=1`, `SE_TERMS_VERSION` matching `termsVersionProd`, and the products
+   set to `live`, with `VERIFIED_PRICES` in
+   `src/config/site.ts` set to the verified VAT-inclusive customer prices.
+   With a 25% VAT rate they would be 36.25 / 86.25 kr, but confirm the actual
+   tax calculation and any country-specific differences before setting them.
 
 ## Analytics
 

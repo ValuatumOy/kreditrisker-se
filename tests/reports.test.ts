@@ -49,6 +49,7 @@ test('http adapter: Stripe redirect only to Stripe, errors become states', async
     assert.equal(sent.reportType, 'se_credit_risk')
     assert.equal(sent.businessId, '556987-6542')
     assert.equal(sent.fid, '900001')
+    assert.equal(sent.acceptedTermsVersion, 'v')
     assert.equal('price' in sent || 'amount' in sent, false, 'the client never sends a price')
     const evil = httpBackend('https://x/api/', async () => Response.json({ url: 'https://evil.example/pay' }))
     assert.equal((await evil.createOrder(req)).kind, 'failure')
@@ -58,4 +59,13 @@ test('http adapter: Stripe redirect only to Stripe, errors become states', async
     assert.deepEqual(await down.createOrder(req), { kind: 'unavailable', reason: 'backend_unreachable' })
     const err = httpBackend('https://x/api/', async () => new Response('', { status: 503 }))
     assert.deepEqual(await err.createOrder(req), { kind: 'failure', code: 'http_503', retryable: true })
+})
+
+test('http adapter resolves the documented relative API path against the site origin', async () => {
+    const backend = httpBackend('/api/', async (url) => {
+        assert.equal(String(url), 'https://www.kreditrisker.se/api/create-checkout')
+        return Response.json({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
+    }, 'https://www.kreditrisker.se')
+    const state = await backend.createOrder({ orgnr: '5569876542', product: 'ai', email: 'a@b.se', acceptedTermsVersion: 'v' })
+    assert.equal(state.kind, 'redirect')
 })

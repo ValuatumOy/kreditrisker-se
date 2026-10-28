@@ -53,14 +53,14 @@ export const REPORT_TYPE: Record<ReportProduct, string> = { basic: 'se_credit_ri
  * the report generated, then captured and emailed; a failed report is never
  * charged. Prices come from Stripe; the page shows only VERIFIED_PRICES.
  */
-export function httpBackend(base: string, fetchImpl: typeof fetch = fetch): ReportBackend {
+export function httpBackend(base: string, fetchImpl: typeof fetch = fetch, origin = globalThis.location?.origin): ReportBackend {
     return {
         async availability() {
             return { kind: 'available' }
         },
         async createOrder(req) {
             try {
-                const res = await fetchImpl(new URL('create-checkout', base), {
+                const res = await fetchImpl(new URL('create-checkout', new URL(base, origin)), {
                     method: 'POST',
                     headers: { 'content-type': 'application/json' },
                     body: JSON.stringify({
@@ -70,6 +70,7 @@ export function httpBackend(base: string, fetchImpl: typeof fetch = fetch): Repo
                         businessId: formatOrgnr(req.orgnr),
                         companyName: req.companyName,
                         email: req.email,
+                        acceptedTermsVersion: req.acceptedTermsVersion,
                         lang: 'sv',
                         reportLang: 'sv',
                         cancelPath: req.returnPath,

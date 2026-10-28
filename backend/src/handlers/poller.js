@@ -10,8 +10,8 @@
 //                  job can't drift toward Stripe's 7-day capture window
 //
 // Every step is safe to re-run: the poller may revisit an order before a write
-// lands. Capture/cancel swallow "already done" errors; FULFILLED is only set
-// after the email is sent, so a failed email is retried next tick.
+// lands. FULFILLED is only set after the email is sent, so a failed email is
+// retried next tick.
 
 const { stripeClient } = require('../lib/stripe');
 const dynamo = require('../lib/dynamo');
@@ -29,8 +29,7 @@ function ageMinutes(order) {
   return (Date.now() - created) / 60000;
 }
 
-// Capture is idempotent for our purposes: a PaymentIntent already captured (or
-// no longer capturable) shouldn't fail the tick.
+// A retry is successful only if Stripe confirms the payment was captured.
 async function capturePaymentIntent(stripe, paymentIntentId) {
   if (!paymentIntentId) {
     console.log('capturePaymentIntent: no paymentIntentId on order, nothing to capture');
@@ -39,12 +38,17 @@ async function capturePaymentIntent(stripe, paymentIntentId) {
   try {
     await stripe.paymentIntents.capture(paymentIntentId);
   } catch (err) {
-    const msg = err?.message || '';
-    if (/already been captured|already captured|cannot be captured|succeeded/i.test(msg)) {
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (paymentIntent.status === 'succeeded') {
       console.log('capturePaymentIntent: already captured', {
         paymentIntentId,
       });
       return;
+    }
+    if (paymentIntent.status === 'canceled') {
+      const canceled = new Error('Payment authorization was canceled before report delivery');
+      canceled.code = 'payment_authorization_canceled';
+      throw canceled;
     }
     throw err;
   }
@@ -58,20 +62,9 @@ async function cancelPaymentIntent(stripe, paymentIntentId) {
   try {
     await stripe.paymentIntents.cancel(paymentIntentId);
   } catch (err) {
-    // Stripe rejects a cancel only when the PI is no longer cancelable — for a
-    // manual-capture hold that means it's already `canceled` or `succeeded`,
-    // both terminal. `payment_intent_unexpected_state` is the wording-stable
-    // signal for that; keep the message regex as a fallback.
-    const msg = err?.message || '';
-    if (
-      err?.code === 'payment_intent_unexpected_state' ||
-      /already canceled|already been canceled|cannot (be )?cancel|status of canceled|succeeded/i.test(
-        msg
-      )
-    ) {
-      console.log('cancelPaymentIntent: already settled', {
-        paymentIntentId,
-      });
+    const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+    if (paymentIntent.status === 'canceled') {
+      console.log('cancelPaymentIntent: already canceled', { paymentIntentId });
       return;
     }
     throw err;
@@ -141,7 +134,13 @@ function reportFileName(companyName) {
 
 async function deliver(stripe, order, pdfBuffer) {
   if (order.paymentIntentId) {
-    await capturePaymentIntent(stripe, order.paymentIntentId);
+    try {
+      await capturePaymentIntent(stripe, order.paymentIntentId);
+    } catch (err) {
+      if (err.code !== 'payment_authorization_canceled') throw err;
+      await fail(stripe, order, err.message);
+      return false;
+    }
   }
   const product = getProduct(order.reportType);
   await emailService.sendReportEmail(order.email, {
@@ -156,12 +155,13 @@ async function deliver(stripe, order, pdfBuffer) {
     sessionId: order.sessionId,
   });
   await settleFunding(order);
+  return true;
 }
 
 async function fulfill(stripe, order, job) {
   // Re-mint the URL implicitly by using the just-fetched job's s3Url.
   const pdfBuffer = await downloadPdf(job.s3Url);
-  await deliver(stripe, order, pdfBuffer);
+  if (!(await deliver(stripe, order, pdfBuffer))) return;
   console.log('poller: fulfilled', {
     sessionId: order.sessionId,
     jobId: order.jobId,
@@ -213,7 +213,7 @@ async function processRestOrder(stripe, order, product) {
     lang: order.params?.lang || DEFAULT_REPORT_LANG,
     currency: order.params?.currency || product.reportCurrency,
   });
-  await deliver(stripe, order, pdfBuffer);
+  if (!(await deliver(stripe, order, pdfBuffer))) return;
   console.log('poller: fulfilled (rest)', {
     sessionId: order.sessionId,
     reportType: order.reportType,
