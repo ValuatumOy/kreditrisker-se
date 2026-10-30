@@ -8,6 +8,7 @@
 const reportEngine = require('./reportEngine')
 const dynamo = require('./dynamo')
 const config = require('./config')
+const { isFixtureOrder } = require('./fixtureTest')
 
 const DIRECT_FULFILL_GENERATORS = new Set(['valuatumRest', 'microProduct'])
 const FULFILLABLE_GENERATORS = new Set([
@@ -28,16 +29,32 @@ class FulfillmentTrackingError extends Error {
     }
 }
 
+class FulfillmentSubmissionUnknownError extends Error {
+    constructor(cause) {
+        super('report submission could not be confirmed', { cause })
+        this.name = 'FulfillmentSubmissionUnknownError'
+    }
+}
+
 // Throws if job submission or tracking fails. Callers must not release the
 // order when a FulfillmentTrackingError says the generator already accepted it.
 async function startFulfillment(order, product) {
+    if (config.isolatedFixtureTest && (!isFixtureOrder(order) || product?.templateName !== 'staattinen_luottomuistio'))
+        throw new Error('Isolated checkout only fulfills the synthetic Basic order')
     if (DIRECT_FULFILL_GENERATORS.has(product.generator)) return { jobId: null }
 
-    const jobId = await reportEngine.submitJob({
-        username: config.reportUsername,
-        templateName: product.templateName,
-        params: order.params,
-    })
+    let jobId
+    try {
+        jobId = await reportEngine.submitJob({
+            username: config.reportUsername,
+            templateName: product.templateName,
+            params: order.params,
+        })
+    } catch (err) {
+        // A timeout or malformed response does not prove that the engine
+        // rejected the request. Its job API has no idempotency key.
+        throw new FulfillmentSubmissionUnknownError(err)
+    }
     try {
         await dynamo.updateOrder(order.sessionId, { jobId })
     } catch (err) {
@@ -50,6 +67,7 @@ module.exports = {
     startFulfillment,
     isFulfillable,
     FulfillmentTrackingError,
+    FulfillmentSubmissionUnknownError,
     FULFILLABLE_GENERATORS,
     DIRECT_FULFILL_GENERATORS,
 }

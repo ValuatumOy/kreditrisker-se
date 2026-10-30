@@ -144,7 +144,8 @@ test('the payment_status gate does not touch manual-capture single reports', asy
   assert.equal(res.statusCode, 200);
   assert.equal(claimOrder.mock.callCount(), 1);
   assert.equal(claimOrder.mock.calls[0].arguments[0].sessionId, CS_ID);
-  assert.equal(fulfillment.startFulfillment.mock.callCount(), 1);
+  assert.equal(claimOrder.mock.calls[0].arguments[0].status, 'CONFIRMING');
+  assert.equal(fulfillment.startFulfillment.mock.callCount(), 0);
 });
 
 test('a report the package does not grant is refused', async () => {
@@ -209,6 +210,17 @@ test('a generation that never started returns the report, one that did keeps it'
 
   await handler(webhookEvent(completedSession()));
   assert.equal(release.mock.callCount(), 1, 'the generator already accepted that job');
+});
+
+test('an unconfirmed package job keeps the reservation for the poller', async () => {
+  const { release } = mockCredits();
+  mock.method(fulfillment, 'startFulfillment', async () => {
+    throw new fulfillment.FulfillmentSubmissionUnknownError(new Error('connection lost'));
+  });
+
+  const res = await handler(webhookEvent(completedSession()));
+  assert.equal(res.statusCode, 200);
+  assert.equal(release.mock.callCount(), 0);
 });
 
 

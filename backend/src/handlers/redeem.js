@@ -16,6 +16,7 @@ const {
 const dynamo = require('../lib/dynamo')
 const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
+const config = require('../lib/config')
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -97,6 +98,9 @@ exports.handler = async event => {
     if (method(event) !== 'POST')
         return json(405, { error: 'Method not allowed' })
 
+    if (config.isolatedFixtureTest)
+        return json(403, { error: 'Package redemption is disabled in the isolated test' })
+
     const { error, product, email, reportType, order } = parseRedeemRequest(
         jsonBody(event)
     )
@@ -147,6 +151,14 @@ exports.handler = async event => {
     try {
         await fulfillment.startFulfillment(order, product)
     } catch (err) {
+        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
+            console.error('redeem: job submission could not be confirmed', {
+                sessionId,
+                error: err.cause?.message || err.message,
+            })
+            // Keep the reservation while the poller resolves this order.
+            return json(500, { error: 'Could not confirm report generation' })
+        }
         if (err instanceof fulfillment.FulfillmentTrackingError) {
             // The generator accepted the job, so keep the reservation.
             console.error('redeem: submitted job could not be recorded', {

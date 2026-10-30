@@ -32,6 +32,8 @@ const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
 const { stripeClient } = require('../lib/stripe')
 const config = require('../lib/config')
+const { isFixturePurchase } = require('../lib/fixtureTest')
+const { isSwedishCompany } = require('../lib/swedishCompany')
 
 const INTERNAL_TEST_CODES = new Set((process.env.INTERNAL_TEST_CODES || '').split(',').filter(Boolean))
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -185,11 +187,17 @@ exports.handler = async event => {
         fulfillReportType,
     } = jsonBody(event)
 
+    if (config.isolatedFixtureTest && !isFixturePurchase({ reportType, businessId, email }))
+        return json(403, { error: 'Isolated checkout accepts only the synthetic test order' })
+
     if (!config.termsVersion || acceptedTermsVersion !== config.termsVersion)
         return json(400, { error: 'Purchase terms have not been accepted' })
 
     const product = getProduct(reportType)
     if (!product) return json(400, { error: 'Unknown reportType' })
+
+    if (!config.isolatedFixtureTest && !isSwedishCompany(businessId))
+        return json(400, { error: 'A valid Swedish organisation number is required' })
 
     const language = normalizeLang(lang)
     const { error: packageError, packageCheckout } = parsePackageCheckout(
@@ -216,7 +224,7 @@ exports.handler = async event => {
     const cancelUrl = `${origin}${returnPath}`
     const successPath = appendParams(
         returnPath,
-        `checkout=success&session_id={CHECKOUT_SESSION_ID}&report=${encodeURIComponent(reportType)}${
+        `checkout=success${reportType === 'se_credit_risk' ? '' : '&session_id={CHECKOUT_SESSION_ID}'}&report=${encodeURIComponent(reportType)}${
             companyName
                 ? `&company=${encodeURIComponent(String(companyName))}`
                 : ''

@@ -21,6 +21,7 @@
 const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
 const config = require('./config');
 const { normalizeLang, reportLangName } = require('./products');
+const { isFixtureEmail } = require('./fixtureTest');
 
 const FROM = config.fromEmail;
 const ADMIN = config.adminEmail;
@@ -152,6 +153,10 @@ function buildSesInput(message) {
 }
 
 async function sendEmail(message, label) {
+  if (config.isolatedFixtureTest &&
+      (![...addresses(message.to), ...addresses(message.bcc)].length ||
+       ![...addresses(message.to), ...addresses(message.bcc)].every(isFixtureEmail)))
+    throw new Error('Isolated checkout only sends to the SES success simulator');
   let response;
   try {
     response = await client().send(new SendEmailCommand(buildSesInput(message)));
@@ -205,6 +210,7 @@ async function sendReportEmail(
           <p style="font-size:14px;color:#1A2420;line-height:1.7;margin:0 0 20px;">
             ${escapeHtml(reportLanguageLine)}
           </p>
+          ${sessionId ? `<p style="font-size:12px;color:#40536a;">Order: ${escapeHtml(sessionId)}</p>` : ''}
           ${Number.isInteger(remainingReports) ? `<div style="background:#f2f8ff;border:1px solid #c8def3;border-radius:8px;padding:16px;margin:0 0 20px;"><strong>${copy.remaining(remainingReports)}</strong><br><span style="font-size:13px;color:#40536a;">${copy.reuse}</span></div>` : ''}
           <div style="border-top:1px solid #E2E9E5;padding-top:20px;">
             <p style="font-size:12px;color:#8A9590;line-height:1.65;margin:0 0 10px;">
@@ -300,10 +306,99 @@ async function sendCreditReleaseEmail(toEmail, details) {
   );
 }
 
+function withdrawalUrl() {
+  return `${config.siteUrl}/angra-kop/`;
+}
+
+function orderAmount(order) {
+  if (!Number.isSafeInteger(order.amountTotal) || !/^[a-z]{3}$/i.test(order.currency || '')) {
+    throw new Error('Order confirmation requires the Stripe total and currency');
+  }
+  return new Intl.NumberFormat('sv-SE', { style: 'currency', currency: order.currency.toUpperCase() }).format(order.amountTotal / 100);
+}
+
+async function sendOrderReceivedEmail(order, productName) {
+  const companyCode = reportCompanyCode(order);
+  await sendEmail({
+    from: FROM, to: order.email, sessionId: order.sessionId,
+    subject: `Din beställning – ${companyCode}`,
+    html: `<!doctype html><html lang="sv"><body>
+      <h1>Vi har tagit emot din beställning</h1>
+      <p>${escapeHtml(productName)} · Organisationsnummer: ${escapeHtml(companyCode)}</p>
+      <p>Order: ${escapeHtml(order.sessionId)}</p>
+      <p>Totalt inklusive moms: ${escapeHtml(orderAmount(order))}. ${order.amountTotal === 0 ? 'Ingen betalning krävs.' : 'Beloppet reserveras och dras först när rapporten är klar.'}</p>
+      <p>Rapporten tas fram automatiskt och skickas som PDF till denna e-postadress.${order.amountTotal > 0 ? ' Om den inte kan tas fram släpps reservationen.' : ''}</p>
+      <p>Som konsument behåller du din ångerrätt i 14 dagar. Du kan meddela att du ångrar köpet via <a href="${escapeHtml(withdrawalUrl())}">Ångra köp</a> eller genom att skriva till ${escapeHtml(CONTACT_EMAIL)}. Ange ordernumret och samma e-postadress som vid köpet.</p>
+      <p>Accepterad villkorsversion: ${escapeHtml(order.acceptedTermsVersion || '')}.</p>
+      <p>Valuatum Oy, FO-nummer 1612398-8<br>Linnanrakentajantie 6–8 C, Suite 15, 00880 Helsinki, Finland<br>${escapeHtml(CONTACT_EMAIL)}<br>+358 45 123 0308</p>
+      <h2>Ångerblankett</h2>
+      <p>Du kan använda blanketten nedan genom att kopiera och fylla i den i ett mejl eller skriva ut den. Du kan också använda ångerfunktionen ovan; blanketten är inte obligatorisk.</p>
+      <pre style="white-space:pre-wrap;font:inherit;line-height:1.5;">Företag: Valuatum Oy
+Postadress: Linnanrakentajantie 6–8 C, Suite 15, 00880 Helsinki, Finland
+E-post till företaget: ${escapeHtml(CONTACT_EMAIL)}
+
+Jag vill härmed frånträda avtalet för följande tjänst:
+Kreditriskrapport, organisationsnummer: ${escapeHtml(companyCode)}
+Ordernummer: ${escapeHtml(order.sessionId)}
+
+Datum då tjänsten beställdes: ____________________
+Datum då tjänsten mottogs: ____________________
+Köparens/köparnas namn: ____________________
+Köparens/köparnas postadress: ____________________
+Kontaktuppgift, e-post eller telefon (frivilligt): ____________________
+Namnteckning från köparen/köparna (endast på papper): ____________________
+Dagens datum: ____________________</pre>
+    </body></html>`,
+  }, 'order confirmation');
+}
+
+async function sendWithdrawalReceipt(order) {
+  const companyCode = reportCompanyCode(order);
+  await sendEmail({
+    from: FROM, to: order.email, sessionId: order.sessionId,
+    subject: `Vi har tagit emot din begäran om att ångra köpet`,
+    html: `<!doctype html><html lang="sv"><body><h1>Din begäran är registrerad</h1>
+      <p>Order: ${escapeHtml(order.sessionId)}</p>
+      <p>Produkt: Kreditriskrapport · Organisationsnummer: ${escapeHtml(companyCode)}</p>
+      <p>Mottagen: ${escapeHtml(order.withdrawalRequestedAt)}</p>
+      <p>Referens: ${escapeHtml(order.withdrawalRequestId)}</p>
+      <p>Det här är en bekräftelse på att vi har tagit emot din begäran. En eventuell återbetalning är inte genomförd genom denna bekräftelse. Vi kontrollerar betalningen och hanterar eventuell återbetalning separat.</p>
+      <p>Valuatum Oy · ${escapeHtml(CONTACT_EMAIL)} · +358 45 123 0308</p>
+    </body></html>`,
+  }, 'withdrawal receipt');
+}
+
+async function sendWithdrawalAdminAlert(order) {
+  const companyCode = reportCompanyCode(order);
+  await sendEmail({
+    from: FROM, to: ADMIN, sessionId: order.sessionId,
+    subject: `Withdrawal ${order.withdrawalPaymentResolution}: ${order.sessionId}`,
+    html: `<h1>Report withdrawal requires review</h1>
+      <p>Order: ${escapeHtml(order.sessionId)}</p>
+      <p>Customer: ${escapeHtml(order.email)}</p>
+      <p>Organisation number: ${escapeHtml(companyCode)}</p>
+      <p>PaymentIntent: ${escapeHtml(order.paymentIntentId || '')}</p>
+      <p>Received: ${escapeHtml(order.withdrawalRequestedAt)}</p>
+      <p>Payment resolution: ${escapeHtml(order.withdrawalPaymentResolution)}</p>
+      <p>${order.withdrawalPaymentResolution === 'REFUND_REQUIRED'
+        ? 'The customer has been charged. No refund has been issued automatically. Review and refund the payment in Stripe within the applicable deadline; record the refund reference and close the REVIEW_REQUIRED item only after verifying the outcome.'
+        : 'The authorization was released or no payment was required. Verify the request and contact the customer if further action is needed.'}</p>`,
+  }, 'withdrawal admin alert');
+}
+
+function reportCompanyCode(order) {
+  const code = order.params?.companyCode;
+  if (typeof code !== 'string' || !code.trim()) throw new Error('Report company code is required for the order receipt');
+  return code;
+}
+
 module.exports = {
   buildCreditEventEmail,
   sendReportEmail,
   sendCreditGrantEmail,
   sendCreditReleaseEmail,
   sendAdminGenerationAlert,
+  sendOrderReceivedEmail,
+  sendWithdrawalReceipt,
+  sendWithdrawalAdminAlert,
 };

@@ -22,6 +22,12 @@ const REPORT_ENGINE = {
     Test: { url: 'https://7zqqrejifzqphtwfb2imxtn67q0yzekq.lambda-url.eu-west-1.on.aws/', arn: 'arn:aws:lambda:eu-west-1:892885731254:function:pdf-report-api-test' },
     Prod: { url: 'https://jdnrhdk37rmqzayy2km4jyrlgq0uapaw.lambda-url.eu-west-1.on.aws/', arn: 'arn:aws:lambda:eu-west-1:892885731254:function:pdf-report-api' },
 }
+const STRIPE_PRODUCT_ENV_NAMES = new Set([
+    'STRIPE_PRODUCT_SE_BASIC', 'STRIPE_PRODUCT_SE_AI',
+    'STRIPE_PRODUCT_SE_BASIC_BUNDLE', 'STRIPE_PRODUCT_SE_AI_BUNDLE',
+])
+
+type ReportEngineTarget = { url: string; arn: string }
 
 export interface CheckoutStackProps extends cdk.StackProps {
     environmentName: 'Test' | 'Prod'
@@ -38,10 +44,55 @@ export interface CheckoutStackProps extends cdk.StackProps {
      * _AI_BUNDLE). A product without an id is not sold (backend/src/lib/products.js).
      */
     stripeProducts?: Record<string, string>
-    /** Explicit switch for new Checkout sessions; outstanding orders still finish. */
+    /** Enables new sessions; disabling Test also disconnects its report engine. */
     checkoutEnabled?: boolean
+    /** Dedicated test engine, with its own queues and data. */
+    testReportEngine?: ReportEngineTarget
     /** Version of the approved purchase terms accepted before checkout. */
     termsVersion?: string
+    /** Separate Stripe credentials for an enabled test checkout. */
+    testSecretName?: string
+    /** Suppress only the test stack's email subscription for simulator-only tests. */
+    suppressTestAlertSubscription?: boolean
+    /** Restrict a temporary test stack to a synthetic company and SES simulator. */
+    isolatedFixtureTest?: boolean
+}
+
+export function checkoutSecretName(props: Pick<CheckoutStackProps, 'environmentName' | 'checkoutEnabled' | 'testSecretName'>): string {
+    if (props.environmentName === 'Prod') {
+        if (props.testSecretName) throw new Error('A test secret cannot be configured on the production checkout')
+        return 'kreditrisker-se-prod'
+    }
+    if (props.testSecretName && !/^kreditrisker-se-isolated-[A-Za-z0-9_-]+$/.test(props.testSecretName)) {
+        throw new Error('Test secret must use a dedicated kreditrisker-se-isolated- name')
+    }
+    if (props.checkoutEnabled && !props.testSecretName) {
+        throw new Error('Enabled test checkout requires a dedicated test secret')
+    }
+    return props.testSecretName ?? 'kreditrisker-se-test'
+}
+
+export function resolveReportEngine(props: Pick<CheckoutStackProps, 'environmentName' | 'checkoutEnabled' | 'testReportEngine'>): ReportEngineTarget | undefined {
+    if (props.environmentName === 'Prod') return REPORT_ENGINE.Prod
+    // The TEST switch also disconnects the engine to prevent background
+    // webhook or redeem events from launching paid jobs while it is off.
+    if (!props.checkoutEnabled) return undefined
+    const target = props.testReportEngine
+    if (!target) {
+        throw new Error('Enabled test checkout requires a separate report engine URL and ARN')
+    }
+    const url = URL.canParse(target.url) ? new URL(target.url) : null
+    const sharedUrls = Object.values(REPORT_ENGINE).map(engine => new URL(engine.url).hostname)
+    const sharedArns = Object.values(REPORT_ENGINE).map(engine => engine.arn)
+    if (!url || url.protocol !== 'https:' || url.username || url.password || url.port
+        || url.pathname !== '/' || url.search || url.hash
+        || !/^[a-z0-9-]+\.lambda-url\.eu-west-1\.on\.aws$/.test(url.hostname)
+        || sharedUrls.includes(url.hostname)
+        || !/^arn:aws:lambda:eu-west-1:\d{12}:function:[A-Za-z0-9_-]+$/.test(target.arn)
+        || sharedArns.includes(target.arn)) {
+        throw new Error('Test report engine must have a separate Lambda Function URL and function ARN in eu-west-1')
+    }
+    return { url: url.origin, arn: target.arn }
 }
 
 export function validateTestCheckoutSite(props: Pick<CheckoutStackProps, 'environmentName' | 'siteUrl' | 'checkoutEnabled'>): void {
@@ -68,7 +119,12 @@ export class CheckoutStack extends cdk.Stack {
     ) {
         super(scope, id, props)
         if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
+        if (props.environmentName === 'Prod' && (props.suppressTestAlertSubscription || props.isolatedFixtureTest)) throw new Error('Production alert subscriptions cannot be suppressed or set to fixture mode')
+        if (props.suppressTestAlertSubscription && !props.isolatedFixtureTest) throw new Error('Suppressing test alerts requires isolated fixture mode')
+        if (Object.keys(props.stripeProducts ?? {}).some(name => !STRIPE_PRODUCT_ENV_NAMES.has(name))) throw new Error('stripeProducts contains an unsupported environment variable')
         validateTestCheckoutSite(props)
+        const reportEngine = resolveReportEngine(props)
+        const secretName = checkoutSecretName(props)
 
         const descriptionPrefix = `${props.environmentName} - Kreditrisker.se`
 
@@ -95,6 +151,12 @@ export class CheckoutStack extends cdk.Stack {
                 name: 'status',
                 type: dynamodb.AttributeType.STRING,
             },
+            projectionType: dynamodb.ProjectionType.ALL,
+        })
+        ordersTable.addGlobalSecondaryIndex({
+            indexName: 'WithdrawalIndex',
+            partitionKey: { name: 'withdrawalState', type: dynamodb.AttributeType.STRING },
+            sortKey: { name: 'withdrawalRequestedAt', type: dynamodb.AttributeType.STRING },
             projectionType: dynamodb.ProjectionType.ALL,
         })
 
@@ -138,11 +200,12 @@ export class CheckoutStack extends cdk.Stack {
         const appSecret = secretsmanager.Secret.fromSecretNameV2(
             this,
             'ReportCheckoutSecrets',
-            `kreditrisker-se-${props.environmentName.toLowerCase()}`
+            secretName
         )
 
-        const adminEmail =
-            props.reportAdminEmail ?? 'luottoriskiraportti202605@valuatum.com'
+        const adminEmail = props.isolatedFixtureTest
+            ? 'success@simulator.amazonses.com'
+            : props.reportAdminEmail ?? 'luottoriskiraportti202605@valuatum.com'
 
         // SES configuration set applied to every send. Suppression keeps hard
         // bounces and complaints from being re-mailed (protecting the shared
@@ -166,9 +229,9 @@ export class CheckoutStack extends cdk.Stack {
         const emailFailureTopic = new sns.Topic(this, 'EmailFailureTopic', {
             displayName: `${descriptionPrefix} SES adverse events`,
         })
-        emailFailureTopic.addSubscription(
-            new subscriptions.EmailSubscription(adminEmail)
-        )
+        if (!(props.environmentName === 'Test' && props.suppressTestAlertSubscription)) {
+            emailFailureTopic.addSubscription(new subscriptions.EmailSubscription(adminEmail))
+        }
         emailConfigurationSet.addEventDestination('EmailFailureEvents', {
             destination: ses.EventDestination.snsTopic(emailFailureTopic),
             events: [
@@ -179,6 +242,7 @@ export class CheckoutStack extends cdk.Stack {
         })
 
         const commonEnv: Record<string, string> = {
+            ...props.stripeProducts,
             ORDERS_TABLE: ordersTable.tableName,
             ORDERS_STATUS_INDEX: 'StatusIndex',
             CREDITS_TABLE: creditsTable.tableName,
@@ -187,22 +251,23 @@ export class CheckoutStack extends cdk.Stack {
             FROM_EMAIL: props.reportFromEmail ?? 'noreply@valuatum.com',
             ADMIN_EMAIL: adminEmail,
             SES_CONFIGURATION_SET: emailConfigurationSet.configurationSetName,
-            REPORT_ENGINE_URL: REPORT_ENGINE[props.environmentName].url,
+            REPORT_ENGINE_URL: reportEngine?.url ?? '',
             REPORT_ENGINE_REGION: 'eu-west-1',
             REPORT_ENGINE_USERNAME:
                 props.reportEngineUsername ?? 'kreditrisker.se',
             APP_SECRETS_ARN: appSecret.secretArn,
             NODE_OPTIONS: '--enable-source-maps',
             CONTACT_EMAIL: props.contactEmail ?? '',
-            ...props.stripeProducts,
             REPORT_CHECKOUT_ENABLED: props.checkoutEnabled ? '1' : '0',
             REPORT_TERMS_VERSION: props.termsVersion ?? '',
+            REPORT_ISOLATED_FIXTURE_TEST: props.environmentName === 'Test' && props.isolatedFixtureTest ? '1' : '0',
         }
 
         const makeFn = (
             name: string,
             entry: string,
-            timeout = 30
+            timeout = 30,
+            reservedConcurrentExecutions?: number
         ): NodejsFunction => {
             const logGroup = new logs.LogGroup(this, `${name}Logs`, {
                 retention: logs.RetentionDays.ONE_MONTH,
@@ -216,20 +281,15 @@ export class CheckoutStack extends cdk.Stack {
                 runtime: lambda.Runtime.NODEJS_22_X,
                 memorySize: 256,
                 timeout: cdk.Duration.seconds(timeout),
+                reservedConcurrentExecutions,
                 environment: commonEnv,
                 logGroup,
                 bundling: {
                     minify: true,
                     sourceMap: true,
-                    externalModules: [
-                        '@aws-sdk/client-dynamodb',
-                        '@aws-sdk/client-secrets-manager',
-                        '@aws-sdk/client-sesv2',
-                        '@aws-sdk/credential-provider-node',
-                        '@aws-sdk/lib-dynamodb',
-                        '@aws-sdk/protocol-http',
-                        '@aws-sdk/signature-v4',
-                    ],
+                    // The email adapter uses SES attachment support from the
+                    // installed SDK. Do not rely on Lambda's changing version.
+                    bundleAwsSDK: true,
                 },
             })
         }
@@ -241,11 +301,14 @@ export class CheckoutStack extends cdk.Stack {
         )
         const webhookFn = makeFn('WebhookFn', 'webhook.js')
         const redeemFn = makeFn('RedeemFn', 'redeem.js')
+        const withdrawalFn = makeFn('WithdrawalFn', 'withdrawal.js')
         const creditNotificationFn = makeFn(
             'CreditNotificationFn',
             'credit-notifications.js'
         )
-        const pollerFn = makeFn('ReportPollerFn', 'poller.js', 120)
+        // A run can last longer than its one-minute schedule. Serializing the
+        // function prevents overlapping runs from sending the same order twice.
+        const pollerFn = makeFn('ReportPollerFn', 'poller.js', 120, 1)
 
         appSecret.grantRead(createCheckoutFn)
         appSecret.grantRead(webhookFn)
@@ -253,6 +316,7 @@ export class CheckoutStack extends cdk.Stack {
         ordersTable.grantReadWriteData(webhookFn)
         ordersTable.grantReadWriteData(pollerFn)
         ordersTable.grantReadWriteData(redeemFn)
+        ordersTable.grantReadWriteData(withdrawalFn)
         creditsTable.grantReadWriteData(redeemFn)
         creditsTable.grantReadWriteData(webhookFn)
         creditsTable.grantReadWriteData(pollerFn)
@@ -260,30 +324,31 @@ export class CheckoutStack extends cdk.Stack {
 
         // Invoke the report engine's Function URL (SigV4). The engine owner must
         // ALSO grant access on their side — see report_generation_api.md.
-        const invokePolicy = new iam.PolicyStatement({
-            actions: ['lambda:InvokeFunctionUrl'],
-            resources: [REPORT_ENGINE[props.environmentName].arn],
-            conditions: {
-                StringEquals: {
-                    'lambda:FunctionUrlAuthType': 'AWS_IAM',
+        if (reportEngine) {
+            const invokePolicy = new iam.PolicyStatement({
+                actions: ['lambda:InvokeFunctionUrl'],
+                resources: [reportEngine.arn],
+                conditions: {
+                    StringEquals: {
+                        'lambda:FunctionUrlAuthType': 'AWS_IAM',
+                    },
                 },
-            },
-        })
-        const invokeViaUrlPolicy = new iam.PolicyStatement({
-            actions: ['lambda:InvokeFunction'],
-            resources: [REPORT_ENGINE[props.environmentName].arn],
-            conditions: {
-                Bool: { 'lambda:InvokedViaFunctionUrl': 'true' },
-            },
-        })
-        webhookFn.addToRolePolicy(invokePolicy)
-        webhookFn.addToRolePolicy(invokeViaUrlPolicy)
-        pollerFn.addToRolePolicy(invokePolicy)
-        pollerFn.addToRolePolicy(invokeViaUrlPolicy)
-        // /api/redeem starts a package-funded report itself, so it submits jobs
-        // exactly like the webhook does for a paid one.
-        redeemFn.addToRolePolicy(invokePolicy)
-        redeemFn.addToRolePolicy(invokeViaUrlPolicy)
+            })
+            const invokeViaUrlPolicy = new iam.PolicyStatement({
+                actions: ['lambda:InvokeFunction'],
+                resources: [reportEngine.arn],
+                conditions: {
+                    Bool: { 'lambda:InvokedViaFunctionUrl': 'true' },
+                },
+            })
+            webhookFn.addToRolePolicy(invokePolicy)
+            webhookFn.addToRolePolicy(invokeViaUrlPolicy)
+            pollerFn.addToRolePolicy(invokePolicy)
+            pollerFn.addToRolePolicy(invokeViaUrlPolicy)
+            // /api/redeem submits package-funded report jobs too.
+            redeemFn.addToRolePolicy(invokePolicy)
+            redeemFn.addToRolePolicy(invokeViaUrlPolicy)
+        }
 
         // Send report/alert mail. The poller is the only Lambda that emails, so
         // create-checkout and webhook deliberately get no SES permission. Scoped
@@ -326,6 +391,13 @@ export class CheckoutStack extends cdk.Stack {
                 ],
             })
         )
+        withdrawalFn.addToRolePolicy(new iam.PolicyStatement({
+            actions: ['ses:SendEmail'],
+            resources: [
+                cdk.Stack.of(this).formatArn({ service: 'ses', resource: 'identity', resourceName: 'valuatum.com' }),
+                cdk.Stack.of(this).formatArn({ service: 'ses', resource: 'configuration-set', resourceName: emailConfigurationSet.configurationSetName }),
+            ],
+        }))
 
         const reportApi = new apigwv2.HttpApi(this, 'ReportCheckoutApi', {
             apiName: 'dk-company-directory-report-checkout',
@@ -341,7 +413,7 @@ export class CheckoutStack extends cdk.Stack {
                 maxAge: cdk.Duration.hours(1),
             },
         })
-        reportApi.addRoutes({
+        const checkoutRoutes = reportApi.addRoutes({
             path: '/api/create-checkout',
             methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
             integration: new integrations.HttpLambdaIntegration(
@@ -364,6 +436,21 @@ export class CheckoutStack extends cdk.Stack {
                 'RedeemInt',
                 redeemFn
             ),
+        })
+        const withdrawalRoutes = reportApi.addRoutes({
+            path: '/api/withdrawal',
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new integrations.HttpLambdaIntegration('WithdrawalInt', withdrawalFn),
+        })
+        const stage = reportApi.defaultStage?.node.defaultChild as apigwv2.CfnStage
+        // RouteSettings references route keys, not resource IDs; CloudFormation
+        // otherwise creates the stage before the routes exist and rejects it.
+        for (const route of [...checkoutRoutes, ...withdrawalRoutes]) stage.node.addDependency(route)
+        stage.addPropertyOverride('RouteSettings', {
+            'POST /api/withdrawal': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 4 },
+            ...(props.isolatedFixtureTest ? {
+                'POST /api/create-checkout': { ThrottlingRateLimit: 0.5, ThrottlingBurstLimit: 2 },
+            } : {}),
         })
 
         // Poller runs ~every minute.
@@ -395,6 +482,62 @@ export class CheckoutStack extends cdk.Stack {
         creditNotificationAlarm.addAlarmAction(
             new cloudwatchActions.SnsAction(emailFailureTopic)
         )
+
+        // The poller catches errors per order so one broken delivery doesn't
+        // block the rest. Lambda Errors alone therefore misses those failures.
+        const pollerOrderErrors = new logs.MetricFilter(this, 'ReportPollerOrderErrors', {
+            logGroup: pollerFn.logGroup,
+            metricNamespace: `KreditriskerSE/${props.environmentName}`,
+            metricName: 'ReportOrderErrors',
+            filterPattern: logs.FilterPattern.literal('"poller: order error"'),
+            metricValue: '1',
+            defaultValue: 0,
+        })
+        const webhookPaymentErrors = new logs.MetricFilter(this, 'WebhookPaymentReviewErrors', {
+            logGroup: webhookFn.logGroup,
+            metricNamespace: `KreditriskerSE/${props.environmentName}`,
+            metricName: 'WebhookPaymentReviewRequired',
+            filterPattern: logs.FilterPattern.literal('"webhook: payment review required"'),
+            metricValue: '1', defaultValue: 0,
+        })
+        for (const [id, metric] of [
+            ['WebhookPaymentReviewAlarm', webhookPaymentErrors.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' })],
+            ['ReportPollerOrderErrorAlarm', pollerOrderErrors.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' })],
+            ['ReportPollerRuntimeErrorAlarm', pollerFn.metricErrors({ period: cdk.Duration.minutes(1) })],
+        ] as const) {
+            new cloudwatch.Alarm(this, id, {
+                metric,
+                threshold: 1,
+                evaluationPeriods: 1,
+                treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+            }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
+        }
+        for (const [id, fn] of [['WithdrawalApi', withdrawalFn], ['WithdrawalWorker', pollerFn]] as const) {
+            const metric = new logs.MetricFilter(this, `${id}Errors`, {
+                logGroup: fn.logGroup,
+                metricNamespace: `KreditriskerSE/${props.environmentName}`,
+                metricName: `${id}Errors`,
+                filterPattern: logs.FilterPattern.literal('"withdrawal: processing error"'),
+                metricValue: '1', defaultValue: 0,
+            })
+            new cloudwatch.Alarm(this, `${id}ErrorAlarm`, {
+                metric: metric.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' }),
+                threshold: 1, evaluationPeriods: 1,
+                treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+            }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
+        }
+        const manualRefunds = new logs.MetricFilter(this, 'WithdrawalManualRefunds', {
+            logGroup: pollerFn.logGroup,
+            metricNamespace: `KreditriskerSE/${props.environmentName}`,
+            metricName: 'WithdrawalManualRefundRequired',
+            filterPattern: logs.FilterPattern.literal('"withdrawal: manual refund required"'),
+            metricValue: '1', defaultValue: 0,
+        })
+        new cloudwatch.Alarm(this, 'WithdrawalManualRefundAlarm', {
+            metric: manualRefunds.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' }),
+            threshold: 1, evaluationPeriods: 1,
+            treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
 
         new cdk.CfnOutput(this, 'ReportCheckoutApiUrl', {
             value: reportApi.apiEndpoint,

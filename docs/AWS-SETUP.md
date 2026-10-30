@@ -77,8 +77,47 @@ credential (username `git`). Nothing in the Jenkinsfile needs editing: bucket,
 distribution, state URI and site origin are read from the
 `KreditriskerSiteStackProd` outputs at run time, the agent is `sweden-build`
 (it reaches sweden-db) and the API token is the Secret text credential
-`kreditrisker-se-api-token`. First load: `COMPANIES=all`. Every run rebuilds
-the search from the whole directory.
+`kreditrisker-se-api-token`. Use an explicit small company batch for tests. A
+`COMPANIES=all` run needs approval and a cost estimate first. Every run
+rebuilds the search from the whole directory.
+
+## Isolated checkout testing
+
+The shared report-engine TEST environment runs other work and must not be
+replaced for Swedish testing. The Swedish test checkout has no engine access by
+default. Enabling it requires `siteUrlTest` plus `testReportEngineUrl` and
+`testReportEngineArn` for a separate engine; the shared TEST and PROD engines
+are rejected. Verify that the supplied function, queues, storage, credentials
+and worker are isolated before using it. This configuration does not itself
+provision that engine.
+
+Use a dedicated Stripe sandbox for live integration tests. The existing test
+key belongs to an account with other checkout webhooks; completing a test
+payment there can trigger unrelated systems. Swedish test products and prices
+must be created in the isolated sandbox before connecting it.
+
+An enabled test checkout requires its own Secrets Manager name, passed as
+`testSecretName=kreditrisker-se-isolated-...`; do not overwrite the existing
+`kreditrisker-se-test` secret. For a simulator-only test, set
+`reportAdminEmailTest=success@simulator.amazonses.com`,
+`isolatedFixtureTest=1` and `suppressTestAlertSubscription=1` to avoid emailing the normal operations
+address. The alarms still exist but have no email subscriber in this mode;
+inspect logs and alarm states directly. Never use this setting for a real
+customer environment. Fixture mode permits only company `0020001012`, the
+Basic product and the SES success simulator recipient in Checkout and webhook
+events; package redemption is disabled. The production stack always retains
+its subscription.
+
+Turning off `checkoutEnabledTest` also removes test-engine access, including
+for ongoing test orders. Finish test orders first: an order with a job ID
+cannot be polled or time out while its engine is disconnected, and may need
+manual cleanup or reconnection to the same engine. In production the switch
+still stops only new sessions so existing orders can finish.
+
+For a no-network checkout flow test, run `npm test` in `backend/`. The
+`isolated-checkout-flow.test.js` test uses in-memory Stripe, engine, order and
+email substitutes and blocks network transports. It does not establish real
+Stripe, AWS or report-generation behavior.
 
 ## 5. Report checkout (only when reports are launched)
 
@@ -86,25 +125,34 @@ Complete the legal, privacy, report-content, payment, delivery and consumer-term
 launch gates first. Swedish reports use the Finnish credit-risk model; verify its
 outputs for Swedish companies as part of the report review before opening sales.
 
-1. Create the Stripe products with SEK, one-time, VAT-exclusive default prices:
-   29 kr for the basic report and 69 kr for the AI report. The backend checks
-   these amounts and tax treatment against `backend/src/lib/report-price-targets.json`.
-   Verify Stripe Tax, registrations, and customer-facing total prices before launch.
-   Create the secret:
+1. The live Stripe basic product `prod_VXJrnLn4qkC2Nv` has a SEK 29.00,
+   one-time, VAT-exclusive default price and tax code `txcd_10000000`. It is not
+   yet connected to checkout. A live, explicitly internal, unpaid Checkout preview
+   on 30 October 2026 with Sweden as the billing country showed 25.5% VAT and a
+   total of SEK 36.40; the preview session was then expired without a payment.
+   This does not test report generation or delivery. The AI product has not been
+   created; its agreed net price is SEK 69.00. The backend checks amounts and tax
+   treatment against `backend/src/lib/report-price-targets.json`. Confirm the
+   company's tax registration and treatment for each customer before launch.
+   The `kreditrisker-se-prod` secret already exists. On a new environment, create
+   its secret out of band; for an existing one, update the necessary fields instead:
    ```bash
    aws secretsmanager create-secret --name kreditrisker-se-prod \
      --secret-string '{"STRIPE_SECRET_KEY":"sk_...","STRIPE_WEBHOOK_SECRET":"whsec_...","VALUATUM_REST_URL":"https://...","VALUATUM_REST_TOKEN":"..."}'
    ```
-2. Add to the context: `contactEmail`, and
-   `stripeProductsProd` = `{"STRIPE_PRODUCT_SE_AI":"prod_...","STRIPE_PRODUCT_SE_BASIC":"prod_..."}`.
+2. Add to the context: `contactEmail` (Valuatum's public support address is
+   `contact25@valuatum.com`), and for a basic-only launch
+   `stripeProductsProd` = `{"STRIPE_PRODUCT_SE_BASIC":"prod_VXJrnLn4qkC2Nv"}`.
    A product without an id is never sold.
 3. `cd backend && npm ci && cd ../aws-infra && npx cdk deploy KreditriskerCheckoutStackProd`
 4. Put the stack's `ReportCheckoutApiDomain` output in `checkoutApiProd` and
    redeploy `KreditriskerSiteStackProd` so `/api/*` reaches it.
 5. In Stripe, point a webhook at the direct `…/api/webhook` URL (not through
    CloudFront) and store its signing secret in the secret above.
-6. Deploy the reviewed report-engine version and verify generated Swedish
-   reports, including their credit-model and fraud-analysis outputs, before sales.
+6. Deploy the reviewed report-engine version and verify a generated Swedish
+   sample of each product before enabling that product. For Basic, verify its
+   credit-model outputs and confirm fraud analysis is absent. For AI, also verify
+   its fraud-analysis outputs and complete the separate fraud privacy gate.
 7. Once content, payment, delivery and legal checks pass, set CDK context
    `checkoutEnabledProd=1` and `termsVersionProd` to the approved terms version,
    then deploy the checkout stack. Without this switch
@@ -114,8 +162,9 @@ outputs for Swedish companies as part of the report review before opening sales.
    `SE_CHECKOUT=1`, `SE_TERMS_VERSION` matching `termsVersionProd`, and the products
    set to `live`, with `VERIFIED_PRICES` in
    `src/config/site.ts` set to the verified VAT-inclusive customer prices.
-   With a 25% VAT rate they would be 36.25 / 86.25 kr, but confirm the actual
-   tax calculation and any country-specific differences before setting them.
+   The preview above establishes the current Swedish consumer example, not
+   every buyer's tax treatment. Check country-specific and business-customer
+   differences before setting and displaying a verified price.
 
 ## Analytics
 

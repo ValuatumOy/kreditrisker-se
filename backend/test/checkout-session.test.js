@@ -68,7 +68,7 @@ test('Stripe return URLs use SITE_URL in test and production despite request ori
             assert.equal(success.origin, siteUrl)
             assert.equal(success.pathname, cancelPath)
             assert.equal(success.searchParams.get('checkout'), 'success')
-            assert.equal(success.searchParams.get('session_id'), '{CHECKOUT_SESSION_ID}')
+            assert.equal(success.searchParams.has('session_id'), false, 'Basic reference is delivered by email instead of request URLs')
             assert.equal(params.cancel_url, `${siteUrl}${cancelPath}`)
         }
     } finally {
@@ -87,6 +87,18 @@ test('checkout refuses orders without the current terms version', async () => {
         })
         assert.equal(response.statusCode, 400)
     }
+})
+
+test('real checkout rejects personnummer, synthetic numbers and invalid organisation numbers', async () => {
+    const initialCount = sessions.length
+    for (const businessId of ['800101-1231', '002000-1012', '556036-9200', '', undefined]) {
+        const response = await handler({
+            requestContext: { http: { method: 'POST' } },
+            body: JSON.stringify({ reportType: 'se_credit_risk', businessId, acceptedTermsVersion: 'test-v1' }),
+        })
+        assert.equal(response.statusCode, 400)
+    }
+    assert.equal(sessions.length, initialCount)
 })
 
 test('checkout stays closed at the API even when product IDs exist', async () => {

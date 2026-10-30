@@ -25,8 +25,9 @@ export const SITE = {
         businessId: '1612398-8',
         country: 'Finland',
         url: 'https://www.valuatum.com/',
-        /** Swedish support address; not decided yet. */
-        email: env('SE_CONTACT_EMAIL'),
+        email: env('SE_CONTACT_EMAIL') ?? 'contact25@valuatum.com',
+        phone: '+358 45 123 0308',
+        address: 'Linnanrakentajantie 6–8 C, Suite 15, 00880 Helsinki, Finland',
     },
     /** Data as-of date for freshness. Fixed in tests; build date otherwise. */
     asOf: env('SE_DATA_AS_OF') ?? new Date().toISOString().slice(0, 10),
@@ -55,6 +56,8 @@ export const FLAGS = {
     reportApiBase: env('PUBLIC_SE_REPORT_API'),
     /** Build is a staging preview: forces noindex and shows a banner. */
     preview: flag('SE_PREVIEW'),
+    /** Allow the synthetic fixture in an explicitly configured preview. */
+    previewFixtureCheckout: flag('SE_PREVIEW_FIXTURE'),
 } as const
 
 export type ReportMode = 'unavailable' | 'sample' | 'live'
@@ -70,7 +73,10 @@ export const APPROVED_PRICES = {
  * Verified prices, filled in only when pricing is decided and tested end to
  * end. Empty = the UI never shows a price.
  */
-export const VERIFIED_PRICES: Partial<Record<'basic' | 'ai', { amountSek: number; vatIncluded: boolean; verifiedAt: string }>> = {}
+export const VERIFIED_PRICES: Partial<Record<'basic' | 'ai', { amountSek: number; vatIncluded: boolean; verifiedAt: string }>> = {
+    // Stripe's live checkout preview for a Swedish consumer, 29 kr + 25.5% VAT.
+    basic: { amountSek: 36.4, vatIncluded: true, verifiedAt: '2026-10-30' },
+}
 
 /** Site is allowed to be indexed at all. */
 export const siteIndexable = FLAGS.indexing && !FLAGS.preview
@@ -79,6 +85,8 @@ if (FLAGS.checkout && (FLAGS.reportAdapter !== 'http' || !FLAGS.reportApiBase))
     throw new Error('SE_CHECKOUT requires PUBLIC_SE_REPORT_ADAPTER=http and PUBLIC_SE_REPORT_API')
 if (FLAGS.checkout && !env('SE_TERMS_VERSION'))
     throw new Error('SE_CHECKOUT requires SE_TERMS_VERSION for the approved purchase terms')
+if (FLAGS.previewFixtureCheckout && !FLAGS.preview)
+    throw new Error('SE_PREVIEW_FIXTURE requires SE_PREVIEW')
 if (FLAGS.reportAdapter === 'mock' && siteIndexable)
     throw new Error('The mock report adapter may only be used in non-indexed preview builds')
 for (const p of ['basic', 'ai'] as const)

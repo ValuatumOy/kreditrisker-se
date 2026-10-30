@@ -1,0 +1,114 @@
+---
+import Base from '../layouts/Base.astro'
+import NightBand from '../components/NightBand.astro'
+import { FLAGS, SITE } from '../config/site.ts'
+---
+
+<Base title="Ångra köp" description="Meddela att du vill ångra ditt köp av en kreditriskrapport." path="/angra-kop/" noindex>
+    <NightBand>
+        <div class="withdrawal" data-withdrawal data-api={FLAGS.reportApiBase ?? '/api/'}>
+            <h1>Ångra köp</h1>
+            <p>Ange ordernumret och samma e-postadress som vid köpet av din kreditriskrapport. Ordernumret finns i beställningsmejlet.</p>
+            <p>Du kan också använda ångerblanketten i beställningsmejlet.</p>
+            <form data-details>
+                <label for="withdrawal-order">Ordernummer</label>
+                <input id="withdrawal-order" name="order" type="text" required maxlength="260" autocomplete="off" />
+                <label for="withdrawal-email">E-postadress vid köpet</label>
+                <input id="withdrawal-email" name="email" type="email" required maxlength="254" autocomplete="email" />
+                <button class="btn" type="submit">Fortsätt</button>
+            </form>
+            <div data-confirm hidden>
+                <p>Du vill ångra köpet för order <strong data-confirm-order></strong>.</p>
+                <p>En bekräftelse skickas till <span data-confirm-email></span>. Eventuell återbetalning hanteras separat.</p>
+                <label class="receipt-choice"><input type="checkbox" data-receipt-method required /> Jag bekräftar att jag vill få mottagningsbeviset via e-post.</label>
+                <button class="btn" type="button" data-submit>Bekräfta att jag ångrar köpet</button>
+                <button class="btn btn--quiet" type="button" data-back>Ändra uppgifter</button>
+            </div>
+            <p data-error role="alert" hidden></p>
+            <div data-receipt role="status" hidden>
+                <h2>Din begäran är registrerad</h2>
+                <p>Referens: <span data-receipt-reference></span></p>
+                <p>Mottagen: <span data-receipt-time></span></p>
+                <p data-receipt-mail></p>
+                <p>Detta bekräftar din begäran. En eventuell återbetalning är inte genomförd ännu.</p>
+            </div>
+            <p>Du kan också kontakta <a href={`mailto:${SITE.provider.email}`}>{SITE.provider.email}</a>.</p>
+        </div>
+    </NightBand>
+    <script is:inline>
+        // Remove the reference before analytics or outbound links can use it.
+        if (location.search) history.replaceState(null, '', location.pathname)
+    </script>
+</Base>
+
+<script>
+    const root = document.querySelector<HTMLElement>('[data-withdrawal]')!
+    const details = root.querySelector<HTMLFormElement>('[data-details]')!
+    const confirmation = root.querySelector<HTMLElement>('[data-confirm]')!
+    const receipt = root.querySelector<HTMLElement>('[data-receipt]')!
+    const error = root.querySelector<HTMLElement>('[data-error]')!
+    const submit = root.querySelector<HTMLButtonElement>('[data-submit]')!
+    const receiptMethod = root.querySelector<HTMLInputElement>('[data-receipt-method]')!
+    let sessionId = ''
+    let email = ''
+    details.addEventListener('submit', event => {
+        event.preventDefault()
+        if (!details.reportValidity()) return
+        sessionId = (details.elements.namedItem('order') as HTMLInputElement).value.trim()
+        email = (details.elements.namedItem('email') as HTMLInputElement).value.trim()
+        root.querySelector('[data-confirm-order]')!.textContent = sessionId
+        root.querySelector('[data-confirm-email]')!.textContent = email
+        details.hidden = true
+        confirmation.hidden = false
+        error.hidden = true
+        submit.focus()
+    })
+    root.querySelector('[data-back]')!.addEventListener('click', () => {
+        confirmation.hidden = true
+        details.hidden = false
+        details.querySelector('input')!.focus()
+    })
+    submit.addEventListener('click', async () => {
+        if (submit.disabled) return
+        if (!receiptMethod.reportValidity()) return
+        submit.disabled = true
+        error.hidden = true
+        try {
+            const response = await fetch(new URL('withdrawal', new URL(root.dataset.api!, location.origin)), {
+                method: 'POST', headers: { 'content-type': 'application/json' }, referrerPolicy: 'no-referrer',
+                body: JSON.stringify({ sessionId, email, confirmed: true, receiptMethod: 'email' }),
+            })
+            if (!response.ok) throw new Error(response.status === 404
+                ? 'Kontrollera ordernumret och e-postadressen. Vi kunde inte hitta en matchande beställning av kreditriskrapporten.'
+                : 'Begäran kunde inte bekräftas. Försök igen eller kontakta oss. Ange samma uppgifter om du försöker igen.')
+            const result = await response.json()
+            if (!result.received || typeof result.requestId !== 'string' || typeof result.receivedAt !== 'string') throw new Error('Begäran kunde inte bekräftas. Försök igen eller kontakta oss.')
+            root.querySelector('[data-receipt-reference]')!.textContent = result.requestId
+            root.querySelector('[data-receipt-time]')!.textContent = new Date(result.receivedAt).toLocaleString('sv-SE')
+            root.querySelector('[data-receipt-mail]')!.textContent = result.receiptEmailAccepted
+                ? 'Vi har skickat en bekräftelse till e-postadressen du angav.'
+                : 'E-postbekräftelsen kunde inte skickas ännu. Vi försöker igen. Spara referensen ovan.'
+            confirmation.hidden = true
+            receipt.hidden = false
+        } catch (failure) {
+            error.textContent = failure instanceof Error ? failure.message : 'Begäran kunde inte bekräftas. Försök igen.'
+            error.hidden = false
+        } finally {
+            submit.disabled = false
+        }
+    })
+</script>
+
+<style>
+    .withdrawal { max-width: 640px; padding-block: 32px; }
+    .withdrawal p { margin-block: 16px; overflow-wrap: anywhere; }
+    form, [data-confirm] { display: grid; gap: 14px; margin-block: 24px; }
+    [hidden] { display: none !important; }
+    label { font-weight: 600; }
+    input:not([type='checkbox']) { width: 100%; min-height: 48px; padding: 10px 12px; font: inherit; border: 1px solid var(--rule-2); background: var(--sheet); border-radius: var(--radius); }
+    .receipt-choice { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; }
+    .receipt-choice input { margin-top: 4px; width: 20px; height: 20px; flex-shrink: 0; }
+    button { justify-self: start; }
+    [data-error] { color: var(--red); }
+    :is(input, button):focus-visible { outline: 2px solid var(--blue); outline-offset: 3px; }
+</style>

@@ -7,49 +7,104 @@ const analytics = Boolean(import.meta.env.PUBLIC_GA_TRACKING_ID)
 
 <Page
     title="Integritetspolicy"
-    description="Hur personuppgifter behandlas på sajten och i företagsprofilerna."
+    description="Vilka personuppgifter Valuatum Oy behandlar vid besök och rapportköp, varför de behövs och vilka rättigheter du har."
     path="/integritet/"
-    lede="Den här sidan beskriver vilka personuppgifter som behandlas, varför och vilka rättigheter du har."
-    draft
+    lede="Här beskriver vi hur vi använder personuppgifter när du besöker sajten, köper en rapport eller kontaktar oss."
 >
-    <Doc toc={[['ansvarig', 'Personuppgiftsansvarig'], ['besokare', 'Besökare'], ['kakor', 'Kakor och statistik'], ['profiler', 'Uppgifter i företagsprofiler'], ['bestallningar', 'Beställningar'], ['rattigheter', 'Dina rättigheter']]}>
-        <h2 id="ansvarig">Personuppgiftsansvarig</h2>
-        <p>{SITE.provider.name} ({SITE.provider.businessId}), {SITE.provider.country}, är personuppgiftsansvarig för behandlingen som beskrivs här.</p>
-
-        <h2 id="besokare">Besökare</h2>
+    <Doc toc={[['ansvarig', 'Ansvarig och kontakt'], ['bestallningar', 'Beställningar'], ['andamal', 'Ändamål och rättslig grund'], ['mottagare', 'Leverantörer och mottagare'], ['lagring', 'Hur länge uppgifterna sparas'], ['kakor', 'Kakor och statistik'], ['profiler', 'Företagsprofiler'], ['rattigheter', 'Dina rättigheter']]}>
+        <h2 id="ansvarig">Ansvarig och kontakt</h2>
         <p>
-            Webbservern loggar tekniska uppgifter som IP-adress och tidpunkt för drift och säkerhet. Sajten visar ingen annonsering.
+            {SITE.provider.name}, FO-nummer {SITE.provider.businessId}, {SITE.provider.country}, är personuppgiftsansvarig för vår behandling.
+            Kontakta oss på <a href={`mailto:${SITE.provider.email}`}>{SITE.provider.email}</a>, telefon
+            <a href={`tel:${SITE.provider.phone.replaceAll(' ', '')}`}>{SITE.provider.phone}</a> eller {SITE.provider.address}.
+        </p>
+
+        <h2 id="bestallningar">Beställningar</h2>
+        <p>
+            Du anger en e-postadress för leveransen. I Stripe-kassan lämnar du de uppgifter som behövs för betalning och skatteberäkning,
+            till exempel namn, faktureringsadress och betalningsuppgifter. Ett eventuellt momsregistreringsnummer är frivilligt.
+            Utan en e-postadress och de uppgifter som krävs i kassan kan vi inte genomföra och leverera köpet.
+        </p>
+        <p>
+            Vårt ordersystem sparar e-postadress, namn som Stripe lämnar till oss, order- och betalningsreferenser, belopp, valuta och betalningsstatus,
+            valt företag och rapport, språk, tidsstämplar samt vilken villkorsversion du godkänt.
+            Det sparar också status för generering och e-postleverans samt uppgifter om en eventuell ångerbegäran och hur den har hanterats.
+            Fullständiga kortuppgifter lagras inte i vårt ordersystem.
+        </p>
+        <p>Om du kontaktar oss behandlar vi dina kontaktuppgifter och innehållet i ditt meddelande för att kunna hantera ärendet.</p>
+
+        <h2 id="andamal">Ändamål och rättslig grund</h2>
+        <ul>
+            <li>För att ta emot beställningen, hantera betalningen, skicka bekräftelse och rapport samt hantera köpärendet behöver vi uppfylla avtalet med dig (artikel 6.1 b i GDPR).</li>
+            <li>Uppgifter som krävs för bokföring, skatteredovisning och lagstadgade konsumenträttigheter behandlas för att fullgöra rättsliga förpliktelser (artikel 6.1 c).</li>
+            <li>När du företräder ett företag behandlar vi dina kontaktuppgifter för vårt berättigade intresse av att hantera företagets beställning och hålla kontakt med dess företrädare (artikel 6.1 f).</li>
+            <li>Tekniska uppgifter om anrop, fel, orderstatus och leveranser används för vårt berättigade intresse av att driva tjänsten säkert, felsöka och utreda leverans- eller betalningsproblem (artikel 6.1 f).</li>
+        </ul>
+        <p>Beställningsuppgifterna används inte för nyhetsbrev eller annonsering i rapportköpet.</p>
+
+        <h2 id="mottagare">Leverantörer och mottagare</h2>
+        <p>
+            Stripe hanterar betalning och skatteberäkning. Vi lämnar e-postadressen, vald produkt och orderuppgifter till Stripe och får tillbaka uppgifter om köpet och betalningsstatus.
+            Stripe behandlar också personuppgifter för egna skyldigheter, bland annat betalningssäkerhet och regelefterlevnad.
+            Läs <a href="https://stripe.com/privacy">Stripes integritetspolicy</a> för information om Stripes behandling, lagring och internationella överföringar.
+        </p>
+        <p>
+            Vi använder Amazon Web Services (AWS) för ordersystem, rapportgenerering och utskick via Amazon SES.
+            E-postadressen och mejlets innehåll behandlas för att skicka beställningsbekräftelsen, rapporten och meddelanden om ångerbegäran.
+            Rapportgenereringen får uppgifter om det valda företaget och rapportinställningarna; köparens e-postadress ingår inte i det anropet.
+        </p>
+        <p>För rapportens automatiska kommentarer används AI-tjänster från Google och OpenRouter. De får uppgifter om det valda företaget och dess ekonomiska underlag.</p>
+        <p>
+            Behöriga personer hos oss kan ta del av orderuppgifter för support, felsökning och återbetalning.
+            Uppgifter kan också behöva lämnas till myndigheter när lag kräver det.
+        </p>
+
+        <h2 id="lagring">Hur länge uppgifterna sparas</h2>
+        <p>
+            Lagringstiden avgörs av vad uppgifterna behövs till. Order- och leveransuppgifter behövs under betalning, generering och leverans,
+            och därefter så länge de behövs för att hantera ångerrätt, reklamationer, återbetalningar eller en pågående tvist.
+            Att rapporten har levererats eller att ångerfristen har gått ut innebär därför inte att alla uppgifter om köpet kan raderas.
+        </p>
+        <p>
+            Uppgifter som utgör bokförings- eller skatteunderlag måste bevaras under den tid som tillämplig lag kräver.
+            Övriga uppgifter ska inte sparas längre än vad som behövs för respektive ändamål. En begäran om radering bedöms därför utifrån
+            vilka uppgifter som fortfarande behövs för köpärendet, rättsliga skyldigheter eller rättsliga anspråk.
+            Du kan kontakta oss för besked om vilka uppgifter om just ditt köp som sparas och varför.
         </p>
 
         <h2 id="kakor">Kakor och statistik</h2>
         {
             analytics ? (
                 <p>
-                    Med ditt samtycke använder vi Google Analytics (Google Ireland Ltd) för att se hur sajten används, till exempel vilka sidor som besöks. Det sätter kakor
-                    (_ga, _ga_*) som sparas i upp till två år. Utan samtycke laddas inget statistikverktyg och inga sådana kakor sätts. Ditt val sparas i webbläsarens lokala
-                    lagring under nyckeln kreditrisker_consent. Du kan ändra eller återkalla samtycket när som helst via <em>Cookieinställningar</em> längst ner på sidan.
+                    Med ditt samtycke använder vi Google Analytics för besöksstatistik, till exempel vilka sidor som besöks (artikel 6.1 a i GDPR).
+                    Verktyget laddas först när du godkänner och kan då sätta statistikkakor. Ditt val sparas i webbläsarens lokala lagring.
+                    Du kan återkalla samtycket via <em>Cookieinställningar</em> längst ner på sidan. Läs även
+                    <a href="https://policies.google.com/privacy">Googles integritetspolicy</a> om behandlingen av statistikuppgifter och internationella överföringar.
                 </p>
             ) : (
-                <p>Sajten använder inga kakor för statistik eller annonsering i nuvarande version. Om statistik läggs till inhämtas ditt samtycke först.</p>
+                <p>Sajten använder inga kakor för statistik eller annonsering i nuvarande version.</p>
             )
         }
+        <p>Stripe-kassan har egen teknik för betalning och säkerhet. Läs <a href="https://stripe.com/legal/cookies-policy">Stripes information om kakor</a>.</p>
 
-        <h2 id="profiler">Uppgifter i företagsprofiler</h2>
+        <h2 id="profiler">Företagsprofiler</h2>
         <p>
-            Profilerna gäller juridiska personer. Enskilda näringsidkare, vars organisationsnummer är ett personnummer, publiceras inte. Namn på styrelseledamöter och andra
-            företrädare visas inte i nuvarande version. Den rättsliga grunden för publicering av företagsuppgifter ska fastställas innan lansering.
-        </p>
-
-        <h2 id="bestallningar">Beställningar</h2>
-        <p>
-            När rapporter kan beställas behandlas e-postadress och betalningsuppgifter för att leverera rapporten och uppfylla bokföringskrav. Betalningen hanteras av en
-            betalleverantör som anges här före lansering.
+            Företagsprofilerna visar uppgifter om juridiska personer och deras ekonomi. Enskilda näringsidkare, vars organisationsnummer är ett personnummer,
+            publiceras inte i denna version. Profilerna har inga fält för namn på styrelseledamöter eller andra företrädare.
+            Hör av dig om du anser att en uppgift i en profil identifierar dig som privatperson eller behöver rättas.
         </p>
 
         <h2 id="rattigheter">Dina rättigheter</h2>
         <p>
-            Du har rätt att få veta vilka uppgifter om dig som behandlas, att få fel rättade och i vissa fall att få uppgifter raderade eller att invända mot behandlingen. Du kan
-            klaga hos Integritetsskyddsmyndigheten (IMY) i Sverige eller dataombudsmannen i Finland.
+            Du kan begära tillgång till dina personuppgifter och få felaktiga uppgifter rättade. Beroende på förutsättningarna kan du också begära radering,
+            begränsning av behandlingen och dataportabilitet. Du kan invända mot behandling som bygger på berättigat intresse.
+            Om behandlingen bygger på samtycke kan du återkalla det; det påverkar inte behandling som redan skett med stöd av samtycket.
+        </p>
+        <p>
+            Skriv till <a href={`mailto:${SITE.provider.email}`}>{SITE.provider.email}</a> för att använda dina rättigheter.
+            Vi kan behöva kontrollera din identitet för att skydda uppgifterna och svarar normalt inom en månad.
+            Du har rätt att klaga hos <a href="https://www.imy.se/">Integritetsskyddsmyndigheten (IMY)</a> i Sverige eller
+            <a href="https://tietosuoja.fi/sv/framsida">dataombudsmannen</a> i Finland.
         </p>
     </Doc>
 </Page>

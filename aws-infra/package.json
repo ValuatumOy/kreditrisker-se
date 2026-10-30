@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "cdk": "cdk",
-    "synth": "cdk synth --quiet"
+    "synth": "cdk synth --quiet",
+    "test": "node --require ts-node/register --test test/*.test.ts"
   },
   "devDependencies": {
     "@types/node": "24.12.2",

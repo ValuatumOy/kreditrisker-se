@@ -1,7 +1,7 @@
 # Report checkout backend
 
-Ported from the Danish directory (creditreports.dk), where it runs in
-production. The flow is unchanged; the Swedish differences are:
+Ported from the Danish directory (creditreports.dk). The Swedish flow includes
+separate purchase confirmation and withdrawal handling. Its main settings are:
 
 - products `se_ai_credit_risk`, `se_credit_risk` and their 3-report bundles, in SEK;
   a product is sold only when its Stripe product id is set (`STRIPE_PRODUCT_SE_*`),
@@ -12,8 +12,7 @@ production. The flow is unchanged; the Swedish differences are:
 - `kreditrisker.se` origins, secret `kreditrisker-se-<env>`, no hardcoded promotion codes
 - the order page prefills the buyer's email in Stripe Checkout
 
-Deployment: docs/AWS-SETUP.md step 5. The rest of this file describes the
-shared design, with Danish examples.
+Deployment: `../docs/AWS-SETUP.md` step 5.
 
 ## Architecture
 
@@ -34,7 +33,7 @@ Browser ─┬─ /*                  → S3 (static Astro)
                           customer pays on Stripe-hosted Checkout                 │
                                                                                   ▼
 Stripe ──→ POST /api/webhook  (DIRECT API Gateway URL, NOT via CloudFront) → webhook Lambda
-                                              │ submit generation job, persist order, 200 fast
+                                              │ persist order, return 200
                                               ▼
                                         DynamoDB orders table
                                               ▲
@@ -56,8 +55,8 @@ CloudFront so it is same-origin (no CORS).
 | Lambda | Trigger | Responsibility |
 | --- | --- | --- |
 | `create-checkout` | `POST /api/create-checkout` | Look up the product **server-side** (price + label never trusted from the client), create a manual-capture Stripe Checkout session with `reportType` + `lang` + `reportLang` + company params in metadata, return `{ url }`. |
-| `webhook` | `POST /api/webhook` (Stripe) | Verify signature. On `checkout.session.completed`: claim an order row (idempotent on `session.id`), submit the generation job, record `jobId`, return `200`. No polling/capture/email here. |
-| `poller` | EventBridge schedule (~1 min) | For each `GENERATING` order, poll the engine job, then capture (DONE → email PDF) or cancel (FAILED/timeout → admin alert) the manual-capture PaymentIntent. |
+| `webhook` | `POST /api/webhook` (Stripe) | Verify signature and claim an order row idempotently. Basic orders wait for confirmation before the poller submits the job. |
+| `poller` | EventBridge schedule (~1 min) | Send Basic order confirmation, submit and poll the job, then capture and email on success or cancel the authorization on failure. |
 
 ## Two languages: `lang` vs `reportLang`
 
@@ -65,21 +64,17 @@ They are independent and must not be collapsed into one field.
 
 | Field | Values | Controls |
 | --- | --- | --- |
-| `lang` | `da` \| `en` (default `da`) | The **buyer's** language: Stripe Checkout copy, the receipt, and the delivery email. Taken from the page the buyer was on. |
-| `reportLang` | `da` \| `en` (default `en`) | The language of the **generated PDF**. Picked in the purchase modal, which preselects the page language but lets the buyer change it. |
+| `lang` | `sv` \| `en` (default `sv`) | The buyer's language for Stripe Checkout and emails. |
+| `reportLang` | `sv` \| `en` (default `sv`) | The language of the generated PDF. The current Swedish site sends `sv`. |
 
-So a Danish-UI buyer can order an English PDF: Stripe and the email stay Danish,
-only the attachment is English. The chosen report language is **disclosed** beside
-Stripe's payment button using Checkout `custom_text.submit`, and repeated in the
-delivery email — always written in `lang`, naming `reportLang`. A missing
-`reportLang` normalizes to `en`, so sessions created by page builds that predate
-the selector still deliver what they advertised.
+The chosen report language is disclosed beside Stripe's payment button and in
+the delivery email, written in `lang`. A missing `reportLang` normalizes to `sv`.
 
 `reportLang` reaches both generators as `params.lang`
 (`buildReportParams()` in `lib/products.js`), which is what the poller and the
 report engine read. The REST endpoint's language code is mapped in
 `REST_LANG_CODES` — identity today; change it in that one place if the endpoint
-ever wants a different code than `da`.
+ever wants a different code than `sv`.
 
 ## Pricing source
 
@@ -106,44 +101,84 @@ Stripe; their prices have not been decided or prepared for launch.
 customer **authorizes but is not charged** at payment time.
 
 - Generation `DONE` → **capture** the PaymentIntent (then email the PDF).
-- Generation `FAILED` or timed out → **cancel** the PaymentIntent, releasing the
-  hold — **no charge is ever made**. An admin alert is emailed; there is no
-  customer-facing failure email.
+- Generation `FAILED` or timed out → the poller requests cancellation of the
+  PaymentIntent and sends an admin alert once cancellation is confirmed. If the
+  payment state is uncertain, operations must investigate it.
+- A report-engine submission can succeed even if its response is lost. In that
+  case the order claim is retained so webhook retries do not submit another job.
+  If no job id is recorded, the poller eventually cancels the authorization (or
+  releases the reserved bundle credit) and alerts an admin. The original job
+  might still be running; check the engine before a manual retry.
+- The poller is limited to one concurrent Lambda execution. This prevents
+  overlapping scheduled runs, but an email accepted by SES immediately before
+  a crash can still be sent again on retry; delivery is not exactly once.
+- A successful generation is charged before SES accepts the email. If sending
+  fails, the order stays `GENERATING` and the poller retries without charging it
+  again. Per-order and poller-runtime errors also raise CloudWatch alarms to the
+  SES-failure SNS topic; its email subscription must be confirmed and monitored.
+  There is no automatic refund or retry limit for a persistent sending failure.
+  SES acceptance also does not prove final delivery; later bounces and complaints
+  require monitoring and manual follow-up. These are release requirements, not a
+  guarantee that every failure is automatically refunded.
+
+Before opening sales, assign an owner to the SNS alerts and agree the delivery
+and refund procedure. For an order-error alarm, find `poller: order error` in
+the poller logs around the alarm time and inspect every affected session ID.
+An alarm that remains in ALARM does not send a new notice for each later error.
+For a runtime-error alarm, inspect the poller logs; there may be no session ID.
+SES bounce notifications carry the session ID in `mail.tags.sessionId`.
+
+Use the session ID to inspect the order, report job, SES events and Stripe
+PaymentIntent. If payment was captured but delivery failed or is uncertain,
+arrange redelivery or a Stripe refund after checking what happened. A captured
+payment cannot be released by canceling its authorization; SES timeouts can
+also leave delivery uncertain. Do not submit a new report job just to retry an
+email.
+
+### Closing a withdrawal after a manual refund
+
+The withdrawal worker leaves a captured payment in `REVIEW_REQUIRED`; it does
+not issue a refund. An operator must check the order and issue any required refund
+in Stripe. After Stripe reports the full refund as succeeded, run the following
+with AWS credentials authorized for the intended environment:
+
+```powershell
+$env:AWS_REGION = 'eu-west-1'
+$env:ORDERS_TABLE = '<OrdersTableName from the intended checkout stack>'
+$env:APP_SECRETS_ARN = '<ReportCheckoutSecretArn from the same stack>'
+node scripts/close-withdrawal.js '<Checkout session ID>'
+```
+
+The command never creates a refund. It reads the specific order and verifies
+that Stripe reports its entire captured amount refunded before conditionally
+marking the review item `CLOSED`. It refuses incomplete, pending or mismatched
+refunds and concurrent changes. Do not put a Stripe secret key in the command
+line. The operator must monitor the alerts and investigate failures.
 
 ### Stripe Tax
 
-The advertised single-report price is VAT-inclusive, so the Product's default
-Price must use `tax_behavior: 'inclusive'`. With
-`automatic_tax: { enabled: true }`, Checkout collects the customer's location
-and breaks the applicable VAT out of that total per jurisdiction.
+The approved single-report targets are 29 / 69 SEK before VAT, so their Stripe
+Prices must use `tax_behavior: 'exclusive'`. Checkout uses
+`automatic_tax: { enabled: true }`. Verify the final consumer-facing price and
+the account's tax registrations before enabling sales.
 
-This is a **Finnish (Valuatum) company selling electronically-supplied services
-internationally**, so VAT is handled through the existing Stripe Tax setup — NOT
-a Denmark-specific registration:
-
-- **EU B2C** → VAT is due in the customer's country; declared via the EU **OSS**
-  (One-Stop-Shop) scheme from Finland. No per-country (e.g. Danish) registration
-  is needed — add the OSS/EU registration in Stripe Tax, which then applies the
-  correct destination rate (DK 25 %, etc.).
-- **EU B2B** with a valid VAT ID → reverse charge (no VAT collected).
-- **Outside the EU** → generally outside EU VAT scope.
-
-The code is registration-agnostic; which registrations exist in the Stripe
-dashboard is a tax decision (confirm with your accountant + Stripe Tax's
-threshold monitoring), not a code change.
+Valuatum is a Finnish company. The applicable VAT treatment depends on the
+buyer, relevant EU sales thresholds, any OSS election and registrations. The
+code does not establish which rules or registrations apply. Confirm them with
+the accountant and check the live Stripe Tax registrations before enabling sales.
 
 ## Configuration
 
 Non-secret config comes from Lambda environment variables (`lib/config.js`),
-injected by the CDK in `../aws-infra/lib/dk-report-checkout-stack.ts`:
+injected by the CDK in `../aws-infra/lib/checkout-stack.ts`:
 
 | Env var | Purpose | Default |
 | --- | --- | --- |
 | `ORDERS_TABLE`, `ORDERS_STATUS_INDEX` | DynamoDB table + GSI names | `CreditReports-Orders`, `StatusIndex` |
-| `SITE_URL` | Public origin for Stripe redirect URLs | `https://creditreports.dk` |
+| `SITE_URL` | Public origin for Stripe redirect URLs | `https://www.kreditrisker.se` |
 | `FROM_EMAIL`, `ADMIN_EMAIL` | SES sender + failure-alert recipient | `noreply@valuatum.com`, `luottoriskiraportti202605@valuatum.com` |
 | `SES_CONFIGURATION_SET` | SES configuration set applied to every send | — (injected by CDK) |
-| `REPORT_ENGINE_URL`, `REPORT_ENGINE_REGION`, `REPORT_ENGINE_USERNAME` | PDF engine endpoint + caller id | — / `eu-west-1` / `creditreports.dk` |
+| `REPORT_ENGINE_URL`, `REPORT_ENGINE_REGION`, `REPORT_ENGINE_USERNAME` | PDF engine endpoint + caller id | — / `eu-west-1` / `kreditrisker.se` |
 | `CLAIM_GRACE_MINUTES`, `MAX_GENERATION_MINUTES` | Poller timing guards | `2`, `30` |
 | `APP_SECRETS_ARN` | Secrets Manager bundle ARN | — |
 
@@ -158,44 +193,15 @@ Secrets live in **one** Secrets Manager JSON secret (`lib/secrets.js`):
 }
 ```
 
-`VALUATUM_REST_URL` + `VALUATUM_REST_TOKEN` are the authenticated Valuatum REST
-`/reports` endpoint the poller calls for the basic `dk_credit_risk` report (same
-mechanism the FI directory uses). They must point at a Valuatum instance that
-serves the Danish companies. **Email needs no secret.** SES authenticates through the poller's Lambda
-execution role, which the CDK grants `ses:SendEmail` on the `valuatum.com`
-identity — there is no API key to rotate or leak.
+Both Swedish report products use the report engine; they do not use
+`VALUATUM_REST_URL` or `VALUATUM_REST_TOKEN` directly. **Email needs no secret.**
+SES authenticates through the Lambda execution roles.
 
 ## Deployment
 
-See `../aws-infra/README.md`. In short:
-
-```bash
-cd backend && npm install        # so esbuild can bundle the Lambdas
-cd ../aws-infra && npm install
-npx cdk deploy DkReportCheckoutStackProd
-```
-
-### Post-deploy setup
-
-1. **CloudFront** — add an `/api/*` behavior to the **existing creditreports.dk
-   distribution** pointing at the API Gateway origin (`ReportCheckoutApiUrl`
-   output), caching disabled, all methods, forward query strings and all viewer
-   headers except Host.
-2. **Stripe webhook** — create an endpoint at the **direct** API Gateway URL
-   (`ReportCheckoutApiUrl`) + `/api/webhook`, listening for
-   `checkout.session.completed`. Copy its signing secret (`whsec_…`).
-3. **Populate the secret** — `dk-company-dir-<env>`, created with placeholders:
-   ```bash
-   aws secretsmanager put-secret-value --region eu-west-1 \
-     --secret-id dk-company-dir-prod \
-     --secret-string '{"STRIPE_SECRET_KEY":"sk_…","STRIPE_WEBHOOK_SECRET":"whsec_…","VALUATUM_REST_URL":"https://…","VALUATUM_REST_TOKEN":"…"}'
-   ```
-   (Warm Lambdas cache secrets — wait ~1 min or redeploy to pick up changes.)
-4. **Stripe Tax** — already set up for the Finnish entity. EU B2C VAT is handled
-   via the OSS registration (no Denmark-specific registration needed); see the
-   "Stripe Tax" section above.
-5. **SES** — see "Email (Amazon SES)" below. Confirm the SNS subscription mailed
-   to `luottoriskiraportti202605@valuatum.com` after **each** stack deploy.
+Follow `../docs/AWS-SETUP.md` and the launch gates in `../docs/LAUNCH-GATES.md`.
+Use a separate sandbox and synthetic engine for testing; never connect the test
+checkout to the shared report engine.
 
 ## Email (Amazon SES)
 
@@ -206,22 +212,19 @@ is no `SES_REGION`.
 - **Sender** — `noreply@valuatum.com`, an address on the **`valuatum.com` SES
   domain identity**. That identity, its DNS, and DKIM are provisioned **out of
   band** (shared with the FI report flow); this repo's CDK deliberately does not
-  own them. `creditreports.dk` is not a sender — customer questions are routed to
-  `contact@creditreports.dk` by a `mailto:` link in the footer, which needs no
-  SES setup.
-- **Auth** — the poller's execution role, granted `ses:SendEmail` scoped to that
-  one identity. `create-checkout` and `webhook` get no SES permission; they never
-  send mail.
+  own them. Customer questions go to the configured `CONTACT_EMAIL`.
+- **Auth** — the poller, withdrawal and credit-notification roles can send through
+  the verified identity. `create-checkout` and `webhook` do not send mail.
 - **SDK** — `@aws-sdk/client-sesv2`, **bundled** with the Lambda rather than
   taken from the Node 22 runtime's copy. The runtime's SDK version varies by
   runtime and region and may predate native `Content.Simple.Attachments`, which
-  the report PDF depends on. Keep `@aws-sdk/client-sesv2` out of the CDK's
-  `externalModules` list.
+  the report PDF depends on. CDK bundles the installed AWS SDK dependencies so
+  the deployed code uses the same SES serializer as the tested code.
 
 ### Configuration set and adverse events
 
 Every send is tagged with the configuration set
-`dk-company-dir-<env>-transactional`, which:
+`kreditrisker-se-<env>-transactional`, which:
 
 - **suppresses** hard bounces and complaints (account-level suppression list), so
   a known-bad address is not re-mailed — this protects the shared `valuatum.com`
@@ -230,14 +233,14 @@ Every send is tagged with the configuration set
 - publishes **`BOUNCE`, `COMPLAINT` and `REJECT`** events to an
   SNS topic subscribed by `luottoriskiraportti202605@valuatum.com`.
 
-Each deployed stack owns its own configuration set and topic, so **test and prod
-each mail their own subscription confirmation** — both must be accepted, and an
-unconfirmed subscription silently delivers nothing. Find the names/ARNs in the
+Each deployed stack owns its own configuration set and topic. The normal test
+and production subscriptions must be confirmed; simulator-only fixture mode
+intentionally has no email subscription. Find the names/ARNs in the
 `EmailConfigurationSetName` and `EmailFailureTopicArn` stack outputs:
 
 ```bash
 aws cloudformation describe-stacks --region eu-west-1 \
-  --stack-name DkReportCheckoutStackProd \
+  --stack-name KreditriskerCheckoutStackProd \
   --query 'Stacks[0].Outputs[?starts_with(OutputKey, `Email`)]'
 ```
 
@@ -258,8 +261,9 @@ DynamoDB order row by hand.
 `STRIPE_WEBHOOK_SECRET`, `VALUATUM_REST_URL`, `VALUATUM_REST_TOKEN`) when
 `APP_SECRETS_ARN` is unset, and `AWS_ENDPOINT_URL`
 points DynamoDB/Secrets Manager/SES at LocalStack. Use `stripe listen` to forward
-webhooks to a locally-run `webhook` handler. Test with card
-`4242 4242 4242 4242`, then do one real €3 smoke purchase + refund in prod.
+webhooks to a locally-run `webhook` handler. Use Stripe's test card
+`4242 4242 4242 4242` only in a verified sandbox. A real paid test needs the
+user's authorization.
 
 Email needs no local key, but SES sending does need credentials that can
 `ses:SendEmail` — point `AWS_ENDPOINT_URL` at LocalStack, or leave

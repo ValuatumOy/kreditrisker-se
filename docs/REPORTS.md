@@ -8,16 +8,21 @@ The client lives in `src/lib/reports/adapter.ts`. It's selected by `PUBLIC_SE_RE
 
 Basic (`basic`) and AI (`ai`) are independent products, each with its own flag `SE_REPORT_BASIC` / `SE_REPORT_AI`, set to `unavailable | sample | live`.
 
-## Endpoints the Swedish backend must implement (JSON)
+## Checkout endpoints (JSON)
 
-| Method | Path | Returns |
+| Method | Path | Purpose |
 |---|---|---|
-| GET | `se/reports/{product}/availability?orgnr=` | `ReportState` |
-| POST | `se/reports/{product}/orders` with body `{orgnr, product, email, acceptedTermsVersion}` | `ReportState` (normally `processing`, or a checkout redirect to be added with the payment provider) |
-| GET | `se/reports/{product}/orders/{orderId}` | `ReportState` |
+| POST | `/api/create-checkout` | Validate the order and return a Stripe Checkout URL. |
+| POST | `/api/webhook` | Receive Stripe events on the direct API Gateway URL. |
+| POST | `/api/withdrawal` | Record a customer's withdrawal request. |
 
-`ReportState.kind` is one of `unavailable{reason}`, `sample{sampleHref}`, `available`, `processing{orderId, startedAt}`, `success{orderId, downloadHref (https only), expiresAt?}` or `failure{orderId?, code, retryable}`.
+The HTTP adapter redirects the buyer to Stripe. After a successful checkout,
+the order is processed in the background and the PDF is sent by email; there is
+no customer-facing status or download endpoint. The mock adapter uses local
+simulated `processing` and `success` states for preview only.
 
 The client ignores any price sent by the backend. Prices come only from `VERIFIED_PRICES` in `src/config/site.ts`.
 
-Still to design with the payment provider: a hosted checkout redirect and return URL, a webhook confirming payment before generation, idempotent order creation, and a refund path for failures. The Finnish Stripe backend in `/backend` is a reference only and is not wired to Sweden.
+The backend is implemented in `backend/`, but is not evidence of a deployed or
+approved sales flow. Complete the end-to-end, consumer-terms, privacy and other
+launch checks in `docs/LAUNCH-GATES.md` before enabling it.

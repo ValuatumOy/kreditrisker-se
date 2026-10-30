@@ -16,14 +16,14 @@ const basic = staticReportState('basic', null)
 const ai = staticReportState('ai', null)
 const price = (p: 'basic' | 'ai') => {
     const v = VERIFIED_PRICES[p]
-    return v ? `${v.amountSek.toLocaleString('sv-SE')} kr ${v.vatIncluded ? 'inkl.' : 'exkl.'} moms` : 'Inte fastställt'
+    return v ? `${v.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr inkl. moms för konsument i Sverige` : 'Inte fastställt'
 }
 type Cell = boolean | string
 const rows: [string, Cell, Cell][] = [
     ['Registeruppgifter och bokslut i flera år', true, true],
     ['Nyckeltal med förklaringar', true, true],
     ['Jämförelse med branschen', true, true],
-    ['Kreditbetyg och riskklass', 'När modellen validerats', 'När modellen validerats'],
+    ['Kreditbetyg och riskklass', true, true],
     ['Skriven analys av lönsamhet, soliditet och likviditet', 'Automatisk text', 'Fördjupad analys'],
     ['Genomgång av offentliga källor på webben', false, true],
     ['Leverans', 'PDF', 'PDF'],
@@ -67,7 +67,7 @@ const rows: [string, Cell, Cell][] = [
                 </tr>
                 <tr class="sum">
                     <th scope="row">Status</th>
-                    <td><span class="tag tag--warn">{STATE_LABEL[basic.kind]}</span></td>
+                    <td><span class:list={['tag', basic.kind === 'available' ? 'tag--ok' : 'tag--warn']}>{STATE_LABEL[basic.kind]}</span></td>
                     <td><span class="tag tag--warn">{STATE_LABEL[ai.kind]}</span></td>
                 </tr>
             </tbody>

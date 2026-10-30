@@ -35,7 +35,7 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
                         <>
                             {s.price && (
                                 <p class="rp__price num">
-                                    {s.price.amountSek.toLocaleString('sv-SE')} kr <span class="muted small">{s.price.vatIncluded ? 'inkl. moms' : 'exkl. moms'}</span>
+                                    {s.price.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr <span class="muted small">inkl. moms för konsument i Sverige</span>
                                 </p>
                             )}
                             <a class="btn" href={orderHref(p)}>

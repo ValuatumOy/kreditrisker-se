@@ -2,6 +2,7 @@
 
 const Stripe = require('stripe');
 const { loadSecrets } = require('./secrets');
+const config = require('./config');
 
 // Returns a Stripe client built from the secret loaded out of Secrets Manager.
 // This product uses its OWN Stripe account/keys. Do not reuse keys from other
@@ -9,6 +10,8 @@ const { loadSecrets } = require('./secrets');
 async function stripeClient() {
   const { STRIPE_SECRET_KEY } = await loadSecrets();
   if (!STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY is not set');
+  if (config.isolatedFixtureTest && !/^sk_test_[A-Za-z0-9]+$/.test(STRIPE_SECRET_KEY))
+    throw new Error('Isolated checkout requires a Stripe test secret key');
   // Newer API versions currently return hosted Checkout links that Stripe rejects as incomplete.
   return new Stripe(STRIPE_SECRET_KEY, { apiVersion: '2024-06-20' });
 }

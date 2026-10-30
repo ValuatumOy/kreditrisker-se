@@ -11,7 +11,9 @@ const faq: { q: string; a: string }[] = [
     },
     {
         q: 'Är detta en kreditupplysning?',
-        a: 'Profilerna visar offentliga registeruppgifter och bokslut. Rapporterna för svenska företag är under utveckling, och vilka regler som gäller för dem granskas innan de lanseras.',
+        a: FLAGS.checkout
+            ? 'Profilerna visar offentliga registeruppgifter och bokslut. Basrapporten samlar fler uppgifter och nyckeltal för din egen bedömning.'
+            : 'Profilerna visar offentliga registeruppgifter och bokslut. Rapporterna för svenska företag är under utveckling.',
     },
     {
         q: 'Varför står det «saknas» i stället för en siffra?',
@@ -19,7 +21,7 @@ const faq: { q: string; a: string }[] = [
     },
     {
         q: 'Varför visas inget kreditbetyg?',
-        a: 'Valuatums kreditriskmodell är inte validerad på svenska företag än. Tills den är det visar vi inga betyg eller riskklasser.',
+        a: 'Företagssidorna visar ännu inga kreditbetyg eller riskklasser. I rapporterna används samma kreditriskmodell som i Finland.',
     },
     {
         q: 'Hur aktuella är siffrorna?',

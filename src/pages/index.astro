@@ -224,7 +224,7 @@ const statement =
                 <ul class="sources__list">
                     <li class="reveal" style="--d:2"><b>Bolagsverket</b><span>Registeruppgifter och digitalt inlämnade årsredovisningar.</span></li>
                     <li class="reveal" style="--d:3"><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></li>
-                    <li class="reveal" style="--d:4"><b>Valuatum</b><span>Nyckeltal med publicerade formler. Kreditbetyg först när modellen är validerad för Sverige.</span></li>
+                    <li class="reveal" style="--d:4"><b>Valuatum</b><span>Nyckeltal med publicerade formler.</span></li>
                 </ul>
                 <p class="small muted reveal">Källorna kräver avtal om datalicens innan publicering. <a href="/kallor/">Om datakällorna</a></p>
             </div>
@@ -253,7 +253,7 @@ const statement =
                             </p>
                             <ul class="rcard__list">
                                 {(p === 'basic'
-                                    ? ['Registeruppgifter och fem års bokslut', 'Nyckeltal med förklaringar', 'Jämförelse med branschen', 'Kreditbetyg när modellen validerats']
+                                    ? ['Registeruppgifter och fem års bokslut', 'Nyckeltal med förklaringar', 'Jämförelse med branschen', 'Kreditbetyg och kreditlimit']
                                     : ['Allt i basrapporten', 'Analys av lönsamhet, soliditet och likviditet', 'Offentliga källor med länkar', 'Slutsatser och begränsningar']
                                 ).map((x) => (
                                     <li>
@@ -262,7 +262,7 @@ const statement =
                                 ))}
                             </ul>
                             <div class="rcard__foot">
-                                <span class="rcard__price">{s.kind === 'available' && s.price ? `${s.price.amountSek.toLocaleString('sv-SE')} kr inkl. moms` : 'Pris: inte fastställt'}</span>
+                                <span class="rcard__price">{s.kind === 'available' && s.price ? `${s.price.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr inkl. moms för konsument i Sverige` : 'Pris: inte fastställt'}</span>
                                 <a class="btn" href={p === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'}>
                                     Läs mer
                                 </a>

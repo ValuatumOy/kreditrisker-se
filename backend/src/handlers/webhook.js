@@ -24,6 +24,10 @@ const {
 const dynamo = require('../lib/dynamo')
 const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
+const { paymentFunding } = require('../lib/paymentFunding')
+const config = require('../lib/config')
+const { isFixturePurchase } = require('../lib/fixtureTest')
+const { isSwedishCompany } = require('../lib/swedishCompany')
 
 // Manual-capture sessions remain unpaid until the poller captures them. Only
 // immediate-capture products require a settled status here.
@@ -40,6 +44,7 @@ function sessionFacts(session) {
             ? session.amount_total
             : undefined,
         currency: session.currency || undefined,
+        paymentStatus: session.payment_status,
         paymentIntentId:
             typeof session.payment_intent === 'string'
                 ? session.payment_intent
@@ -56,8 +61,18 @@ async function fulfillSingleReport(session, product) {
         amountTotal,
         currency,
         paymentIntentId,
+        paymentStatus,
     } = sessionFacts(session)
     const reportType = meta.reportType
+
+    try {
+        paymentFunding({ amountTotal, paymentIntentId, paymentStatus })
+    } catch (error) {
+        // No claim and no paid job: Stripe retries, and the log metric alerts
+        // operations even though returning a 5xx does not fail the Lambda.
+        console.error('webhook: payment review required', { sessionId, error: error.message })
+        return text(503, 'Payment could not be verified')
+    }
 
     if (!fulfillment.isFulfillable(product)) {
         console.error('webhook: product has no fulfillable generator', {
@@ -77,8 +92,9 @@ async function fulfillSingleReport(session, product) {
 
     const claimed = await dynamo.claimOrder({
         sessionId,
-        status: 'GENERATING',
+        status: reportType === 'se_credit_risk' ? 'CONFIRMING' : 'GENERATING',
         paymentIntentId,
+        paymentStatus,
         email,
         customerName,
         amountTotal,
@@ -100,6 +116,10 @@ async function fulfillSingleReport(session, product) {
         return json(200, { received: true })
     }
 
+    // A durable reference reaches the buyer before the paid Basic job starts.
+    // The poller retries confirmation, then claims submission once.
+    if (reportType === 'se_credit_risk') return json(200, { received: true })
+
     let jobId
     try {
         ;({ jobId } = await fulfillment.startFulfillment(
@@ -107,6 +127,15 @@ async function fulfillSingleReport(session, product) {
             product
         ))
     } catch (err) {
+        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
+            console.error('webhook: job submission could not be confirmed', {
+                sessionId,
+                error: err.cause?.message || err.message,
+            })
+            // Keep the claim: a redelivery must not submit another job.
+            // The poller releases the authorization if no job is recorded.
+            return json(200, { received: true })
+        }
         if (err instanceof fulfillment.FulfillmentTrackingError) {
             console.error('webhook: submitted job could not be recorded', {
                 sessionId,
@@ -232,6 +261,15 @@ async function fulfillPackagePurchase(session, product) {
     try {
         await fulfillment.startFulfillment(order, fulfilled)
     } catch (err) {
+        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
+            console.error('webhook: package job submission could not be confirmed', {
+                sessionId,
+                orderId: order.sessionId,
+                error: err.cause?.message || err.message,
+            })
+            // Preserve the reservation until the poller resolves the order.
+            return json(200, { received: true })
+        }
         if (err instanceof fulfillment.FulfillmentTrackingError) {
             // The generator accepted the job, so keep the reservation.
             console.error('webhook: submitted job could not be recorded', {
@@ -312,12 +350,25 @@ exports.handler = async event => {
     const sessionId = session.id
     const reportType = session.metadata?.reportType
 
+    if (config.isolatedFixtureTest && (stripeEvent.livemode !== false || !isFixturePurchase({
+        reportType, businessId: session.metadata?.businessId,
+        email: session.customer_details?.email || session.customer_email,
+    }))) {
+        console.error('webhook: isolated test rejected a non-fixture order', { sessionId })
+        return json(200, { received: true })
+    }
+
     const product = getProduct(reportType)
     if (!product) {
         console.error('webhook: unknown reportType, cannot fulfill', {
             sessionId,
             reportType,
         })
+        return json(200, { received: true })
+    }
+
+    if (!config.isolatedFixtureTest && !isSwedishCompany(session.metadata?.businessId)) {
+        console.error('webhook: invalid Swedish organisation number', { sessionId })
         return json(200, { received: true })
     }
 

@@ -1,31 +1,73 @@
 ---
 import Page from '../layouts/Page.astro'
 import Doc from '../components/Doc.astro'
-import { FLAGS } from '../config/site.ts'
+import { SITE } from '../config/site.ts'
 ---
 
 <Page
     title="Leverans och ångerrätt"
-    description="Hur rapporter levereras digitalt och vad som gäller för ångerrätt vid köp av digitalt innehåll."
+    description="Digital leverans av kreditriskrapporter, 14 dagars ångerrätt för konsumenter och hjälp vid fel."
     path="/leverans/"
-    lede="Rapporterna är digitalt innehåll som levereras som PDF. Den här sidan fylls i med exakta villkor innan rapporterna kan beställas."
-    draft
+    lede="Rapporten skickas som PDF till din e-post. Som konsument har du 14 dagars ångerrätt även efter leveransen."
 >
-    <Doc toc={[['status', 'Status'], ['leverans', 'Leverans'], ['anger', 'Ångerrätt'], ['fel', 'Om något går fel']]}>
-        <h2 id="status">Status</h2>
-        <p>{FLAGS.checkout ? 'Rapporter kan beställas.' : 'Rapporter kan inte beställas ännu. Inga betalningar tas emot.'}</p>
-
+    <Doc toc={[['leverans', 'Leverans'], ['anger', 'Ångra ett köp'], ['aterbetalning', 'Återbetalning'], ['fel', 'Fel eller utebliven leverans']]}>
         <h2 id="leverans">Leverans</h2>
-        <p>Rapporten levereras som PDF till den e-postadress du anger. Leveranstiden anges här när den är testad och fastställd.</p>
-
-        <h2 id="anger">Ångerrätt</h2>
         <p>
-            Enligt distansavtalslagen gäller i regel 14 dagars ångerrätt för konsumenter. För digitalt innehåll som inte levereras på ett fysiskt medium upphör ångerrätten om
-            leveransen har påbörjats med konsumentens uttryckliga samtycke och konsumenten har bekräftat att ångerrätten därmed går förlorad. Hur detta tillämpas på
-            rapporterna, och om köparen i praktiken är näringsidkare eller konsument, ska granskas av jurist innan lansering.
+            Efter slutförd beställning får du ett mejl med ordernummer, totalbelopp och ångerblankett. Rapporten tas fram automatiskt och skickas i ett separat mejl som en bifogad PDF.
+            Du behöver en fungerande e-postadress, internetanslutning och en webbläsare eller annan app som kan öppna PDF-filer. Inget konto hos oss krävs.
+        </p>
+        <p>
+            Genereringen börjar efter beställningsbekräftelsen. Rapporten skickas så snart den är klar, utan onödigt dröjsmål.
+            Beloppet reserveras vid köpet och dras först när PDF-filen är klar för leverans. Om genereringen misslyckas släpps reservationen utan att beloppet dras.
+        </p>
+        <p>
+            Kontrollera skräpposten om du saknar ett mejl. Kontakta <a href={`mailto:${SITE.provider.email}`}>{SITE.provider.email}</a> om rapporten inte kommer fram.
+            Ange ordernumret om du har fått det och e-postadressen som användes vid köpet, så kan vi undersöka leveransen.
         </p>
 
-        <h2 id="fel">Om något går fel</h2>
-        <p>Vad som gäller om rapporten inte kan tas fram eller levereras anges här innan lansering.</p>
+        <h2 id="anger">Ångra ett köp</h2>
+        <p>
+            När du köper som konsument kan du ångra köpet utan att ange något skäl inom 14 dagar från det att avtalet ingicks.
+            Du behåller ångerrätten under hela fristen även om vi har börjat ta fram eller redan levererat rapporten. Vi begär inte att du avstår från ångerrätten.
+            Den lagstadgade ångerrätten gäller inte när du köper för din näringsverksamhet.
+        </p>
+        <p>
+            Använd <a href="/angra-kop/">Ångra köp</a> och ange ordernumret från beställningsmejlet och samma e-postadress som vid köpet.
+            Kontrollera uppgifterna och bekräfta att du vill ångra köpet. Du får ett mottagningsbevis via e-post.
+        </p>
+        <p>
+            Du kan också meddela oss tydligt via <a href={`mailto:${SITE.provider.email}`}>{SITE.provider.email}</a> eller post till
+            {SITE.provider.name}, {SITE.provider.address}. Ångerblanketten i beställningsmejlet är frivillig.
+            Det räcker att du skickar ditt meddelande före ångerfristens slut. Spara gärna en kopia.
+        </p>
+        <p>När du har ångrat köpet ska du sluta använda rapporten och inte göra den tillgänglig för andra.</p>
+
+        <h2 id="aterbetalning">Återbetalning</h2>
+        <p>
+            Om beloppet bara är reserverat släpper vi reservationen. Om det redan har dragits återbetalar vi hela köpesumman utan onödigt dröjsmål,
+            senast 14 dagar efter att vi tog emot ditt meddelande om att du ångrar köpet. Vi använder samma betalningssätt som vid köpet, utan återbetalningsavgift.
+        </p>
+        <p>
+            Mottagningsbeviset bekräftar din begäran; det betyder inte att en återbetalning redan har genomförts.
+            Vi kontrollerar betalningen och hanterar återbetalningen separat. Därefter kan bankens eller betalningsleverantörens handläggningstid tillkomma innan beloppet syns på ditt konto.
+        </p>
+
+        <h2 id="fel">Fel eller utebliven leverans</h2>
+        <p>
+            Kontakta <a href={`mailto:${SITE.provider.email}`}>{SITE.provider.email}</a> om PDF-filen saknas, inte går att öppna,
+            gäller fel företag eller annars inte motsvarar det du köpt. Beskriv felet och ange ordernumret och din e-postadress.
+            Skicka inte kortnummer eller andra känsliga betalningsuppgifter.
+        </p>
+        <p>
+            Vid fel försöker vi i första hand rätta felet eller leverera en fungerande rapport utan kostnad och inom skälig tid.
+            Som konsument kan du också ha rätt till prisavdrag, hävning och skadestånd enligt tillämplig lag.
+            Vid försening har du rätt att kräva leverans och, när lagens förutsättningar är uppfyllda, häva köpet.
+        </p>
+        <p>
+            För konsumenter i Sverige ansvarar vi för ursprungliga fel som visar sig inom tre år från leveransen.
+            Reklamera inom skälig tid efter att du märkt felet; ett meddelande inom två månader räknas alltid som att det lämnats i rätt tid.
+            Reklamationsrätten gäller oberoende av om ångerfristen har gått ut.
+        </p>
+        <p>Läs även <a href="/villkor/">köp- och användarvillkoren</a> och <a href="https://www.konsumentverket.se/varor-och-tjanster/digitala-tjanster-och-digitalt-innehall/">Konsumentverkets information om digitalt innehåll</a>.</p>
     </Doc>
 </Page>
