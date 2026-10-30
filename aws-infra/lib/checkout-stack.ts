@@ -413,7 +413,7 @@ export class CheckoutStack extends cdk.Stack {
                 maxAge: cdk.Duration.hours(1),
             },
         })
-        reportApi.addRoutes({
+        const checkoutRoutes = reportApi.addRoutes({
             path: '/api/create-checkout',
             methods: [apigwv2.HttpMethod.GET, apigwv2.HttpMethod.POST],
             integration: new integrations.HttpLambdaIntegration(
@@ -437,12 +437,15 @@ export class CheckoutStack extends cdk.Stack {
                 redeemFn
             ),
         })
-        reportApi.addRoutes({
+        const withdrawalRoutes = reportApi.addRoutes({
             path: '/api/withdrawal',
             methods: [apigwv2.HttpMethod.POST],
             integration: new integrations.HttpLambdaIntegration('WithdrawalInt', withdrawalFn),
         })
         const stage = reportApi.defaultStage?.node.defaultChild as apigwv2.CfnStage
+        // RouteSettings references route keys, not resource IDs; CloudFormation
+        // otherwise creates the stage before the routes exist and rejects it.
+        for (const route of [...checkoutRoutes, ...withdrawalRoutes]) stage.node.addDependency(route)
         stage.addPropertyOverride('RouteSettings', {
             'POST /api/withdrawal': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 4 },
             ...(props.isolatedFixtureTest ? {

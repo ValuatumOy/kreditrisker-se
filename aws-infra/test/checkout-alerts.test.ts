@@ -39,7 +39,7 @@ for (const environmentName of ['Test', 'Prod'] as const) {
             siteUrl: 'https://example.test',
             ...(environmentName === 'Test' ? { testSecretName: 'kreditrisker-se-isolated-checkout', isolatedFixtureTest: true, suppressTestAlertSubscription: true } : {}),
         })
-        const resources = Template.fromStack(stack).toJSON().Resources as Record<string, { Type: string; Properties: Record<string, any> }>
+        const resources = Template.fromStack(stack).toJSON().Resources as Record<string, { Type: string; Properties: Record<string, any>; DependsOn?: string[] }>
         const subscriptions = Object.values(resources).filter(resource => resource.Type === 'AWS::SNS::Subscription')
         assert.equal(subscriptions.length, environmentName === 'Test' ? 0 : 1)
         const checkoutLambda = Object.entries(resources).find(([id, resource]) => id.startsWith('CreateCheckoutFn') && resource.Type === 'AWS::Lambda::Function')?.[1]
@@ -51,6 +51,10 @@ for (const environmentName of ['Test', 'Prod'] as const) {
             && index.KeySchema.some((key: any) => key.AttributeName === 'withdrawalState' && key.KeyType === 'HASH')))
         assert.ok(Object.values(resources).some(resource => resource.Type === 'AWS::ApiGatewayV2::Route' && resource.Properties.RouteKey === 'POST /api/withdrawal'))
         const stage = Object.values(resources).find(resource => resource.Type === 'AWS::ApiGatewayV2::Stage')
+        for (const routeKey of ['POST /api/withdrawal', 'POST /api/create-checkout']) {
+            const routeId = Object.entries(resources).find(([, resource]) => resource.Type === 'AWS::ApiGatewayV2::Route' && resource.Properties.RouteKey === routeKey)?.[0]
+            assert.ok(routeId && stage?.DependsOn?.includes(routeId), `API stage must wait for ${routeKey}`)
+        }
         assert.deepEqual(stage?.Properties.RouteSettings['POST /api/withdrawal'], { ThrottlingBurstLimit: 4, ThrottlingRateLimit: 2 })
         assert.deepEqual(stage?.Properties.RouteSettings['POST /api/create-checkout'], environmentName === 'Test' ? { ThrottlingBurstLimit: 2, ThrottlingRateLimit: 0.5 } : undefined)
         assert.ok(Object.entries(resources).some(([id, resource]) => id.startsWith('WithdrawalManualRefundAlarm') && resource.Type === 'AWS::CloudWatch::Alarm'))
