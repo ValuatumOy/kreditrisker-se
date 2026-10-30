@@ -16,7 +16,7 @@ export function summarize(c: PublishedCompany): string[] {
 
     const [p] = r.periods
     if (!p) {
-        out.push('Företaget har inget inlämnat bokslut i källan ännu.')
+        out.push('Det finns inget bokslut för företaget i källan.')
         return out
     }
     const m = metricsOf(p)
@@ -42,6 +42,6 @@ export function summarize(c: PublishedCompany): string[] {
     const emp = count(p.employees)
     if (emp.state === 'positive') out.push(`Medelantalet anställda var ${emp.text}.`)
     if (c.freshness === 'stale' || c.freshness === 'aging')
-        out.push(`Det senaste bokslutet i källan avser ${year}; nyare siffror finns inte.`)
+        out.push(`Det senaste bokslutet i källan avser ${year}.`)
     return out
 }

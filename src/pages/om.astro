@@ -2,6 +2,7 @@
 import Page from '../layouts/Page.astro'
 import Doc from '../components/Doc.astro'
 import { SITE } from '../config/site.ts'
+import { providerJsonLd } from '../lib/seo.ts'
 const p = SITE.provider
 ---
 
@@ -9,6 +10,7 @@ const p = SITE.provider
     title="Om tjänsten och kontakt"
     description={`${SITE.name} tillhandahålls av ${p.name}. Kontaktuppgifter, rättelser och leverantörsuppgifter.`}
     path="/om/"
+    jsonLd={[providerJsonLd()]}
     lede={`${SITE.name} är en tjänst för att granska svenska företag innan man gör affärer med dem. Den byggs och drivs av ${p.name}.`}
 >
     <Doc toc={[['leverantor', 'Leverantör'], ['kontakt', 'Kontakt'], ['rattelse', 'Rättelser'], ['status', 'Status']]}>
