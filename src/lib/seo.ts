@@ -19,14 +19,26 @@ export const crumbsJsonLd = (list: Crumb[]) => ({
 export const companyJsonLd = (c: PublishedCompany) => ({
     '@context': 'https://schema.org',
     '@type': 'Organization',
+    '@id': SITE.origin + c.path + '#company',
     name: c.record.name,
-    url: SITE.origin + c.path,
+    mainEntityOfPage: SITE.origin + c.path,
     identifier: { '@type': 'PropertyValue', propertyID: 'organisationsnummer', value: c.record.orgnr },
-    legalName: c.record.name,
     description: `${LEGAL_FORM_TEXT[c.record.legalForm]}${c.record.municipality ? `, ${c.record.municipality.name}` : ''}`,
-    ...(c.record.registeredAt ? { foundingDate: c.record.registeredAt } : {}),
-    ...(c.record.municipality ? { address: { '@type': 'PostalAddress', addressLocality: c.record.municipality.name, addressCountry: 'SE' } } : {}),
 })
+
+/** The service provider described on /om/. */
+export const providerJsonLd = () => ({
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${SITE.origin}/om/#provider`,
+    name: SITE.provider.name,
+    url: SITE.provider.url,
+    identifier: { '@type': 'PropertyValue', propertyID: 'FO-nummer', value: SITE.provider.businessId },
+    ...(SITE.provider.email ? { email: SITE.provider.email } : {}),
+})
+
+/** Escape HTML-significant input while retaining valid JSON-LD. */
+export const serializeJsonLd = (data: object) => JSON.stringify(data).replace(/</g, '\\u003c')
 
 /** The single rule for index/noindex: global flag, real data, and the page's own verdict. */
 export const isIndexable = (pageNoindex: boolean, syntheticData: boolean) => siteIndexable && !syntheticData && !pageNoindex
