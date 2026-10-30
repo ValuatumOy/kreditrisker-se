@@ -63,9 +63,9 @@ export const FLAGS = {
 export type ReportMode = 'unavailable' | 'sample' | 'live'
 export const TERMS_VERSION = env('SE_TERMS_VERSION') ?? 'utkast-2026-09'
 
-/** Approved net prices; they are not shown until Stripe and checkout are verified. */
+/** Approved prices; they are not shown until Stripe and checkout are verified. */
 export const APPROVED_PRICES = {
-    basic: { amountSek: priceTargets.basic / 100, vatIncluded: false },
+    basic: { amountSek: priceTargets.basic / 100, vatIncluded: true },
     ai: { amountSek: priceTargets.ai / 100, vatIncluded: false },
 } as const
 
@@ -74,8 +74,7 @@ export const APPROVED_PRICES = {
  * end. Empty = the UI never shows a price.
  */
 export const VERIFIED_PRICES: Partial<Record<'basic' | 'ai', { amountSek: number; vatIncluded: boolean; verifiedAt: string }>> = {
-    // Stripe's live checkout preview for a Swedish consumer, 29 kr + 25.5% VAT.
-    basic: { amountSek: 36.4, vatIncluded: true, verifiedAt: '2026-10-30' },
+    basic: { amountSek: priceTargets.basic / 100, vatIncluded: true, verifiedAt: '2026-10-30' },
 }
 
 /** Site is allowed to be indexed at all. */

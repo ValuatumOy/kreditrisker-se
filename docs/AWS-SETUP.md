@@ -125,13 +125,9 @@ Complete the legal, privacy, report-content, payment, delivery and consumer-term
 launch gates first. Swedish reports use the Finnish credit-risk model; verify its
 outputs for Swedish companies as part of the report review before opening sales.
 
-1. The live Stripe basic product `prod_VXJrnLn4qkC2Nv` has a SEK 29.00,
-   one-time, VAT-exclusive default price and tax code `txcd_10000000`. It is not
-   yet connected to checkout. A live, explicitly internal, unpaid Checkout preview
-   on 30 October 2026 with Sweden as the billing country showed 25.5% VAT and a
-   total of SEK 36.40; the preview session was then expired without a payment.
-   This does not test report generation or delivery. The AI product has not been
-   created; its agreed net price is SEK 69.00. The backend checks amounts and tax
+1. The Stripe basic product `prod_VXJrnLn4qkC2Nv` uses a SEK 29.00,
+   one-time, VAT-inclusive price and tax code `txcd_10000000`. The AI product has
+   not been created; its planned price is SEK 69.00 before VAT. The backend checks amounts and tax
    treatment against `backend/src/lib/report-price-targets.json`. Confirm the
    company's tax registration and treatment for each customer before launch.
    The `kreditrisker-se-prod` secret already exists. On a new environment, create
@@ -162,8 +158,8 @@ outputs for Swedish companies as part of the report review before opening sales.
    `SE_CHECKOUT=1`, `SE_TERMS_VERSION` matching `termsVersionProd`, and the products
    set to `live`, with `VERIFIED_PRICES` in
    `src/config/site.ts` set to the verified VAT-inclusive customer prices.
-   The preview above establishes the current Swedish consumer example, not
-   every buyer's tax treatment. Check country-specific and business-customer
+   Verify the Swedish consumer price in Checkout; it does not establish every
+   buyer's tax treatment. Check country-specific and business-customer
    differences before setting and displaying a verified price.
 
 ## Analytics

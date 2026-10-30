@@ -127,7 +127,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         if (s.kind === 'available') {
             const price = prices[product]
             root.querySelector('[data-price]')!.textContent = price
-                ? `${price.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
+                ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
                 : 'Priset visas innan du betalar.'
         }
     }

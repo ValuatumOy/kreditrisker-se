@@ -157,10 +157,10 @@ line. The operator must monitor the alerts and investigate failures.
 
 ### Stripe Tax
 
-The approved single-report targets are 29 / 69 SEK before VAT, so their Stripe
-Prices must use `tax_behavior: 'exclusive'`. Checkout uses
-`automatic_tax: { enabled: true }`. Verify the final consumer-facing price and
-the account's tax registrations before enabling sales.
+The basic report costs SEK 29 including VAT, so its Stripe Price must use
+`tax_behavior: 'inclusive'`. The planned AI report price is SEK 69 before VAT
+and uses `tax_behavior: 'exclusive'`; it is not yet available. Checkout uses
+`automatic_tax: { enabled: true }` and verifies the amount and tax behavior.
 
 Valuatum is a Finnish company. The applicable VAT treatment depends on the
 buyer, relevant EU sales thresholds, any OSS election and registrations. The

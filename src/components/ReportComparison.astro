@@ -16,7 +16,7 @@ const basic = staticReportState('basic', null)
 const ai = staticReportState('ai', null)
 const price = (p: 'basic' | 'ai') => {
     const v = VERIFIED_PRICES[p]
-    return v ? `${v.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr inkl. moms för konsument i Sverige` : 'Inte fastställt'
+    return v ? `${v.amountSek.toLocaleString('sv-SE')} kr inkl. moms för konsument i Sverige` : 'Inte fastställt'
 }
 type Cell = boolean | string
 const rows: [string, Cell, Cell][] = [

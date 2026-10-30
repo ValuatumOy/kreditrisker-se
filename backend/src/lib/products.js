@@ -67,7 +67,7 @@ const PRODUCTS = {
   se_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_BASIC || '',
     currency: 'sek',
-    taxBehavior: 'exclusive',
+    taxBehavior: 'inclusive',
     expectedUnitAmount: PRICE_TARGETS.basic,
     taxCode: 'txcd_10000000',
     name: {

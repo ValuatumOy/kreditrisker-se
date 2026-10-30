@@ -125,18 +125,18 @@ test('checkout rejects a default price with the wrong billing contract', async (
     }
 })
 
-test('Swedish single reports accept only the approved SEK amounts excluding VAT', async () => {
-    for (const [reportType, expected] of [['se_credit_risk', 2900], ['se_ai_credit_risk', 6900]]) {
+test('Swedish single reports accept only the approved SEK amounts and tax treatment', async () => {
+    for (const [reportType, expected, taxBehavior] of [['se_credit_risk', 2900, 'inclusive'], ['se_ai_credit_risk', 6900, 'exclusive']]) {
         const product = getProduct(reportType)
-        assert.equal(product.taxBehavior, 'exclusive')
+        assert.equal(product.taxBehavior, taxBehavior)
         assert.equal(product.expectedUnitAmount, expected)
-        const price = { id: 'price_test', active: true, currency: 'sek', type: 'one_time', tax_behavior: 'exclusive', unit_amount: expected }
+        const price = { id: 'price_test', active: true, currency: 'sek', type: 'one_time', tax_behavior: taxBehavior, unit_amount: expected }
         const stripe = { products: { retrieve: async () => ({ active: true, default_price: price }) } }
         assert.equal((await resolvePrice(stripe, product)).unit_amount, expected)
         price.unit_amount += 100
         await assert.rejects(resolvePrice(stripe, product), /differs from approved price/)
         price.unit_amount = expected
-        price.tax_behavior = 'inclusive'
+        price.tax_behavior = taxBehavior === 'inclusive' ? 'exclusive' : 'inclusive'
         await assert.rejects(resolvePrice(stripe, product), /invalid tax behavior/)
     }
 })
