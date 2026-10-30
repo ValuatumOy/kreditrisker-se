@@ -1,7 +1,7 @@
 # Report checkout backend
 
-Ported from the Danish directory (creditreports.dk), where it runs in
-production. The flow is unchanged; the Swedish differences are:
+Ported from the Danish directory (creditreports.dk). The Swedish flow includes
+separate purchase confirmation and withdrawal handling. Its main settings are:
 
 - products `se_ai_credit_risk`, `se_credit_risk` and their 3-report bundles, in SEK;
   a product is sold only when its Stripe product id is set (`STRIPE_PRODUCT_SE_*`),
@@ -34,7 +34,7 @@ Browser ─┬─ /*                  → S3 (static Astro)
                           customer pays on Stripe-hosted Checkout                 │
                                                                                   ▼
 Stripe ──→ POST /api/webhook  (DIRECT API Gateway URL, NOT via CloudFront) → webhook Lambda
-                                              │ submit generation job, persist order, 200 fast
+                                              │ persist order, return 200
                                               ▼
                                         DynamoDB orders table
                                               ▲
@@ -56,8 +56,8 @@ CloudFront so it is same-origin (no CORS).
 | Lambda | Trigger | Responsibility |
 | --- | --- | --- |
 | `create-checkout` | `POST /api/create-checkout` | Look up the product **server-side** (price + label never trusted from the client), create a manual-capture Stripe Checkout session with `reportType` + `lang` + `reportLang` + company params in metadata, return `{ url }`. |
-| `webhook` | `POST /api/webhook` (Stripe) | Verify signature. On `checkout.session.completed`: claim an order row (idempotent on `session.id`), submit the generation job, record `jobId`, return `200`. No polling/capture/email here. |
-| `poller` | EventBridge schedule (~1 min) | For each `GENERATING` order, poll the engine job, then capture (DONE → email PDF) or cancel (FAILED/timeout → admin alert) the manual-capture PaymentIntent. |
+| `webhook` | `POST /api/webhook` (Stripe) | Verify signature and claim an order row idempotently. Basic orders wait for confirmation before the poller submits the job. |
+| `poller` | EventBridge schedule (~1 min) | Send Basic order confirmation, submit and poll the job, then capture and email on success or cancel the authorization on failure. |
 
 ## Two languages: `lang` vs `reportLang`
 
@@ -65,21 +65,17 @@ They are independent and must not be collapsed into one field.
 
 | Field | Values | Controls |
 | --- | --- | --- |
-| `lang` | `da` \| `en` (default `da`) | The **buyer's** language: Stripe Checkout copy, the receipt, and the delivery email. Taken from the page the buyer was on. |
-| `reportLang` | `da` \| `en` (default `en`) | The language of the **generated PDF**. Picked in the purchase modal, which preselects the page language but lets the buyer change it. |
+| `lang` | `sv` \| `en` (default `sv`) | The buyer's language for Stripe Checkout and emails. |
+| `reportLang` | `sv` \| `en` (default `sv`) | The language of the generated PDF. The current Swedish site sends `sv`. |
 
-So a Danish-UI buyer can order an English PDF: Stripe and the email stay Danish,
-only the attachment is English. The chosen report language is **disclosed** beside
-Stripe's payment button using Checkout `custom_text.submit`, and repeated in the
-delivery email — always written in `lang`, naming `reportLang`. A missing
-`reportLang` normalizes to `en`, so sessions created by page builds that predate
-the selector still deliver what they advertised.
+The chosen report language is disclosed beside Stripe's payment button and in
+the delivery email, written in `lang`. A missing `reportLang` normalizes to `sv`.
 
 `reportLang` reaches both generators as `params.lang`
 (`buildReportParams()` in `lib/products.js`), which is what the poller and the
 report engine read. The REST endpoint's language code is mapped in
 `REST_LANG_CODES` — identity today; change it in that one place if the endpoint
-ever wants a different code than `da`.
+ever wants a different code than `sv`.
 
 ## Pricing source
 
