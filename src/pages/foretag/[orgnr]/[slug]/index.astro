@@ -70,7 +70,7 @@ const sources = [...[r.status.source, ...r.periods.map((p) => p.source), ...(r.p
 const figCount: Record<string, number> = {}
 const nextFig = (kind = 'Diagram') => `${kind} ${(figCount[kind] = (figCount[kind] ?? 0) + 1)}`
 const title = `${r.name} (${formatOrgnr(r.orgnr)})`
-const desc = [summary[0], summary[2]].filter(Boolean).join(' ').slice(0, 158)
+const desc = summary.slice(0, 2).join(' ')
 ---
 
 {

@@ -92,6 +92,77 @@ test('zero/missing gross profit keeps omitted sales at zero; explicit sales alwa
     }
 })
 
+test('nine observed missing-sales cases do not confirm a 100% decline in any mapped view', () => {
+    const cases = [
+        ['5561935056', '2023-12-31', 11.570839],
+        ['5562023159', '2023-12-31', 119.088471],
+        ['5563468064', '2023-12-31', 5.330682],
+        ['5564385846', '2023-08-31', 3.411664],
+        ['5564563954', '2025-04-30', 1.722108],
+        ['5565916151', '2023-08-31', undefined],
+        ['5566603204', '2022-12-31', undefined],
+        ['5566802277', '2025-02-28', 3.519976],
+        ['5568907264', '2025-02-28', 2.215087],
+    ] as const
+    for (const [orgnr, end, gross] of cases) {
+        const b = bundle()
+        b.companies[0].companyCode = orgnr
+        const year = Number(end.slice(0, 4))
+        const priorEnd = new Date(Date.UTC(year - 1, Number(end.slice(5, 7)), 0)).toISOString().slice(0, 10)
+        b.modeldata.dataMap = {
+            [year]: { ebit: 1, ns_growth: -1, cr_fiscal_year_end: Number(end.replaceAll('-', '')), ...(gross === undefined ? {} : { cr_gross_profit: gross }) },
+            [year - 1]: { ns: 10, cr_fiscal_year_end: Number(priorEnd.replaceAll('-', '')) },
+        }
+        const res = mapBundle(b, opts)
+        assert.ok(res.ok)
+        const p = res.record.periods[0]
+        assert.equal(p.income.netSales.status, gross === undefined ? 'reported' : 'missing', orgnr)
+        if (gross === undefined) assert.equal(numeric(p.income.netSales), 0, 'amount fallback remains unchanged')
+        assert.deepEqual(metricsOf(p).revenueGrowth, { status: 'missing', reason: 'not_in_source' }, orgnr)
+        assert.equal(percent(p.ratios.revenueGrowth).state, 'missing', 'the financial table formats this shared ratio as missing')
+        assert.equal(numeric(p.ratios.revenueGrowth), undefined, 'the KPI has no numeric growth badge')
+        const company = publishCompany(res.record, undefined, '2026-10-23')
+        assert.doesNotMatch(summarize(company).join(' '), /en ökning|en minskning/, orgnr)
+        assert.equal(toRow(company).rg, undefined, orgnr)
+    }
+})
+
+test('growth retains the API ratio for explicit annual sales, including an explicit zero', () => {
+    for (const [sales, growth] of [[12, 0.2], [0, -1]] as const) {
+        const b = bundle()
+        Object.assign(b.modeldata.dataMap['2025'], { ns: sales, ns_growth: growth })
+        b.modeldata.dataMap['2024'].ns = 10
+        const res = mapBundle(b, opts)
+        assert.ok(res.ok)
+        assert.equal(numeric(res.record.periods[0].ratios.revenueGrowth), growth)
+        assert.equal(numeric(res.record.periods[0].income.netSales), sales * 1e6)
+        assert.match(summarize(publishCompany(res.record, undefined, '2026-10-23')).join(' '), sales === 0 ? /en minskning med 100,0 %/ : /en ökning med 20,0 %/)
+    }
+})
+
+test('growth requires a reported sales input in the actual preceding annual period', () => {
+    const mutations: ((b: Bundle) => void)[] = [
+        (b) => { delete b.modeldata.dataMap['2024'].ns },
+        (b) => { delete b.modeldata.dataMap['2024'] },
+        (b) => { b.modeldata.dataMap['2024'] = {} },
+        (b) => { b.modeldata.dataMap['2024'].cr_fiscal_year_end = 20240630 },
+        (b) => { b.modeldata.dataMap['2024'].cr_fiscal_period_length = 6 },
+        (b) => { b.modeldata.dataMap['2025'].cr_fiscal_period_length = 6 },
+        (b) => { b.modeldata.dataMap['2024'].ns = '0' },
+        (b) => { b.modeldata.dataMap['2024'].ns = 0 },
+        (b) => { b.modeldata.dataMap['2025'].ns = NaN },
+    ]
+    for (const mutate of mutations) {
+        const b = bundle()
+        b.modeldata.dataMap['2025'].ns_growth = 0.2
+        mutate(b)
+        const res = mapBundle(b, opts)
+        assert.ok(res.ok)
+        assert.deepEqual(res.record.periods[0].ratios.revenueGrowth, { status: 'missing', reason: 'not_in_source' })
+        assert.doesNotMatch(summarize(publishCompany(res.record, undefined, '2026-10-23')).join(' '), /en ökning|en minskning/)
+    }
+})
+
 test('function-format costs do not turn unreported depreciation into a zero or a verified EBITDA', () => {
     for (const depreciation of [undefined, 0, -1.016804]) {
         const b = bundle()

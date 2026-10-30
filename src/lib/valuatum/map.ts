@@ -18,6 +18,7 @@
 import { SCHEMA_VERSION, type BalanceSheet, type CompanyRecord, type CompanyStatusCode, type FiscalPeriod, type IncomeStatement, type KeyRatios, type LegalFormCode, type SourceRef, type Value } from '../contract/types.ts'
 import { KOMMUNER } from '../../config/kommuner.ts'
 import { parseOrgnr } from '../orgnr.ts'
+import { periodsConsecutive } from '../metrics.ts'
 import type { Bundle } from './api.ts'
 
 /** modeldata amounts are in millions of the model currency. */
@@ -243,6 +244,7 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
         .reverse()
 
     const periods: FiscalPeriod[] = []
+    const reportedSalesByPeriod = new Map<FiscalPeriod, number>()
     for (const y of years) {
         const row = md.dataMap[y]
         const get = (name: string): number | undefined => (typeof row[name] === 'number' && Number.isFinite(row[name]) ? (row[name] as number) : undefined)
@@ -277,7 +279,7 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             income.depreciation = { status: 'missing', reason: 'not_in_source' }
             income.ebitda = { status: 'missing', reason: 'not_in_source' }
         }
-        periods.push({
+        const period: FiscalPeriod = {
             start: startDate.toISOString().slice(0, 10),
             end,
             months,
@@ -289,7 +291,17 @@ export function mapBundle(b: Bundle, opts: { batchId: string; importedAt: string
             balance: values(BALANCE_VARS, UNIT, true),
             ratios: values(RATIO_VARS, 1, false),
             employees: employees === undefined ? { status: 'missing', reason: 'not_in_source' } : { status: 'reported', value: Math.round(employees), source: src },
-        })
+        }
+        periods.push(period)
+        const sales = get(INCOME_VARS.netSales)
+        if (sales !== undefined) reportedSalesByPeriod.set(period, sales)
+    }
+    for (const [i, period] of periods.entries()) {
+        const prior = periods[i + 1]
+        // A stored growth ratio can treat an absent sales input as zero.
+        if (!reportedSalesByPeriod.has(period) || !prior || !reportedSalesByPeriod.has(prior) || reportedSalesByPeriod.get(prior) === 0
+            || period.months !== 12 || prior.months !== 12 || !periodsConsecutive(period, prior))
+            period.ratios.revenueGrowth = { status: 'missing', reason: 'not_in_source' }
     }
 
     const sniCode = (company.industryCode ?? '').replace(/\D/g, '')

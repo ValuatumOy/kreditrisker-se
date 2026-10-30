@@ -23,7 +23,7 @@ const demo = getDemoSite()
 const pick = (prefix: string) => demo.companies.find((c) => c.record.name.startsWith(prefix))!
 const samples = [
     { key: 'full', tab: 'Fullständig', note: 'Fem bokslut och alla poster. Nyckeltalen räknas med öppna formler.', company: pick('Exempel Mjukvara') },
-    { key: 'sparse', tab: 'Gles', note: 'Förkortat bokslut: bara omsättningen finns. Resten står som saknas, inte som noll.', company: pick('Exempel Fastigheter') },
+    { key: 'sparse', tab: 'Gles', note: 'Exempel på ett förkortat bokslut med ofullständiga uppgifter.', company: pick('Exempel Fastigheter') },
     { key: 'stale', tab: 'Inaktuell', note: 'Senaste bokslutet avser 2022. Åren därefter visas som luckor.', company: pick('Exempel Metall') },
 ]
 const typing = demo.companies.slice(0, 6).map((c) => c.record.name).concat(['002000-1012'])
@@ -39,9 +39,9 @@ const eqPct = (numeric(m0.equityRatio) ?? 0) * 100
 const src = { source: 'synthetic', retrievedAt: '2026-09-01' } as const
 const states: { label: string; value: Value; fmt: 'sek' | 'pct'; means: string }[] = [
     { label: 'Rapporterat', value: { status: 'reported', value: 30_200_000, source: src }, fmt: 'sek', means: 'Står i årsredovisningen, med källa och räkenskapsår.' },
-    { label: 'Noll', value: { status: 'reported', value: 0, source: src }, fmt: 'sek', means: 'Bolaget har redovisat exakt noll.' },
+    { label: 'Noll', value: { status: 'reported', value: 0, source: src }, fmt: 'sek', means: 'En nolla kan också betyda att bokslutsposten saknas i källdatan.' },
     { label: 'Negativt', value: { status: 'reported', value: -412_000, source: src }, fmt: 'sek', means: 'Förlust eller negativt eget kapital.' },
-    { label: 'Saknas', value: { status: 'missing', reason: 'not_in_source' }, fmt: 'sek', means: 'Posten finns inte i källan. Aldrig 0.' },
+    { label: 'Saknas', value: { status: 'missing', reason: 'not_in_source' }, fmt: 'sek', means: 'Uppgiften kan inte fastställas från källdatan.' },
     { label: 'Ej jämförbar', value: { status: 'incomparable', reason: 'period_length' }, fmt: 'pct', means: 'T.ex. tillväxt efter ett 18-månadersår.' },
 ]
 const reports = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, null) }))
@@ -60,14 +60,14 @@ const statement =
     title="Bokslut, nyckeltal och kreditrisk för svenska företag"
     description="Sök svenska företag på namn eller organisationsnummer. Bokslut i flera år, nyckeltal med öppna formler och tydliga källor för varje siffra."
     path="/"
-    jsonLd={[{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: SITE.origin + '/', inLanguage: 'sv-SE', potentialAction: { '@type': 'SearchAction', target: `${SITE.origin}/sok/?q={q}`, 'query-input': 'required name=q' } }]}
+    jsonLd={[{ '@context': 'https://schema.org', '@type': 'WebSite', name: SITE.name, url: SITE.origin + '/', inLanguage: 'sv-SE' }]}
 >
     <!-- ============================================================ HERO -->
     <section class="hero">
         <Circuit />
         <div class="shell hero__inner">
             <p class="hero__badge reveal"><svg class="hero__sq" viewBox="11.5 9 41.5 41.5" aria-hidden="true"><path d="M13 14h11l8 24.5V50h-5.5z" fill="#1d3d31" /><path d="M32 38.5 41.5 9H52L37.5 50H32z" fill="#4f8a6c" /></svg> Byggt av Valuatum</p>
-            <h1 class="reveal" style="--d:1">Se siffrorna bakom <span class="tone">varje svenskt företag</span></h1>
+            <h1 class="reveal" style="--d:1">Se siffrorna bakom <span class="tone">svenska företag</span></h1>
             <p class="hero__sub reveal" style="--d:2">Bokslut, nyckeltal och källor på ett ställe. Varje siffra visar räkenskapsår och hur aktuell den är.</p>
             <div class="hero__search reveal" style="--d:3">
                 <SearchBox size="hero" id="hero-q" typing={typing} />
@@ -80,8 +80,8 @@ const statement =
         <div class="shell hero__stage">
             <p class="hero__left reveal" style="--d:2">
                 <span class="hero__mini" aria-hidden="true"><Icon name="doc" /> Så fungerar det</span>
-                Kreditrisker visar <b>fem års bokslut</b> och nyckeltal med öppna formler.{' '}
-                <span class="tone">Saknas en uppgift står det saknas, inte noll.</span>
+                Kreditrisker visar <b>upp till fem års bokslut</b> och nyckeltal med öppna formler.{' '}
+                <span class="tone">Bokslutsposter som saknas i källdatan visas normalt som 0.</span>
             </p>
             <div class="hero__card reveal" style="--d:3">
                 <HeroCard samples={samples} />
@@ -150,7 +150,7 @@ const statement =
                     <div class="tile__demo dark demo-bars" aria-hidden="true">
                         {[42, 51, 58, 71, 86].map((h, i) => <span style={`--h:${h}%;--i:${i}`}><i class="num">{2021 + i}</i></span>)}
                     </div>
-                    <h3>Fem års bokslut</h3>
+                    <h3>Upp till fem års bokslut</h3>
                     <p>Resultat- och balansräkning år för år, med period och källa i varje kolumn.</p>
                 </article>
                 <article class="tile tile--gaps reveal" data-spotlight>
@@ -161,7 +161,7 @@ const statement =
                         <div><span>Årets resultat</span><b class="num neg">−490 tkr</b></div>
                     </div>
                     <h3>Saknade uppgifter syns</h3>
-                    <p>En uppgift som saknas blir aldrig en nolla, och en negativ siffra syns direkt.</p>
+                    <p>Uppgifter som inte kan fastställas visas som saknas. Negativa siffror syns direkt.</p>
                 </article>
                 <article class="tile tile--report reveal" style="--d:1" data-spotlight>
                     <div class="tile__demo dark demo-report" aria-hidden="true">
@@ -185,7 +185,7 @@ const statement =
     <section class="section states">
         <div class="shell">
             <div class="section__head">
-                <h2 class="reveal">Fem sorters värden. <span class="tone">Noll betyder noll.</span></h2>
+                <h2 class="reveal">Så visas uppgifterna</h2>
                 <p class="reveal" style="--d:1">Små bolag lämnar ofta förkortade bokslut, och alla räkenskapsår är inte tolv månader. Därför skiljer vi på fem sorters värden.</p>
             </div>
             <ol class="states__row">

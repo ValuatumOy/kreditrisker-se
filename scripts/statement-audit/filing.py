@@ -23,9 +23,16 @@ XBRLDI = "http://xbrl.org/2006/xbrldi"
 XSI = "http://www.w3.org/2001/XMLSchema-instance"
 TRANSFORM_BASE = "http://www.xbrl.org/inlineXBRL/transformation/"
 REPORTING_SCOPES = {
-    f"{{http://www.taxonomier.se/se/fr/gen-base/{version}}}RedovisningInformation{name}Segment": scope
+    f"{{http://www.taxonomier.se/se/fr/gen-base/{version}}}{name}": scope
     for version in ("2020-12-01", "2021-10-31")
-    for name, scope in (("JuridiskPerson", "company"), ("Koncern", "group"), ("Generell", "general"))
+    for name, scope in (
+        ("RedovisningInformationJuridiskPersonSegment", "company"),
+        ("RedovisningInformationKoncernSegment", "group"),
+        ("RedovisningInformationGenerellSegment", "general"),
+        ("redovisninginformationjuridiskpersonsegment", "company"),
+        ("redovisninginformationkoncernsegment", "group"),
+        ("redovisninginformationgenerellsegment", "general"),
+    )
 }
 TRANSFORMS = {
     "2010-04-20": {"numspacecomma", "numspacedot", "numcomma", "numdot", "numdotcomma", "numcommadot"},
@@ -60,11 +67,13 @@ def _decode(data):
 
 def _xml(data):
     html = _decode(data)
-    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", html, re.I):
+    # Ignore only a plain HTML doctype in the prolog; retain original evidence bytes/HTML.
+    parse_html = re.sub(r"\A(\ufeff?(?:<\?xml[^?]*\?>)?[ \t\r\n]*)<!DOCTYPE html>", r"\1", html, count=1)
+    if re.search(r"<!\s*(?:DOCTYPE|ENTITY)\b", parse_html, re.I):
         raise ValueError("DTD and entity declarations are not allowed")
     scopes, stack, pending = {}, [], {}
     try:
-        parser = ET.iterparse(io.StringIO(html), events=("start", "end", "start-ns"))
+        parser = ET.iterparse(io.StringIO(parse_html), events=("start", "end", "start-ns"))
         count = 0
         for event, item in parser:
             if event == "start-ns":
@@ -314,11 +323,29 @@ def _viewer_html(html, root, generated):
     return html
 
 
+def _literal_row_label(element, parents):
+    cell, row = None, parents.get(element)
+    while row is not None and row.tag != f"{{{XHTML}}}tr":
+        if row.tag in {f"{{{XHTML}}}td", f"{{{XHTML}}}th"}:
+            cell = row
+        row = parents.get(row)
+    if row is None or cell is None or parents.get(cell) is not row:
+        return None
+    cells = [child for child in row if child.tag in {f"{{{XHTML}}}td", f"{{{XHTML}}}th"}]
+    if not cells or cell is cells[0] or any(node.tag == f"{{{XHTML}}}table" for node in row.iter()):
+        return None
+    label = cells[0]
+    if any(node.tag.startswith(f"{{{IX}}}") for node in label.iter()):
+        return None
+    return " ".join(_text(label).split())
+
+
 def _document(data, name, index):
     html, root, scopes = _xml(data)
     title_node = root.find("x:head/x:title", NS)
     title = _text(title_node).strip() if title_node is not None else ""
     document = {"name": name, "title": title, "kind": _kind(root, title, scopes), "html": html, "sha256": hashlib.sha256(data).hexdigest()}
+    parents = {child: parent for parent in root.iter() for child in parent}
     ids = defaultdict(list)
     for element in root.iter():
         if element.get("id"):
@@ -399,6 +426,13 @@ def _document(data, name, index):
                     fact["value"] = value
             except (ValueError, InvalidOperation) as exc:
                 errors.append(str(exc))
+        if numeric and fact["localName"] == "Nettoomsattning" and (fact["namespace"] or "").startswith(
+                "http://www.taxonomier.se/se/fr/gen-base/"):
+            label = _literal_row_label(element, parents)
+            if label and re.fullmatch(r"Bruttoresultat(?:\s*,\s*tkr)?", label, re.I):
+                issue = "Nettoomsattning is tagged on a literal gross-profit row; it is not a valid net-sales reference."
+                fact.update(literalSourceLabel=label, semanticIssue=issue)
+                errors.append(issue)
         if errors:
             fact["error"] = "; ".join(errors)
         facts.append(fact)
