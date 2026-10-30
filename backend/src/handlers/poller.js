@@ -9,9 +9,8 @@
 //   PENDING/RUN  → leave it; fail + cancel past MAX_GENERATION minutes so a stuck
 //                  job can't drift toward Stripe's 7-day capture window
 //
-// Every step is safe to re-run: the poller may revisit an order before a write
-// lands. FULFILLED is only set after the email is sent, so a failed email is
-// retried next tick.
+// FULFILLED is set after email succeeds so failures can be retried. If SES
+// accepts an email but the order update fails, a retry can send it again.
 
 const { stripeClient } = require('../lib/stripe');
 const dynamo = require('../lib/dynamo');
