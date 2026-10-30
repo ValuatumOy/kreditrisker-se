@@ -40,6 +40,45 @@ test('single reports create Swedish tax-aware sessions with manual capture', asy
     }
 })
 
+test('Stripe return URLs use SITE_URL in test and production despite request origin headers', async () => {
+    const configPath = require.resolve('../src/lib/config')
+    const handlerPath = require.resolve('../src/handlers/create-checkout')
+    const previousConfig = require.cache[configPath]
+    const previousHandler = require.cache[handlerPath]
+    const previousSiteUrl = process.env.SITE_URL
+    const cancelPath = '/foretag/5560369208/alvsjo/'
+    try {
+        for (const [siteUrl, requestOrigin] of [
+            ['https://d123example.cloudfront.net', 'https://www.kreditrisker.se'],
+            ['https://www.kreditrisker.se', 'https://kreditrisker.se'],
+        ]) {
+            process.env.SITE_URL = siteUrl
+            delete require.cache[configPath]
+            delete require.cache[handlerPath]
+            const configuredHandler = require('../src/handlers/create-checkout').handler
+            const response = await configuredHandler({
+                requestContext: { http: { method: 'POST' }, domainName: 'www.kreditrisker.se' },
+                headers: { origin: requestOrigin, host: 'www.kreditrisker.se', 'x-forwarded-host': 'kreditrisker.se' },
+                body: JSON.stringify({ reportType: 'se_credit_risk', businessId: '556036-9208',
+                    lang: 'sv', reportLang: 'sv', acceptedTermsVersion: 'test-v1', cancelPath }),
+            })
+            assert.equal(response.statusCode, 200)
+            const params = sessions.at(-1)
+            const success = new URL(params.success_url)
+            assert.equal(success.origin, siteUrl)
+            assert.equal(success.pathname, cancelPath)
+            assert.equal(success.searchParams.get('checkout'), 'success')
+            assert.equal(success.searchParams.get('session_id'), '{CHECKOUT_SESSION_ID}')
+            assert.equal(params.cancel_url, `${siteUrl}${cancelPath}`)
+        }
+    } finally {
+        require.cache[configPath] = previousConfig
+        require.cache[handlerPath] = previousHandler
+        if (previousSiteUrl === undefined) delete process.env.SITE_URL
+        else process.env.SITE_URL = previousSiteUrl
+    }
+})
+
 test('checkout refuses orders without the current terms version', async () => {
     for (const acceptedTermsVersion of ['', 'old-version']) {
         const response = await handler({

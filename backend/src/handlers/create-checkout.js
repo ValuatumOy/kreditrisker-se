@@ -19,7 +19,7 @@
 // Charge policy: manual capture (authorize now, capture only after the report
 // generates successfully).
 
-const { json, jsonBody, method, header } = require('../lib/http')
+const { json, jsonBody, method } = require('../lib/http')
 const {
     getProduct,
     grantFor,
@@ -67,26 +67,6 @@ function parsePackageCheckout(product, body) {
             fulfillReportType: grant.reportType,
         },
     }
-}
-
-function requestOrigin(event) {
-    const origin = header(event, 'origin')
-    if (
-        origin &&
-        /^https:\/\/([a-z0-9-]+\.)?kreditrisker\.se$/i.test(origin)
-    ) {
-        return origin.replace(/\/$/, '')
-    }
-
-    const host =
-        header(event, 'x-forwarded-host') ||
-        header(event, 'host') ||
-        event?.requestContext?.domainName
-    if (host && /^([a-z0-9-]+\.)?kreditrisker\.se$/i.test(host)) {
-        return `https://${host}`
-    }
-
-    return config.siteUrl
 }
 
 function appendParams(path, params) {
@@ -228,7 +208,7 @@ exports.handler = async event => {
     const langDisclosure = reportLangDisclosure(reportLanguage, language)
 
     // Only same-origin relative paths are honored for Stripe redirects.
-    const origin = requestOrigin(event)
+    const origin = config.siteUrl
     const returnPath =
         typeof cancelPath === 'string' && cancelPath.startsWith('/')
             ? cancelPath
