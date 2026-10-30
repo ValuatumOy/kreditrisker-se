@@ -18,6 +18,18 @@ test('production checkout cannot suppress its alert subscription', () => {
     }), /Production alert subscriptions cannot be suppressed/)
 })
 
+test('test alerts can only be suppressed for an isolated fixture checkout', () => {
+    assert.throws(() => new CheckoutStack(new cdk.App(), 'NoSilentRealOrders', {
+        environmentName: 'Test', siteUrl: 'https://example.test', suppressTestAlertSubscription: true,
+    }), /Suppressing test alerts requires isolated fixture mode/)
+})
+
+test('product settings cannot override operational or security environment variables', () => {
+    assert.throws(() => new CheckoutStack(new cdk.App(), 'NoEnvOverrides', {
+        environmentName: 'Test', siteUrl: 'https://example.test', stripeProducts: { ADMIN_EMAIL: 'other@example.com' },
+    }), /stripeProducts contains an unsupported environment variable/)
+})
+
 for (const environmentName of ['Test', 'Prod'] as const) {
     test(`${environmentName} checkout alerts on caught order errors and poller runtime errors`, () => {
         const app = new cdk.App()
@@ -25,19 +37,22 @@ for (const environmentName of ['Test', 'Prod'] as const) {
             env: { account: '123456789012', region: 'eu-west-1' },
             environmentName,
             siteUrl: 'https://example.test',
-            ...(environmentName === 'Test' ? { testSecretName: 'kreditrisker-se-isolated-checkout', suppressTestAlertSubscription: true } : {}),
+            ...(environmentName === 'Test' ? { testSecretName: 'kreditrisker-se-isolated-checkout', isolatedFixtureTest: true, suppressTestAlertSubscription: true } : {}),
         })
         const resources = Template.fromStack(stack).toJSON().Resources as Record<string, { Type: string; Properties: Record<string, any> }>
         const subscriptions = Object.values(resources).filter(resource => resource.Type === 'AWS::SNS::Subscription')
         assert.equal(subscriptions.length, environmentName === 'Test' ? 0 : 1)
         const checkoutLambda = Object.entries(resources).find(([id, resource]) => id.startsWith('CreateCheckoutFn') && resource.Type === 'AWS::Lambda::Function')?.[1]
         assert.match(JSON.stringify(checkoutLambda?.Properties.Environment.Variables.APP_SECRETS_ARN), environmentName === 'Test' ? /kreditrisker-se-isolated-checkout/ : /kreditrisker-se-prod/)
+        assert.equal(checkoutLambda?.Properties.Environment.Variables.REPORT_ISOLATED_FIXTURE_TEST, environmentName === 'Test' ? '1' : '0')
+        assert.equal(checkoutLambda?.Properties.Environment.Variables.ADMIN_EMAIL, environmentName === 'Test' ? 'success@simulator.amazonses.com' : 'luottoriskiraportti202605@valuatum.com')
         const orderTable = Object.entries(resources).find(([id, resource]) => id.startsWith('OrdersTable') && resource.Type === 'AWS::DynamoDB::Table')?.[1]
         assert.ok(orderTable?.Properties.GlobalSecondaryIndexes.some((index: any) => index.IndexName === 'WithdrawalIndex'
             && index.KeySchema.some((key: any) => key.AttributeName === 'withdrawalState' && key.KeyType === 'HASH')))
         assert.ok(Object.values(resources).some(resource => resource.Type === 'AWS::ApiGatewayV2::Route' && resource.Properties.RouteKey === 'POST /api/withdrawal'))
         const stage = Object.values(resources).find(resource => resource.Type === 'AWS::ApiGatewayV2::Stage')
         assert.deepEqual(stage?.Properties.RouteSettings['POST /api/withdrawal'], { ThrottlingBurstLimit: 4, ThrottlingRateLimit: 2 })
+        assert.deepEqual(stage?.Properties.RouteSettings['POST /api/create-checkout'], environmentName === 'Test' ? { ThrottlingBurstLimit: 2, ThrottlingRateLimit: 0.5 } : undefined)
         assert.ok(Object.entries(resources).some(([id, resource]) => id.startsWith('WithdrawalManualRefundAlarm') && resource.Type === 'AWS::CloudWatch::Alarm'))
         const topicId = Object.entries(resources).find(([id, resource]) => id.startsWith('EmailFailureTopic') && resource.Type === 'AWS::SNS::Topic')?.[0]
         const logGroupId = Object.entries(resources).find(([id, resource]) => id.startsWith('ReportPollerFnLogs') && resource.Type === 'AWS::Logs::LogGroup')?.[0]

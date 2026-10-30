@@ -22,6 +22,10 @@ const REPORT_ENGINE = {
     Test: { url: 'https://7zqqrejifzqphtwfb2imxtn67q0yzekq.lambda-url.eu-west-1.on.aws/', arn: 'arn:aws:lambda:eu-west-1:892885731254:function:pdf-report-api-test' },
     Prod: { url: 'https://jdnrhdk37rmqzayy2km4jyrlgq0uapaw.lambda-url.eu-west-1.on.aws/', arn: 'arn:aws:lambda:eu-west-1:892885731254:function:pdf-report-api' },
 }
+const STRIPE_PRODUCT_ENV_NAMES = new Set([
+    'STRIPE_PRODUCT_SE_BASIC', 'STRIPE_PRODUCT_SE_AI',
+    'STRIPE_PRODUCT_SE_BASIC_BUNDLE', 'STRIPE_PRODUCT_SE_AI_BUNDLE',
+])
 
 type ReportEngineTarget = { url: string; arn: string }
 
@@ -50,6 +54,8 @@ export interface CheckoutStackProps extends cdk.StackProps {
     testSecretName?: string
     /** Suppress only the test stack's email subscription for simulator-only tests. */
     suppressTestAlertSubscription?: boolean
+    /** Restrict a temporary test stack to a synthetic company and SES simulator. */
+    isolatedFixtureTest?: boolean
 }
 
 export function checkoutSecretName(props: Pick<CheckoutStackProps, 'environmentName' | 'checkoutEnabled' | 'testSecretName'>): string {
@@ -113,7 +119,9 @@ export class CheckoutStack extends cdk.Stack {
     ) {
         super(scope, id, props)
         if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
-        if (props.environmentName === 'Prod' && props.suppressTestAlertSubscription) throw new Error('Production alert subscriptions cannot be suppressed')
+        if (props.environmentName === 'Prod' && (props.suppressTestAlertSubscription || props.isolatedFixtureTest)) throw new Error('Production alert subscriptions cannot be suppressed or set to fixture mode')
+        if (props.suppressTestAlertSubscription && !props.isolatedFixtureTest) throw new Error('Suppressing test alerts requires isolated fixture mode')
+        if (Object.keys(props.stripeProducts ?? {}).some(name => !STRIPE_PRODUCT_ENV_NAMES.has(name))) throw new Error('stripeProducts contains an unsupported environment variable')
         validateTestCheckoutSite(props)
         const reportEngine = resolveReportEngine(props)
         const secretName = checkoutSecretName(props)
@@ -195,8 +203,9 @@ export class CheckoutStack extends cdk.Stack {
             secretName
         )
 
-        const adminEmail =
-            props.reportAdminEmail ?? 'luottoriskiraportti202605@valuatum.com'
+        const adminEmail = props.isolatedFixtureTest
+            ? 'success@simulator.amazonses.com'
+            : props.reportAdminEmail ?? 'luottoriskiraportti202605@valuatum.com'
 
         // SES configuration set applied to every send. Suppression keeps hard
         // bounces and complaints from being re-mailed (protecting the shared
@@ -233,6 +242,7 @@ export class CheckoutStack extends cdk.Stack {
         })
 
         const commonEnv: Record<string, string> = {
+            ...props.stripeProducts,
             ORDERS_TABLE: ordersTable.tableName,
             ORDERS_STATUS_INDEX: 'StatusIndex',
             CREDITS_TABLE: creditsTable.tableName,
@@ -248,9 +258,9 @@ export class CheckoutStack extends cdk.Stack {
             APP_SECRETS_ARN: appSecret.secretArn,
             NODE_OPTIONS: '--enable-source-maps',
             CONTACT_EMAIL: props.contactEmail ?? '',
-            ...props.stripeProducts,
             REPORT_CHECKOUT_ENABLED: props.checkoutEnabled ? '1' : '0',
             REPORT_TERMS_VERSION: props.termsVersion ?? '',
+            REPORT_ISOLATED_FIXTURE_TEST: props.environmentName === 'Test' && props.isolatedFixtureTest ? '1' : '0',
         }
 
         const makeFn = (
@@ -435,6 +445,9 @@ export class CheckoutStack extends cdk.Stack {
         const stage = reportApi.defaultStage?.node.defaultChild as apigwv2.CfnStage
         stage.addPropertyOverride('RouteSettings', {
             'POST /api/withdrawal': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 4 },
+            ...(props.isolatedFixtureTest ? {
+                'POST /api/create-checkout': { ThrottlingRateLimit: 0.5, ThrottlingBurstLimit: 2 },
+            } : {}),
         })
 
         // Poller runs ~every minute.

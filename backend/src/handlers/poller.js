@@ -27,6 +27,7 @@ const config = require('../lib/config');
 const fulfillment = require('../lib/fulfillment');
 const withdrawals = require('../lib/withdrawals');
 const { paymentFunding } = require('../lib/paymentFunding');
+const { isFixtureOrder } = require('../lib/fixtureTest');
 
 function ageMinutes(order) {
   const created = Date.parse(order.createdAt || '');
@@ -295,7 +296,7 @@ exports.handler = async () => {
   for (const indexed of pendingWithdrawals) {
     try {
       const order = await dynamo.getOrder(indexed.sessionId);
-      if (order) await withdrawals.processWithdrawal(stripe, order);
+      if (order && (!config.isolatedFixtureTest || isFixtureOrder(order))) await withdrawals.processWithdrawal(stripe, order);
     } catch (error) {
       console.error('withdrawal: processing error', { sessionId: indexed.sessionId, step: 'background processing', error: error.message });
     }
@@ -310,7 +311,7 @@ exports.handler = async () => {
   for (const indexed of confirming) {
     try {
       const order = await dynamo.getOrder(indexed.sessionId);
-      if (order?.status === 'CONFIRMING') await confirmBasicOrder(stripe, order);
+      if (order?.status === 'CONFIRMING' && (!config.isolatedFixtureTest || isFixtureOrder(order))) await confirmBasicOrder(stripe, order);
     } catch (error) {
       console.error('poller: order error', { sessionId: indexed.sessionId, error: error.message });
     }
@@ -323,7 +324,7 @@ exports.handler = async () => {
       // The status index is eventually consistent; it may still show a
       // jobless or already fulfilled version of an order.
       const order = await dynamo.getOrder(indexedOrder.sessionId);
-      if (!order || order.status !== 'GENERATING' || order.withdrawalRequestId) continue;
+      if (!order || order.status !== 'GENERATING' || order.withdrawalRequestId || (config.isolatedFixtureTest && !isFixtureOrder(order))) continue;
       await processOrder(stripe, order);
     } catch (err) {
       console.error('poller: order error', {

@@ -99,11 +99,14 @@ must be created in the isolated sandbox before connecting it.
 An enabled test checkout requires its own Secrets Manager name, passed as
 `testSecretName=kreditrisker-se-isolated-...`; do not overwrite the existing
 `kreditrisker-se-test` secret. For a simulator-only test, set
-`reportAdminEmailTest=success@simulator.amazonses.com` and
-`suppressTestAlertSubscription=1` to avoid emailing the normal operations
+`reportAdminEmailTest=success@simulator.amazonses.com`,
+`isolatedFixtureTest=1` and `suppressTestAlertSubscription=1` to avoid emailing the normal operations
 address. The alarms still exist but have no email subscriber in this mode;
 inspect logs and alarm states directly. Never use this setting for a real
-customer environment. The production stack always retains its subscription.
+customer environment. Fixture mode permits only company `0020001012`, the
+Basic product and the SES success simulator recipient in Checkout and webhook
+events; package redemption is disabled. The production stack always retains
+its subscription.
 
 Turning off `checkoutEnabledTest` also removes test-engine access, including
 for ongoing test orders. Finish test orders first: an order with a job ID

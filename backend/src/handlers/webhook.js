@@ -25,6 +25,8 @@ const dynamo = require('../lib/dynamo')
 const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
 const { paymentFunding } = require('../lib/paymentFunding')
+const config = require('../lib/config')
+const { isFixturePurchase } = require('../lib/fixtureTest')
 
 // Manual-capture sessions remain unpaid until the poller captures them. Only
 // immediate-capture products require a settled status here.
@@ -346,6 +348,14 @@ exports.handler = async event => {
     const session = stripeEvent.data.object
     const sessionId = session.id
     const reportType = session.metadata?.reportType
+
+    if (config.isolatedFixtureTest && (stripeEvent.livemode !== false || !isFixturePurchase({
+        reportType, businessId: session.metadata?.businessId,
+        email: session.customer_details?.email || session.customer_email,
+    }))) {
+        console.error('webhook: isolated test rejected a non-fixture order', { sessionId })
+        return json(200, { received: true })
+    }
 
     const product = getProduct(reportType)
     if (!product) {

@@ -39,6 +39,7 @@ const config = {
   contactEmail: strEnv('CONTACT_EMAIL', 'contact25@valuatum.com'),
   siteUrl: strEnv('SITE_URL', 'https://www.kreditrisker.se').replace(/\/$/, ''),
   termsVersion: strEnv('REPORT_TERMS_VERSION', ''),
+  isolatedFixtureTest: strEnv('REPORT_ISOLATED_FIXTURE_TEST') === '1',
 
   // Email (Amazon SES v2, same region as this stack). Sender is an address on
   // the verified valuatum.com SES domain identity. Internal failure alerts go to

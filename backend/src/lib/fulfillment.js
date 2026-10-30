@@ -8,6 +8,7 @@
 const reportEngine = require('./reportEngine')
 const dynamo = require('./dynamo')
 const config = require('./config')
+const { isFixtureOrder } = require('./fixtureTest')
 
 const DIRECT_FULFILL_GENERATORS = new Set(['valuatumRest', 'microProduct'])
 const FULFILLABLE_GENERATORS = new Set([
@@ -38,6 +39,8 @@ class FulfillmentSubmissionUnknownError extends Error {
 // Throws if job submission or tracking fails. Callers must not release the
 // order when a FulfillmentTrackingError says the generator already accepted it.
 async function startFulfillment(order, product) {
+    if (config.isolatedFixtureTest && (!isFixtureOrder(order) || product?.templateName !== 'staattinen_luottomuistio'))
+        throw new Error('Isolated checkout only fulfills the synthetic Basic order')
     if (DIRECT_FULFILL_GENERATORS.has(product.generator)) return { jobId: null }
 
     let jobId

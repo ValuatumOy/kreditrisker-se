@@ -15,6 +15,7 @@
 //   testSecretName        dedicated kreditrisker-se-isolated-* Stripe secret for test
 //   reportAdminEmailTest  test-only operational email recipient
 //   suppressTestAlertSubscription  1 for isolated simulator-only testing
+//   isolatedFixtureTest   1 to restrict the test API to one synthetic company and SES simulator
 //   checkoutEnabledProd   1 to allow new live checkout sessions after launch checks
 //   termsVersionTest/Prod version identifier for the approved purchase terms
 //
@@ -80,7 +81,7 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         ...(environmentName === 'Test' && (testReportEngineUrl || testReportEngineArn)
             ? { testReportEngine: { url: testReportEngineUrl ?? '', arn: testReportEngineArn ?? '' } }
             : {}),
-        ...(environmentName === 'Test' ? { testSecretName: ctx('testSecretName'), suppressTestAlertSubscription: ctx('suppressTestAlertSubscription') === '1' } : {}),
+        ...(environmentName === 'Test' ? { testSecretName: ctx('testSecretName'), suppressTestAlertSubscription: ctx('suppressTestAlertSubscription') === '1', isolatedFixtureTest: ctx('isolatedFixtureTest') === '1' } : {}),
         termsVersion: ctx(`termsVersion${environmentName}`),
     })
 }

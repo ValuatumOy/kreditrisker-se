@@ -21,6 +21,7 @@
 const { SESv2Client, SendEmailCommand } = require('@aws-sdk/client-sesv2');
 const config = require('./config');
 const { normalizeLang, reportLangName } = require('./products');
+const { isFixtureEmail } = require('./fixtureTest');
 
 const FROM = config.fromEmail;
 const ADMIN = config.adminEmail;
@@ -152,6 +153,10 @@ function buildSesInput(message) {
 }
 
 async function sendEmail(message, label) {
+  if (config.isolatedFixtureTest &&
+      (![...addresses(message.to), ...addresses(message.bcc)].length ||
+       ![...addresses(message.to), ...addresses(message.bcc)].every(isFixtureEmail)))
+    throw new Error('Isolated checkout only sends to the SES success simulator');
   let response;
   try {
     response = await client().send(new SendEmailCommand(buildSesInput(message)));

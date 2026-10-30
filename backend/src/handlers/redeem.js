@@ -16,6 +16,7 @@ const {
 const dynamo = require('../lib/dynamo')
 const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
+const config = require('../lib/config')
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
@@ -96,6 +97,9 @@ async function remainingReports(email, reportType) {
 exports.handler = async event => {
     if (method(event) !== 'POST')
         return json(405, { error: 'Method not allowed' })
+
+    if (config.isolatedFixtureTest)
+        return json(403, { error: 'Package redemption is disabled in the isolated test' })
 
     const { error, product, email, reportType, order } = parseRedeemRequest(
         jsonBody(event)

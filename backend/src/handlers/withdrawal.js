@@ -4,6 +4,8 @@ const { randomUUID } = require('node:crypto')
 const { json, jsonBody, method } = require('../lib/http')
 const dynamo = require('../lib/dynamo')
 const withdrawals = require('../lib/withdrawals')
+const config = require('../lib/config')
+const { isFixtureOrder } = require('../lib/fixtureTest')
 
 const SESSION_ID = /^cs_(?:test|live)_[A-Za-z0-9_]{8,240}$/
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -20,6 +22,7 @@ exports.handler = async event => {
     if (body.confirmed !== true) return json(400, { error: 'Confirm that you want to withdraw from this order.' })
     if (body.receiptMethod !== 'email') return json(400, { error: 'Confirm email as the receipt method.' })
     try {
+        if (config.isolatedFixtureTest && !isFixtureOrder(await dynamo.getOrder(sessionId))) return notFound()
         const order = await dynamo.requestWithdrawal({ sessionId, email, requestId: randomUUID(), requestedAt: new Date().toISOString(), receiptMethod: 'email' })
         if (!order) return notFound()
         try {

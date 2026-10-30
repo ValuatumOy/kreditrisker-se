@@ -32,6 +32,7 @@ const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
 const { stripeClient } = require('../lib/stripe')
 const config = require('../lib/config')
+const { isFixturePurchase } = require('../lib/fixtureTest')
 
 const INTERNAL_TEST_CODES = new Set((process.env.INTERNAL_TEST_CODES || '').split(',').filter(Boolean))
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -184,6 +185,9 @@ exports.handler = async event => {
         requestId,
         fulfillReportType,
     } = jsonBody(event)
+
+    if (config.isolatedFixtureTest && !isFixturePurchase({ reportType, businessId, email }))
+        return json(403, { error: 'Isolated checkout accepts only the synthetic test order' })
 
     if (!config.termsVersion || acceptedTermsVersion !== config.termsVersion)
         return json(400, { error: 'Purchase terms have not been accepted' })

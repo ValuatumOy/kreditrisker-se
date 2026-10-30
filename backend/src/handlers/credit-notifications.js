@@ -3,6 +3,7 @@
 const notifications = require('../lib/creditNotifications')
 const credits = require('../lib/credits')
 const emailService = require('../lib/email')
+const config = require('../lib/config')
 
 // Send without a count if the balance read fails.
 async function readUnspentReports(item) {
@@ -49,6 +50,7 @@ async function sendNotification(item) {
 }
 
 exports.handler = async (_event, context = {}) => {
+    if (config.isolatedFixtureTest) return { disabled: true }
     const due = await notifications.listDueNotifications()
     const stats = {
         due: due.length,
