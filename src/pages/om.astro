@@ -22,24 +22,19 @@ const p = SITE.provider
             <dd class="num">{p.businessId}</dd>
             <dt>Land</dt>
             <dd>{p.country}</dd>
+            <dt>Adress</dt>
+            <dd>{p.address}</dd>
             <dt>Webbplats</dt>
             <dd><a href={p.url}>{p.url.replace(/^https:\/\/|\/$/g, '')}</a></dd>
         </dl>
         <p>
             Valuatum driver sedan tidigare <a href="https://luottoriskit.fi/fi/">luottoriskit.fi</a> med bokslut och kreditrapporter för finska företag. Den svenska tjänsten
-            har egna data, egen metod och egna villkor.
+            använder svenska företagsuppgifter.
         </p>
 
         <h2 id="kontakt">Kontakt</h2>
-        {
-            p.email ? (
-                <p>
-                    E-post: <a href={`mailto:${p.email}`}>{p.email}</a>
-                </p>
-            ) : (
-                <p>En svensk kontaktadress publiceras när tjänsten lanseras. Till dess når du Valuatum via <a href={p.url}>valuatum.com</a>.</p>
-            )
-        }
+        <p>E-post: <a href={`mailto:${p.email}`}>{p.email}</a></p>
+        <p>Telefon: <a href="tel:+358451230308">{p.phone}</a></p>
 
         <h2 id="rattelse">Rättelser</h2>
         <p>

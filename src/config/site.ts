@@ -25,8 +25,9 @@ export const SITE = {
         businessId: '1612398-8',
         country: 'Finland',
         url: 'https://www.valuatum.com/',
-        /** Swedish support address; not decided yet. */
-        email: env('SE_CONTACT_EMAIL'),
+        email: env('SE_CONTACT_EMAIL') ?? 'contact25@valuatum.com',
+        phone: '+358 45 123 0308',
+        address: 'Linnanrakentajantie 6–8 C, Suite 15, 00880 Helsinki, Finland',
     },
     /** Data as-of date for freshness. Fixed in tests; build date otherwise. */
     asOf: env('SE_DATA_AS_OF') ?? new Date().toISOString().slice(0, 10),
