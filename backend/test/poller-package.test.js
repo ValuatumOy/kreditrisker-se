@@ -29,6 +29,11 @@ beforeEach(() => {
     mock.method(emailService, 'sendReportEmail', async () => undefined)
     mock.method(emailService, 'sendCreditReleaseEmail', async () => undefined)
     mock.method(emailService, 'sendAdminGenerationAlert', async () => undefined)
+    mock.method(dynamo, 'claimDelivery', async () => true)
+    mock.method(dynamo, 'finishSingleOrder', async (sessionId, attrs) => {
+        await dynamo.updateOrder(sessionId, attrs)
+        return true
+    })
 })
 
 test('package success consumes the reservation and ends the order atomically', async () => {
@@ -106,7 +111,7 @@ test('a cancelled payment cannot be mistaken for an already captured payment', a
         retrieve: async () => ({ status: 'canceled' }),
     } }
     const updateOrder = mock.method(dynamo, 'updateOrder', async () => undefined)
-    const delivered = await deliver(stripe, { sessionId: 'cs_test_single', paymentIntentId: 'pi_test', email: 'buyer@example.com', reportType: 'se_credit_risk' }, Buffer.from('pdf'))
+    const delivered = await deliver(stripe, { sessionId: 'cs_test_single', amountTotal: 2900, paymentIntentId: 'pi_test', email: 'buyer@example.com', reportType: 'se_credit_risk' }, Buffer.from('pdf'))
     assert.equal(delivered, false)
     assert.equal(emailService.sendReportEmail.mock.callCount(), 0)
     assert.equal(updateOrder.mock.callCount(), 1)
@@ -120,7 +125,7 @@ test('a captured payment cannot be treated as canceled after generation failure'
         retrieve: async () => ({ status: 'succeeded' }),
     } }
     const updateOrder = mock.method(dynamo, 'updateOrder')
-    await assert.rejects(fail(stripe, { sessionId: 'cs_test_single', paymentIntentId: 'pi_test' }, 'Generation failed'), /cannot be canceled/)
+    await assert.rejects(fail(stripe, { sessionId: 'cs_test_single', amountTotal: 2900, paymentIntentId: 'pi_test' }, 'Generation failed'), /cannot be canceled/)
     assert.equal(updateOrder.mock.callCount(), 0)
     assert.equal(emailService.sendAdminGenerationAlert.mock.callCount(), 0)
 })
@@ -131,9 +136,36 @@ test('a retry after successful capture can still deliver the report', async () =
         retrieve: async () => ({ status: 'succeeded' }),
     } }
     const updateOrder = mock.method(dynamo, 'updateOrder', async () => undefined)
-    await deliver(stripe, { sessionId: 'cs_test_single', paymentIntentId: 'pi_test', email: 'buyer@example.com', reportType: 'se_credit_risk' }, Buffer.from('pdf'))
+    await deliver(stripe, { sessionId: 'cs_test_single', amountTotal: 2900, paymentIntentId: 'pi_test', email: 'buyer@example.com', reportType: 'se_credit_risk' }, Buffer.from('pdf'))
     assert.equal(emailService.sendReportEmail.mock.callCount(), 1)
     assert.equal(updateOrder.mock.callCount(), 1)
+})
+
+test('an unconfirmed capture response cannot authorize report delivery', async () => {
+    const stripe = { paymentIntents: {
+        capture: async () => ({ status: 'processing' }),
+        retrieve: async () => ({ status: 'processing' }),
+    } }
+    const updateOrder = mock.method(dynamo, 'updateOrder')
+    await assert.rejects(deliver(stripe, {
+        sessionId: 'cs_test_single', amountTotal: 2900, paymentIntentId: 'pi_test',
+        email: 'buyer@example.com', reportType: 'se_credit_risk',
+    }, Buffer.from('pdf')), /capture was not confirmed/)
+    assert.equal(emailService.sendReportEmail.mock.callCount(), 0)
+    assert.equal(updateOrder.mock.callCount(), 0)
+})
+
+test('an unconfirmed cancellation cannot mark the order failed or claim the hold was released', async () => {
+    const stripe = { paymentIntents: {
+        cancel: async () => ({ status: 'processing' }),
+        retrieve: async () => ({ status: 'processing' }),
+    } }
+    const updateOrder = mock.method(dynamo, 'updateOrder')
+    await assert.rejects(fail(stripe, {
+        sessionId: 'cs_test_single', amountTotal: 2900, paymentIntentId: 'pi_test', reportType: 'se_credit_risk',
+    }, 'Generation failed'), /cancellation was not confirmed/)
+    assert.equal(emailService.sendAdminGenerationAlert.mock.callCount(), 0)
+    assert.equal(updateOrder.mock.callCount(), 0)
 })
 
 test('package failure relies on the transactional release outbox', async () => {

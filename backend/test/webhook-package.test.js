@@ -144,7 +144,8 @@ test('the payment_status gate does not touch manual-capture single reports', asy
   assert.equal(res.statusCode, 200);
   assert.equal(claimOrder.mock.callCount(), 1);
   assert.equal(claimOrder.mock.calls[0].arguments[0].sessionId, CS_ID);
-  assert.equal(fulfillment.startFulfillment.mock.callCount(), 1);
+  assert.equal(claimOrder.mock.calls[0].arguments[0].status, 'CONFIRMING');
+  assert.equal(fulfillment.startFulfillment.mock.callCount(), 0);
 });
 
 test('a report the package does not grant is refused', async () => {

@@ -36,7 +36,7 @@ const config = {
   // Public site origin (used in Stripe redirect URLs, and as the allowed CORS
   // origin if the browser calls the API cross-origin). This is the host the
   // Astro site is actually served on — companies.creditreports.dk — NOT the apex.
-  contactEmail: strEnv('CONTACT_EMAIL', ''),
+  contactEmail: strEnv('CONTACT_EMAIL', 'contact25@valuatum.com'),
   siteUrl: strEnv('SITE_URL', 'https://www.kreditrisker.se').replace(/\/$/, ''),
   termsVersion: strEnv('REPORT_TERMS_VERSION', ''),
 

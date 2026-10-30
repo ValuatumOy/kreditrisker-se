@@ -1,7 +1,10 @@
 'use strict';
 
 // Poller — triggered by an EventBridge schedule (~every 1 min). For each order
-// still GENERATING, checks the report-engine job and resolves the manual-capture
+// CONFIRMING Basic orders first receive an order reference. Withdrawal requests
+// are handled independently of fulfillment status, with charged payments queued
+// for manual refund review. For each remaining GENERATING order, checks the
+// report-engine job and resolves the manual-capture
 // PaymentIntent:
 //   DONE         → download PDF, CAPTURE the PaymentIntent, email the PDF, mark FULFILLED
 //   FAILED       → CANCEL the PaymentIntent (release the hold, no charge),
@@ -21,6 +24,9 @@ const { generateValuatumReport } = require('../lib/valuatumReports');
 const { getProduct, localizedField, DEFAULT_REPORT_LANG } = require('../lib/products');
 const emailService = require('../lib/email');
 const config = require('../lib/config');
+const fulfillment = require('../lib/fulfillment');
+const withdrawals = require('../lib/withdrawals');
+const { paymentFunding } = require('../lib/paymentFunding');
 
 function ageMinutes(order) {
   const created = Date.parse(order.createdAt || '');
@@ -31,11 +37,11 @@ function ageMinutes(order) {
 // A retry is successful only if Stripe confirms the payment was captured.
 async function capturePaymentIntent(stripe, paymentIntentId) {
   if (!paymentIntentId) {
-    console.log('capturePaymentIntent: no paymentIntentId on order, nothing to capture');
-    return;
+    throw new Error('Payment review required: capture has no PaymentIntent');
   }
   try {
-    await stripe.paymentIntents.capture(paymentIntentId);
+    const intent = await stripe.paymentIntents.capture(paymentIntentId);
+    if (intent?.status !== 'succeeded') throw new Error('Payment capture was not confirmed');
   } catch (err) {
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (paymentIntent.status === 'succeeded') {
@@ -55,11 +61,11 @@ async function capturePaymentIntent(stripe, paymentIntentId) {
 
 async function cancelPaymentIntent(stripe, paymentIntentId) {
   if (!paymentIntentId) {
-    console.log('cancelPaymentIntent: no paymentIntentId on order, no hold to release');
-    return;
+    throw new Error('Payment review required: cancellation has no PaymentIntent');
   }
   try {
-    await stripe.paymentIntents.cancel(paymentIntentId);
+    const intent = await stripe.paymentIntents.cancel(paymentIntentId);
+    if (intent?.status !== 'canceled') throw new Error('Payment cancellation was not confirmed');
   } catch (err) {
     const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
     if (paymentIntent.status === 'canceled') {
@@ -91,6 +97,10 @@ async function settleFunding(order, attrs = {}, occurredAt = new Date().toISOStr
   if (order.funding === 'package') {
     return credits.consume(packageSettlementInput(order, orderAttrs, occurredAt));
   }
+  if (order.reportType === 'se_credit_risk') {
+    const completed = await dynamo.finishSingleOrder(order.sessionId, orderAttrs);
+    return completed ? { status: 'SETTLED' } : { status: 'WITHDRAWN' };
+  }
   return dynamo.updateOrder(order.sessionId, orderAttrs);
 }
 
@@ -98,6 +108,10 @@ async function releaseFunding(order, reason, occurredAt = new Date().toISOString
   const orderAttrs = { status: 'FAILED', error: reason };
   if (order.funding === 'package') {
     return credits.release(packageSettlementInput(order, orderAttrs, occurredAt));
+  }
+  if (order.reportType === 'se_credit_risk') {
+    const completed = await dynamo.finishSingleOrder(order.sessionId, orderAttrs);
+    return completed ? { status: 'SETTLED' } : { status: 'WITHDRAWN' };
   }
   return dynamo.updateOrder(order.sessionId, orderAttrs);
 }
@@ -132,7 +146,10 @@ function reportFileName(companyName) {
 }
 
 async function deliver(stripe, order, pdfBuffer) {
-  if (order.paymentIntentId) {
+  const funding = paymentFunding(order);
+  if (order.reportType === 'se_credit_risk' && order.funding !== 'package'
+      && !(await dynamo.claimDelivery(order.sessionId))) return false;
+  if (funding === 'STRIPE') {
     try {
       await capturePaymentIntent(stripe, order.paymentIntentId);
     } catch (err) {
@@ -153,8 +170,8 @@ async function deliver(stripe, order, pdfBuffer) {
     // Tags the send so an SES bounce/complaint event names the order.
     sessionId: order.sessionId,
   });
-  await settleFunding(order);
-  return true;
+  const settlement = await settleFunding(order);
+  return settlement?.status !== 'WITHDRAWN';
 }
 
 async function fulfill(stripe, order, job) {
@@ -168,8 +185,9 @@ async function fulfill(stripe, order, job) {
 }
 
 async function fail(stripe, order, reason) {
-  await cancelPaymentIntent(stripe, order.paymentIntentId);
+  if (paymentFunding(order) === 'STRIPE') await cancelPaymentIntent(stripe, order.paymentIntentId);
   const settlement = await releaseFunding(order, reason);
+  if (settlement?.status === 'WITHDRAWN') return;
   // Best-effort: a failed admin alert (e.g. SES identity not verified) must
   // not keep the order GENERATING and re-loop the poller every tick. The hold
   // is already released above, so marking the order terminal is the priority.
@@ -220,6 +238,7 @@ async function processRestOrder(stripe, order, product) {
 }
 
 async function processOrder(stripe, order) {
+  paymentFunding(order);
   const product = getProduct(order.reportType);
   if (product?.generator === 'valuatumRest') {
     await processRestOrder(stripe, order, product);
@@ -250,8 +269,52 @@ async function processOrder(stripe, order) {
   // else PENDING/RUNNING within budget → leave for the next tick.
 }
 
+async function confirmBasicOrder(stripe, order) {
+  if (order.withdrawalRequestId) return;
+  paymentFunding(order);
+  if (ageMinutes(order) > config.maxGenerationMinutes) {
+    await fail(stripe, order, 'Order confirmation could not be sent before the generation deadline.');
+    return;
+  }
+  if (!order.confirmationAcceptedAt) {
+    await emailService.sendOrderReceivedEmail(order, localizedField(getProduct(order.reportType)?.name, order.lang));
+    await dynamo.updateOrder(order.sessionId, { confirmationAcceptedAt: new Date().toISOString() });
+  }
+  if (!(await dynamo.beginGeneration(order.sessionId))) return;
+  try {
+    await fulfillment.startFulfillment(order, getProduct(order.reportType));
+  } catch (error) {
+    // Once claimed, never resubmit: an interrupted response may hide a paid job.
+    console.error('poller: order error', { sessionId: order.sessionId, error: error.message });
+  }
+}
+
 exports.handler = async () => {
   const stripe = await stripeClient();
+  const pendingWithdrawals = await dynamo.listWithdrawals();
+  for (const indexed of pendingWithdrawals) {
+    try {
+      const order = await dynamo.getOrder(indexed.sessionId);
+      if (order) await withdrawals.processWithdrawal(stripe, order);
+    } catch (error) {
+      console.error('withdrawal: processing error', { sessionId: indexed.sessionId, step: 'background processing', error: error.message });
+    }
+  }
+  for (const indexed of await dynamo.listWithdrawals('REVIEW_REQUIRED')) {
+    const order = await dynamo.getOrder(indexed.sessionId);
+    if (order?.withdrawalState === 'REVIEW_REQUIRED') {
+      console.warn('withdrawal: manual refund required', { sessionId: order.sessionId });
+    }
+  }
+  const confirming = await listOrdersByStatus('CONFIRMING');
+  for (const indexed of confirming) {
+    try {
+      const order = await dynamo.getOrder(indexed.sessionId);
+      if (order?.status === 'CONFIRMING') await confirmBasicOrder(stripe, order);
+    } catch (error) {
+      console.error('poller: order error', { sessionId: indexed.sessionId, error: error.message });
+    }
+  }
   const orders = await listOrdersByStatus('GENERATING');
   console.log('poller: tick', { count: orders.length });
 
@@ -260,7 +323,7 @@ exports.handler = async () => {
       // The status index is eventually consistent; it may still show a
       // jobless or already fulfilled version of an order.
       const order = await dynamo.getOrder(indexedOrder.sessionId);
-      if (!order || order.status !== 'GENERATING') continue;
+      if (!order || order.status !== 'GENERATING' || order.withdrawalRequestId) continue;
       await processOrder(stripe, order);
     } catch (err) {
       console.error('poller: order error', {

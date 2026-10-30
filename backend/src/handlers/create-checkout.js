@@ -216,7 +216,7 @@ exports.handler = async event => {
     const cancelUrl = `${origin}${returnPath}`
     const successPath = appendParams(
         returnPath,
-        `checkout=success&session_id={CHECKOUT_SESSION_ID}&report=${encodeURIComponent(reportType)}${
+        `checkout=success${reportType === 'se_credit_risk' ? '' : '&session_id={CHECKOUT_SESSION_ID}'}&report=${encodeURIComponent(reportType)}${
             companyName
                 ? `&company=${encodeURIComponent(String(companyName))}`
                 : ''

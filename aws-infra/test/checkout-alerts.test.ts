@@ -21,10 +21,27 @@ for (const environmentName of ['Test', 'Prod'] as const) {
             siteUrl: 'https://example.test',
         })
         const resources = Template.fromStack(stack).toJSON().Resources as Record<string, { Type: string; Properties: Record<string, any> }>
+        const orderTable = Object.entries(resources).find(([id, resource]) => id.startsWith('OrdersTable') && resource.Type === 'AWS::DynamoDB::Table')?.[1]
+        assert.ok(orderTable?.Properties.GlobalSecondaryIndexes.some((index: any) => index.IndexName === 'WithdrawalIndex'
+            && index.KeySchema.some((key: any) => key.AttributeName === 'withdrawalState' && key.KeyType === 'HASH')))
+        assert.ok(Object.values(resources).some(resource => resource.Type === 'AWS::ApiGatewayV2::Route' && resource.Properties.RouteKey === 'POST /api/withdrawal'))
+        const stage = Object.values(resources).find(resource => resource.Type === 'AWS::ApiGatewayV2::Stage')
+        assert.deepEqual(stage?.Properties.RouteSettings['POST /api/withdrawal'], { ThrottlingBurstLimit: 4, ThrottlingRateLimit: 2 })
+        assert.ok(Object.entries(resources).some(([id, resource]) => id.startsWith('WithdrawalManualRefundAlarm') && resource.Type === 'AWS::CloudWatch::Alarm'))
         const topicId = Object.entries(resources).find(([id, resource]) => id.startsWith('EmailFailureTopic') && resource.Type === 'AWS::SNS::Topic')?.[0]
         const logGroupId = Object.entries(resources).find(([id, resource]) => id.startsWith('ReportPollerFnLogs') && resource.Type === 'AWS::Logs::LogGroup')?.[0]
         const functionId = Object.entries(resources).find(([id, resource]) => id.startsWith('ReportPollerFn') && resource.Type === 'AWS::Lambda::Function')?.[0]
         assert.ok(topicId && logGroupId && functionId)
+        const webhookLogId = Object.entries(resources).find(([id, resource]) => id.startsWith('WebhookFnLogs') && resource.Type === 'AWS::Logs::LogGroup')?.[0]
+        const paymentFilter = Object.entries(resources).find(([id, resource]) => id.startsWith('WebhookPaymentReviewErrors') && resource.Type === 'AWS::Logs::MetricFilter')?.[1]
+        assert.ok(webhookLogId && paymentFilter)
+        assert.equal(paymentFilter.Properties.FilterPattern, '"webhook: payment review required"')
+        assert.deepEqual(paymentFilter.Properties.LogGroupName, { Ref: webhookLogId })
+        const paymentAlarm = Object.entries(resources).find(([id, resource]) => id.startsWith('WebhookPaymentReviewAlarm') && resource.Type === 'AWS::CloudWatch::Alarm')?.[1]
+        assert.ok(paymentAlarm)
+        assert.equal(paymentAlarm.Properties.Threshold, 1)
+        assert.equal(paymentAlarm.Properties.MetricName, 'WebhookPaymentReviewRequired')
+        assert.deepEqual(paymentAlarm.Properties.AlarmActions, [{ Ref: topicId }])
         const filter = Object.entries(resources).find(([id, resource]) => id.startsWith('ReportPollerOrderErrors') && resource.Type === 'AWS::Logs::MetricFilter')?.[1]
         assert.ok(filter)
         assert.equal(filter.Properties.FilterPattern, '"poller: order error"')

@@ -125,6 +125,12 @@ export class CheckoutStack extends cdk.Stack {
             },
             projectionType: dynamodb.ProjectionType.ALL,
         })
+        ordersTable.addGlobalSecondaryIndex({
+            indexName: 'WithdrawalIndex',
+            partitionKey: { name: 'withdrawalState', type: dynamodb.AttributeType.STRING },
+            sortKey: { name: 'withdrawalRequestedAt', type: dynamodb.AttributeType.STRING },
+            projectionType: dynamodb.ProjectionType.ALL,
+        })
 
         const creditsTable = new dynamodb.Table(this, 'CreditsTable', {
             partitionKey: {
@@ -265,6 +271,7 @@ export class CheckoutStack extends cdk.Stack {
         )
         const webhookFn = makeFn('WebhookFn', 'webhook.js')
         const redeemFn = makeFn('RedeemFn', 'redeem.js')
+        const withdrawalFn = makeFn('WithdrawalFn', 'withdrawal.js')
         const creditNotificationFn = makeFn(
             'CreditNotificationFn',
             'credit-notifications.js'
@@ -279,6 +286,7 @@ export class CheckoutStack extends cdk.Stack {
         ordersTable.grantReadWriteData(webhookFn)
         ordersTable.grantReadWriteData(pollerFn)
         ordersTable.grantReadWriteData(redeemFn)
+        ordersTable.grantReadWriteData(withdrawalFn)
         creditsTable.grantReadWriteData(redeemFn)
         creditsTable.grantReadWriteData(webhookFn)
         creditsTable.grantReadWriteData(pollerFn)
@@ -353,6 +361,13 @@ export class CheckoutStack extends cdk.Stack {
                 ],
             })
         )
+        withdrawalFn.addToRolePolicy(new iam.PolicyStatement({
+            actions: ['ses:SendEmail'],
+            resources: [
+                cdk.Stack.of(this).formatArn({ service: 'ses', resource: 'identity', resourceName: 'valuatum.com' }),
+                cdk.Stack.of(this).formatArn({ service: 'ses', resource: 'configuration-set', resourceName: emailConfigurationSet.configurationSetName }),
+            ],
+        }))
 
         const reportApi = new apigwv2.HttpApi(this, 'ReportCheckoutApi', {
             apiName: 'dk-company-directory-report-checkout',
@@ -391,6 +406,15 @@ export class CheckoutStack extends cdk.Stack {
                 'RedeemInt',
                 redeemFn
             ),
+        })
+        reportApi.addRoutes({
+            path: '/api/withdrawal',
+            methods: [apigwv2.HttpMethod.POST],
+            integration: new integrations.HttpLambdaIntegration('WithdrawalInt', withdrawalFn),
+        })
+        const stage = reportApi.defaultStage?.node.defaultChild as apigwv2.CfnStage
+        stage.addPropertyOverride('RouteSettings', {
+            'POST /api/withdrawal': { ThrottlingRateLimit: 2, ThrottlingBurstLimit: 4 },
         })
 
         // Poller runs ~every minute.
@@ -433,7 +457,15 @@ export class CheckoutStack extends cdk.Stack {
             metricValue: '1',
             defaultValue: 0,
         })
+        const webhookPaymentErrors = new logs.MetricFilter(this, 'WebhookPaymentReviewErrors', {
+            logGroup: webhookFn.logGroup,
+            metricNamespace: `KreditriskerSE/${props.environmentName}`,
+            metricName: 'WebhookPaymentReviewRequired',
+            filterPattern: logs.FilterPattern.literal('"webhook: payment review required"'),
+            metricValue: '1', defaultValue: 0,
+        })
         for (const [id, metric] of [
+            ['WebhookPaymentReviewAlarm', webhookPaymentErrors.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' })],
             ['ReportPollerOrderErrorAlarm', pollerOrderErrors.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' })],
             ['ReportPollerRuntimeErrorAlarm', pollerFn.metricErrors({ period: cdk.Duration.minutes(1) })],
         ] as const) {
@@ -444,6 +476,32 @@ export class CheckoutStack extends cdk.Stack {
                 treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
             }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
         }
+        for (const [id, fn] of [['WithdrawalApi', withdrawalFn], ['WithdrawalWorker', pollerFn]] as const) {
+            const metric = new logs.MetricFilter(this, `${id}Errors`, {
+                logGroup: fn.logGroup,
+                metricNamespace: `KreditriskerSE/${props.environmentName}`,
+                metricName: `${id}Errors`,
+                filterPattern: logs.FilterPattern.literal('"withdrawal: processing error"'),
+                metricValue: '1', defaultValue: 0,
+            })
+            new cloudwatch.Alarm(this, `${id}ErrorAlarm`, {
+                metric: metric.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' }),
+                threshold: 1, evaluationPeriods: 1,
+                treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+            }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
+        }
+        const manualRefunds = new logs.MetricFilter(this, 'WithdrawalManualRefunds', {
+            logGroup: pollerFn.logGroup,
+            metricNamespace: `KreditriskerSE/${props.environmentName}`,
+            metricName: 'WithdrawalManualRefundRequired',
+            filterPattern: logs.FilterPattern.literal('"withdrawal: manual refund required"'),
+            metricValue: '1', defaultValue: 0,
+        })
+        new cloudwatch.Alarm(this, 'WithdrawalManualRefundAlarm', {
+            metric: manualRefunds.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' }),
+            threshold: 1, evaluationPeriods: 1,
+            treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+        }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
 
         new cdk.CfnOutput(this, 'ReportCheckoutApiUrl', {
             value: reportApi.apiEndpoint,

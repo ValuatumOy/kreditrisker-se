@@ -24,6 +24,7 @@ const {
 const dynamo = require('../lib/dynamo')
 const credits = require('../lib/credits')
 const fulfillment = require('../lib/fulfillment')
+const { paymentFunding } = require('../lib/paymentFunding')
 
 // Manual-capture sessions remain unpaid until the poller captures them. Only
 // immediate-capture products require a settled status here.
@@ -40,6 +41,7 @@ function sessionFacts(session) {
             ? session.amount_total
             : undefined,
         currency: session.currency || undefined,
+        paymentStatus: session.payment_status,
         paymentIntentId:
             typeof session.payment_intent === 'string'
                 ? session.payment_intent
@@ -56,8 +58,18 @@ async function fulfillSingleReport(session, product) {
         amountTotal,
         currency,
         paymentIntentId,
+        paymentStatus,
     } = sessionFacts(session)
     const reportType = meta.reportType
+
+    try {
+        paymentFunding({ amountTotal, paymentIntentId, paymentStatus })
+    } catch (error) {
+        // No claim and no paid job: Stripe retries, and the log metric alerts
+        // operations even though returning a 5xx does not fail the Lambda.
+        console.error('webhook: payment review required', { sessionId, error: error.message })
+        return text(503, 'Payment could not be verified')
+    }
 
     if (!fulfillment.isFulfillable(product)) {
         console.error('webhook: product has no fulfillable generator', {
@@ -77,8 +89,9 @@ async function fulfillSingleReport(session, product) {
 
     const claimed = await dynamo.claimOrder({
         sessionId,
-        status: 'GENERATING',
+        status: reportType === 'se_credit_risk' ? 'CONFIRMING' : 'GENERATING',
         paymentIntentId,
+        paymentStatus,
         email,
         customerName,
         amountTotal,
@@ -99,6 +112,10 @@ async function fulfillSingleReport(session, product) {
         })
         return json(200, { received: true })
     }
+
+    // A durable reference reaches the buyer before the paid Basic job starts.
+    // The poller retries confirmation, then claims submission once.
+    if (reportType === 'se_credit_risk') return json(200, { received: true })
 
     let jobId
     try {

@@ -65,6 +65,9 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             <p class="od__state"><span class="tag">{STATE_LABEL.paid}</span></p>
             <p>Om betalningen godkändes skickas rapporten till din e-post när den är klar.</p>
             <p class="small muted">Beloppet reserveras och dras först när rapporten är klar. Om rapporten inte kan tas fram släpps reservationen och du debiteras inget.</p>
+            <p data-confirmation-note hidden>Ordernumret skickas till din e-postadress i beställningsbekräftelsen.</p>
+            <p class="small" data-paid-reference hidden>Order: <span class="num" data-paid-order></span></p>
+            <a data-withdrawal-link href="/angra-kop/" hidden>Ångra köp</a>
         </div>
 
         <div class="od__panel" data-view="failure" hidden aria-live="assertive">
@@ -75,6 +78,15 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         </div>
     </div>
     </NightBand>
+    <script is:inline>
+        const orderReturnRoot = document.querySelector('[data-order]')
+        const orderReturnParams = new URLSearchParams(location.search)
+        if (orderReturnRoot && orderReturnParams.has('session_id')) {
+            orderReturnRoot.dataset.returnParams = location.search
+            orderReturnParams.delete('session_id')
+            history.replaceState(null, '', `${location.pathname}?${orderReturnParams}`)
+        }
+    </script>
 </Base>
 
 <script>
@@ -85,7 +97,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     import { findCompanies, type SearchHit } from '../../lib/search.ts'
 
     const root = document.querySelector<HTMLElement>('[data-order]')!
-    const params = new URLSearchParams(location.search)
+    const params = new URLSearchParams(root.dataset.returnParams ?? location.search)
     const product: ReportProduct = params.get('produkt') === 'ai' ? 'ai' : 'basic'
     const parsed = parseOrgnr(params.get('orgnr') ?? '')
     const orgnr = parsed.ok ? parsed.orgnr : ''
@@ -131,7 +143,23 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         const co = root.querySelector('[data-company]')!
         co.textContent = hit ? `${hit.n}, org.nr ${formatOrgnr(orgnr)}` : `Org.nr ${formatOrgnr(orgnr)}`
         companyName = hit?.n
-        if (params.get('checkout') === 'success') return show({ kind: 'paid' })
+        if (params.get('checkout') === 'success') {
+            if (product === 'basic') {
+                root.querySelector<HTMLElement>('[data-confirmation-note]')!.hidden = false
+                root.querySelector<HTMLElement>('[data-withdrawal-link]')!.hidden = false
+            }
+            const sessionId = params.get('session_id') ?? ''
+            if (/^cs_(?:test|live)_[A-Za-z0-9_]{8,240}$/.test(sessionId)) {
+                root.querySelector('[data-paid-order]')!.textContent = sessionId
+                root.querySelector<HTMLElement>('[data-paid-reference]')!.hidden = false
+                if (product === 'basic') {
+                    const link = root.querySelector<HTMLAnchorElement>('[data-withdrawal-link]')!
+                    link.href = '/angra-kop/'
+                    link.hidden = false
+                }
+            }
+            return show({ kind: 'paid' })
+        }
         if (hit) root.querySelector<HTMLAnchorElement>('[data-back]')!.href = hit.p
 
         const demo = params.get('demo')
@@ -198,6 +226,9 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     }
     .od__panel[hidden] {
         display: none;
+    }
+    [data-paid-reference] {
+        overflow-wrap: anywhere;
     }
     .od__state {
         display: flex;

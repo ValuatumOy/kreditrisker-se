@@ -39,7 +39,7 @@ const emailService = require('../src/lib/email')
 
 let state
 function reset() {
-    state = { orders: new Map(), jobs: [], sessions: [], captures: [], cancellations: [], emails: [], alerts: [], submitError: false, emailError: false }
+    state = { orders: new Map(), jobs: [], sessions: [], captures: [], cancellations: [], emails: [], confirmations: [], alerts: [], submitError: false, emailError: false }
 }
 reset()
 
@@ -64,9 +64,10 @@ const stripe = {
         capture: async id => {
             if (state.captures.includes(id)) throw new Error('already captured')
             state.captures.push(id)
+            return { status: 'succeeded' }
         },
         retrieve: async id => ({ status: state.captures.includes(id) ? 'succeeded' : 'requires_capture' }),
-        cancel: async id => { state.cancellations.push(id) },
+        cancel: async id => { state.cancellations.push(id); return { status: 'canceled' } },
     },
 }
 
@@ -81,6 +82,20 @@ dynamo.updateOrder = async (id, values) => {
 }
 dynamo.deleteOrder = async id => { state.orders.delete(id) }
 dynamo.getOrder = async id => state.orders.get(id)
+dynamo.listWithdrawals = async () => []
+dynamo.beginGeneration = async id => {
+    const order = state.orders.get(id)
+    if (order.status !== 'CONFIRMING' || order.withdrawalRequestId) return false
+    order.status = 'GENERATING'
+    return true
+}
+dynamo.claimDelivery = async id => !state.orders.get(id)?.withdrawalRequestId
+dynamo.finishSingleOrder = async (id, values) => {
+    const order = state.orders.get(id)
+    if (order.withdrawalRequestId) return false
+    Object.assign(order, values)
+    return true
+}
 dynamo.listOrdersByStatus = async status => state.staleOrders ??
     [...state.orders.values()].filter(order => order.status === status)
 reportEngine.submitJob = async request => {
@@ -95,6 +110,7 @@ emailService.sendReportEmail = async (to, details) => {
     state.emails.push({ to, details })
 }
 emailService.sendAdminGenerationAlert = async (...args) => { state.alerts.push(args) }
+emailService.sendOrderReceivedEmail = async order => { state.confirmations.push(order.sessionId) }
 
 const checkout = require('../src/handlers/create-checkout')
 const webhook = require('../src/handlers/webhook')
@@ -148,6 +164,11 @@ test('both Swedish checkout flows connect to the expected report and delivery in
         const event = signedEvent(session)
         assert.equal((await webhook.handler(event)).statusCode, 200)
         assert.equal((await webhook.handler(event)).statusCode, 200)
+        if (reportType === 'se_credit_risk') {
+            assert.equal(state.jobs.length, 0, 'Basic waits for its order confirmation')
+            await poller.handler()
+            assert.deepEqual(state.confirmations, [session.id])
+        }
         assert.equal(state.jobs.length, 1, 'a repeated webhook must not start a second report')
         assert.equal(state.jobs[0].templateName, template)
         assert.equal(state.jobs[0].params.companyCode, '556036-9208')

@@ -68,7 +68,7 @@ test('Stripe return URLs use SITE_URL in test and production despite request ori
             assert.equal(success.origin, siteUrl)
             assert.equal(success.pathname, cancelPath)
             assert.equal(success.searchParams.get('checkout'), 'success')
-            assert.equal(success.searchParams.get('session_id'), '{CHECKOUT_SESSION_ID}')
+            assert.equal(success.searchParams.has('session_id'), false, 'Basic reference is delivered by email instead of request URLs')
             assert.equal(params.cancel_url, `${siteUrl}${cancelPath}`)
         }
     } finally {
