@@ -113,17 +113,24 @@ Complete the legal, privacy, report-content, payment, delivery and consumer-term
 launch gates first. Swedish reports use the Finnish credit-risk model; verify its
 outputs for Swedish companies as part of the report review before opening sales.
 
-1. Create the Stripe products with SEK, one-time, VAT-exclusive default prices:
-   29 kr for the basic report and 69 kr for the AI report. The backend checks
-   these amounts and tax treatment against `backend/src/lib/report-price-targets.json`.
-   Verify Stripe Tax, registrations, and customer-facing total prices before launch.
-   Create the secret:
+1. The live Stripe basic product `prod_VXJrnLn4qkC2Nv` has a SEK 29.00,
+   one-time, VAT-exclusive default price and tax code `txcd_10000000`. It is not
+   yet connected to checkout. A live, explicitly internal, unpaid Checkout preview
+   on 30 October 2026 with Sweden as the billing country showed 25.5% VAT and a
+   total of SEK 36.40; the preview session was then expired without a payment.
+   This does not test report generation or delivery. The AI product has not been
+   created; its agreed net price is SEK 69.00. The backend checks amounts and tax
+   treatment against `backend/src/lib/report-price-targets.json`. Confirm the
+   company's tax registration and treatment for each customer before launch.
+   The `kreditrisker-se-prod` secret already exists. On a new environment, create
+   its secret out of band; for an existing one, update the necessary fields instead:
    ```bash
    aws secretsmanager create-secret --name kreditrisker-se-prod \
      --secret-string '{"STRIPE_SECRET_KEY":"sk_...","STRIPE_WEBHOOK_SECRET":"whsec_...","VALUATUM_REST_URL":"https://...","VALUATUM_REST_TOKEN":"..."}'
    ```
-2. Add to the context: `contactEmail`, and
-   `stripeProductsProd` = `{"STRIPE_PRODUCT_SE_AI":"prod_...","STRIPE_PRODUCT_SE_BASIC":"prod_..."}`.
+2. Add to the context: `contactEmail` (Valuatum's public support address is
+   `contact25@valuatum.com`), and for a basic-only launch
+   `stripeProductsProd` = `{"STRIPE_PRODUCT_SE_BASIC":"prod_VXJrnLn4qkC2Nv"}`.
    A product without an id is never sold.
 3. `cd backend && npm ci && cd ../aws-infra && npx cdk deploy KreditriskerCheckoutStackProd`
 4. Put the stack's `ReportCheckoutApiDomain` output in `checkoutApiProd` and
@@ -143,8 +150,9 @@ outputs for Swedish companies as part of the report review before opening sales.
    `SE_CHECKOUT=1`, `SE_TERMS_VERSION` matching `termsVersionProd`, and the products
    set to `live`, with `VERIFIED_PRICES` in
    `src/config/site.ts` set to the verified VAT-inclusive customer prices.
-   With a 25% VAT rate they would be 36.25 / 86.25 kr, but confirm the actual
-   tax calculation and any country-specific differences before setting them.
+   The preview above establishes the current Swedish consumer example, not
+   every buyer's tax treatment. Check country-specific and business-customer
+   differences before setting and displaying a verified price.
 
 ## Analytics
 
