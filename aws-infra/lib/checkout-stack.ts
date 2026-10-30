@@ -230,7 +230,8 @@ export class CheckoutStack extends cdk.Stack {
         const makeFn = (
             name: string,
             entry: string,
-            timeout = 30
+            timeout = 30,
+            reservedConcurrentExecutions?: number
         ): NodejsFunction => {
             const logGroup = new logs.LogGroup(this, `${name}Logs`, {
                 retention: logs.RetentionDays.ONE_MONTH,
@@ -244,6 +245,7 @@ export class CheckoutStack extends cdk.Stack {
                 runtime: lambda.Runtime.NODEJS_22_X,
                 memorySize: 256,
                 timeout: cdk.Duration.seconds(timeout),
+                reservedConcurrentExecutions,
                 environment: commonEnv,
                 logGroup,
                 bundling: {
@@ -273,7 +275,9 @@ export class CheckoutStack extends cdk.Stack {
             'CreditNotificationFn',
             'credit-notifications.js'
         )
-        const pollerFn = makeFn('ReportPollerFn', 'poller.js', 120)
+        // A run can last longer than its one-minute schedule. Serializing the
+        // function prevents overlapping runs from sending the same order twice.
+        const pollerFn = makeFn('ReportPollerFn', 'poller.js', 120, 1)
 
         appSecret.grantRead(createCheckoutFn)
         appSecret.grantRead(webhookFn)

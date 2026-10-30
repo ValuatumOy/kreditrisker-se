@@ -114,6 +114,9 @@ customer **authorizes but is not charged** at payment time.
   If no job id is recorded, the poller eventually cancels the authorization (or
   releases the reserved bundle credit) and alerts an admin. The original job
   might still be running; check the engine before a manual retry.
+- The poller is limited to one concurrent Lambda execution. This prevents
+  overlapping scheduled runs, but an email accepted by SES immediately before
+  a crash can still be sent again on retry; delivery is not exactly once.
 
 ### Stripe Tax
 
