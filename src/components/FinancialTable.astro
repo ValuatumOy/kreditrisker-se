@@ -1,6 +1,6 @@
 ---
-// Multi-year income statement, balance sheet and ratios in tkr, newest year
-// first as in Swedish annual reports. Every cell keeps its value state.
+// Multi-year income statement, balance sheet and ratios in tkr, oldest year
+// first to match the charts. Every cell keeps its value state.
 import type { FiscalPeriod, IncomeStatement, Value } from '../lib/contract/types.ts'
 import { addsUp, BALANCE_ROWS, INCOME_ROWS, type StatementRow } from '../config/statement.ts'
 import { date, percent, periodLabel, SOURCE_TEXT, tkr, count, type Display } from '../lib/format.ts'
@@ -13,7 +13,7 @@ interface Props {
     orgnr: string
 }
 const { periods, no, orgnr } = Astro.props
-const cols = periods.slice(0, 5)
+const cols = periods.slice(0, 5).reverse()
 const metrics = cols.map(metricsOf)
 const tableId = `bokslut-${no.replace(/[^a-zA-Z0-9-]/g, '-')}`
 const showGrossProfit = cols.some((p) => p.income.netSales.status === 'missing' && (numeric(p.income.grossProfit) ?? 0) !== 0)
@@ -22,7 +22,7 @@ const showGrossProfit = cols.some((p) => p.income.netSales.status === 'missing' 
 const uniform = cols.every((p) => p.source.source === cols[0].source.source && p.framework === cols[0].framework && p.consolidated === cols[0].consolidated)
 const filed = cols.map((p) => p.filedAt).filter((d): d is string => !!d).sort()
 const sourceLine = uniform
-    ? `${SOURCE_TEXT[cols[0].source.source]}, ${cols[0].consolidated ? 'koncernens ' : ''}årsredovisningar för ${cols.length === 1 ? periodLabel(cols[0]) : `${periodLabel(cols.at(-1)!)}–${periodLabel(cols[0])}`}${cols[0].framework !== 'unknown' ? ` (${cols[0].framework})` : ''}${filed.length ? `, registrerade ${filed.length > 1 ? `${date(filed[0])}–${date(filed.at(-1)!)}` : date(filed[0])}` : ''}${cols.some((p) => p.months !== 12) ? '. Räkenskapsår som inte är 12 månader är markerade i tabellhuvudet' : ''}`
+    ? `${SOURCE_TEXT[cols[0].source.source]}, ${cols[0].consolidated ? 'koncernens ' : ''}årsredovisningar för ${cols.length === 1 ? periodLabel(cols[0]) : `${periodLabel(cols[0])}–${periodLabel(cols.at(-1)!)}`}${cols[0].framework !== 'unknown' ? ` (${cols[0].framework})` : ''}${filed.length ? `, registrerade ${filed.length > 1 ? `${date(filed[0])}–${date(filed.at(-1)!)}` : date(filed[0])}` : ''}${cols.some((p) => p.months !== 12) ? '. Räkenskapsår som inte är 12 månader är markerade i tabellhuvudet' : ''}`
     : cols.map((p) => `${periodLabel(p)}: ${SOURCE_TEXT[p.source.source]}, period ${date(p.start)}–${date(p.end)}${p.framework !== 'unknown' ? `, ${p.framework}` : ''}${p.filedAt ? `, registrerad ${date(p.filedAt)}` : ''}`).join('; ')
 
 type Row = { key: string; label: string; cells: Display[]; sum?: boolean; item?: boolean; detail?: boolean }
