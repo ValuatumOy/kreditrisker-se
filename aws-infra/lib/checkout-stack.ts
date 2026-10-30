@@ -429,6 +429,28 @@ export class CheckoutStack extends cdk.Stack {
             new cloudwatchActions.SnsAction(emailFailureTopic)
         )
 
+        // The poller catches errors per order so one broken delivery doesn't
+        // block the rest. Lambda Errors alone therefore misses those failures.
+        const pollerOrderErrors = new logs.MetricFilter(this, 'ReportPollerOrderErrors', {
+            logGroup: pollerFn.logGroup,
+            metricNamespace: `KreditriskerSE/${props.environmentName}`,
+            metricName: 'ReportOrderErrors',
+            filterPattern: logs.FilterPattern.literal('"poller: order error"'),
+            metricValue: '1',
+            defaultValue: 0,
+        })
+        for (const [id, metric] of [
+            ['ReportPollerOrderErrorAlarm', pollerOrderErrors.metric({ period: cdk.Duration.minutes(1), statistic: 'Sum' })],
+            ['ReportPollerRuntimeErrorAlarm', pollerFn.metricErrors({ period: cdk.Duration.minutes(1) })],
+        ] as const) {
+            new cloudwatch.Alarm(this, id, {
+                metric,
+                threshold: 1,
+                evaluationPeriods: 1,
+                treatMissingData: cloudwatch.TreatMissingData.NOT_BREACHING,
+            }).addAlarmAction(new cloudwatchActions.SnsAction(emailFailureTopic))
+        }
+
         new cdk.CfnOutput(this, 'ReportCheckoutApiUrl', {
             value: reportApi.apiEndpoint,
             description:

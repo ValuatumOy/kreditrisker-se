@@ -39,7 +39,7 @@ const emailService = require('../src/lib/email')
 
 let state
 function reset() {
-    state = { orders: new Map(), jobs: [], sessions: [], captures: [], cancellations: [], emails: [], alerts: [], submitError: false }
+    state = { orders: new Map(), jobs: [], sessions: [], captures: [], cancellations: [], emails: [], alerts: [], submitError: false, emailError: false }
 }
 reset()
 
@@ -61,7 +61,11 @@ const stripe = {
         return { url: `https://checkout.stripe.com/c/pay/${id}` }
     } } },
     paymentIntents: {
-        capture: async id => { state.captures.push(id) },
+        capture: async id => {
+            if (state.captures.includes(id)) throw new Error('already captured')
+            state.captures.push(id)
+        },
+        retrieve: async id => ({ status: state.captures.includes(id) ? 'succeeded' : 'requires_capture' }),
         cancel: async id => { state.cancellations.push(id) },
     },
 }
@@ -86,7 +90,10 @@ reportEngine.submitJob = async request => {
 }
 reportEngine.getJob = async () => ({ status: 'DONE', s3Url: 'https://example.test/fake.pdf' })
 reportEngine.downloadPdf = async () => Buffer.from('%PDF-1.4 local fake')
-emailService.sendReportEmail = async (to, details) => { state.emails.push({ to, details }) }
+emailService.sendReportEmail = async (to, details) => {
+    if (state.emailError) throw new Error('test SES failure')
+    state.emails.push({ to, details })
+}
 emailService.sendAdminGenerationAlert = async (...args) => { state.alerts.push(args) }
 
 const checkout = require('../src/handlers/create-checkout')
@@ -178,6 +185,27 @@ test('an uncertain submission is never automatically repeated or charged', async
     assert.equal(state.emails.length, 0)
     assert.equal(state.alerts.length, 1)
     assert.equal(order.status, 'FAILED')
+})
+
+test('a failed email after capture is logged and retried without another capture', async t => {
+    reset()
+    state.emailError = true
+    const session = await createOrder('se_credit_risk')
+    await webhook.handler(signedEvent(session))
+    const errorLog = t.mock.method(console, 'error', () => {})
+
+    await poller.handler()
+    assert.deepEqual(state.captures, ['pi_test_local'])
+    assert.equal(state.emails.length, 0)
+    assert.equal(state.orders.get(session.id).status, 'GENERATING')
+    assert.ok(errorLog.mock.calls.some(call => call.arguments[0] === 'poller: order error'))
+
+    state.emailError = false
+    await poller.handler()
+    assert.deepEqual(state.captures, ['pi_test_local'])
+    assert.equal(state.jobs.length, 1)
+    assert.equal(state.emails.length, 1)
+    assert.equal(state.orders.get(session.id).status, 'FULFILLED')
 })
 
 test('the poller rereads an order before acting on a stale status-index entry', async () => {

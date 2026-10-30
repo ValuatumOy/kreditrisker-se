@@ -10,7 +10,7 @@ export const STATE_LABEL: Record<ReportState['kind'], string> = {
     success: 'Klar',
     failure: 'Misslyckades',
     redirect: 'Till betalning',
-    paid: 'Betald',
+    paid: 'Beställning',
 }
 
 export const UNAVAILABLE_TEXT: Record<UnavailableReason, string> = {

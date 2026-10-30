@@ -117,6 +117,22 @@ customer **authorizes but is not charged** at payment time.
 - The poller is limited to one concurrent Lambda execution. This prevents
   overlapping scheduled runs, but an email accepted by SES immediately before
   a crash can still be sent again on retry; delivery is not exactly once.
+- A successful generation is charged before SES accepts the email. If sending
+  fails, the order stays `GENERATING` and the poller retries without charging it
+  again. Per-order and poller-runtime errors also raise CloudWatch alarms to the
+  SES-failure SNS topic; its email subscription must be confirmed and monitored.
+  There is no automatic refund or retry limit for a persistent sending failure.
+  SES acceptance also does not prove final delivery; later bounces and complaints
+  require monitoring and manual follow-up. These are release requirements, not a
+  guarantee that every failure is automatically refunded.
+
+Before opening sales, assign an owner to the SNS alerts and agree the delivery
+and refund procedure. For an alert, use its session ID to inspect the order,
+report job, SES events and Stripe PaymentIntent. If payment was captured but
+delivery failed or is uncertain, arrange redelivery or a Stripe refund after
+checking what happened. A captured payment cannot be released by canceling its
+authorization; SES timeouts can also leave delivery uncertain. Do not submit a
+new report job just to retry an email.
 
 ### Stripe Tax
 
