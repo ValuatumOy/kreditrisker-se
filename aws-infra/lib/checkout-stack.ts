@@ -44,6 +44,16 @@ export interface CheckoutStackProps extends cdk.StackProps {
     termsVersion?: string
 }
 
+export function validateTestCheckoutSite(props: Pick<CheckoutStackProps, 'environmentName' | 'siteUrl' | 'checkoutEnabled'>): void {
+    if (props.environmentName !== 'Test' || !props.checkoutEnabled) return
+    const site = URL.canParse(props.siteUrl) ? new URL(props.siteUrl) : null
+    const hostname = site?.hostname.replace(/\.$/, '')
+    if (!site || site.protocol !== 'https:' || site.username || site.password || site.pathname !== '/' || site.search || site.hash
+        || hostname === 'kreditrisker.se' || hostname === 'www.kreditrisker.se') {
+        throw new Error('Enabled test checkout requires a separate HTTPS test-site origin; set siteUrlTest')
+    }
+}
+
 /**
  * Report checkout backend, ported from the Danish directory: Stripe Checkout
  * (manual capture) + async report generation + email delivery. The site's
@@ -58,6 +68,7 @@ export class CheckoutStack extends cdk.Stack {
     ) {
         super(scope, id, props)
         if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
+        validateTestCheckoutSite(props)
 
         const descriptionPrefix = `${props.environmentName} - Kreditrisker.se`
 
