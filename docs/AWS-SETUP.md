@@ -130,8 +130,10 @@ outputs for Swedish companies as part of the report review before opening sales.
    redeploy `KreditriskerSiteStackProd` so `/api/*` reaches it.
 5. In Stripe, point a webhook at the direct `…/api/webhook` URL (not through
    CloudFront) and store its signing secret in the secret above.
-6. Deploy the reviewed report-engine version and verify generated Swedish
-   reports, including their credit-model and fraud-analysis outputs, before sales.
+6. Deploy the reviewed report-engine version and verify a generated Swedish
+   sample of each product before enabling that product. For Basic, verify its
+   credit-model outputs and confirm fraud analysis is absent. For AI, also verify
+   its fraud-analysis outputs and complete the separate fraud privacy gate.
 7. Once content, payment, delivery and legal checks pass, set CDK context
    `checkoutEnabledProd=1` and `termsVersionProd` to the approved terms version,
    then deploy the checkout stack. Without this switch

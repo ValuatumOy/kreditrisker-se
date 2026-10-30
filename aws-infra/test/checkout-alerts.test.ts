@@ -1,5 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import * as fs from 'node:fs'
 import * as path from 'node:path'
 import * as cdk from 'aws-cdk-lib'
 import { Template } from 'aws-cdk-lib/assertions'
@@ -13,7 +14,8 @@ process.env.PATH = `${path.resolve(__dirname, esbuildDir)}${path.delimiter}${pro
 
 for (const environmentName of ['Test', 'Prod'] as const) {
     test(`${environmentName} checkout alerts on caught order errors and poller runtime errors`, () => {
-        const stack = new CheckoutStack(new cdk.App(), `Alerts${environmentName}`, {
+        const app = new cdk.App()
+        const stack = new CheckoutStack(app, `Alerts${environmentName}`, {
             env: { account: '123456789012', region: 'eu-west-1' },
             environmentName,
             siteUrl: 'https://example.test',
@@ -49,6 +51,20 @@ for (const environmentName of ['Test', 'Prod'] as const) {
                 assert.equal(alarm.Properties.Namespace, 'AWS/Lambda')
                 assert.deepEqual(alarm.Properties.Dimensions, [{ Name: 'FunctionName', Value: { Ref: functionId } }])
             }
+        }
+
+        if (environmentName === 'Prod') {
+            // Check the synthesized Lambda, not just the local email module:
+            // the runtime's older SDK must not silently drop PDF attachments.
+            app.synth()
+            const assets = JSON.parse(fs.readFileSync(path.join(app.outdir, 'AlertsProd.assets.json'), 'utf8'))
+            const pollerAsset = Object.values(assets.files).find((asset: any) => asset.displayName === 'ReportPollerFn/Code') as any
+            assert.ok(pollerAsset)
+            const bundlePath = path.join(app.outdir, pollerAsset.source.path, 'index.js')
+            const bundle = fs.readFileSync(bundlePath, 'utf8')
+            const sourceMap = JSON.parse(fs.readFileSync(`${bundlePath}.map`, 'utf8'))
+            assert.ok(sourceMap.sources.some((source: string) => source.includes('@aws-sdk/client-sesv2/')))
+            assert.doesNotMatch(bundle, /require\(["']@aws-sdk\/client-sesv2["']\)/)
         }
     })
 }

@@ -251,15 +251,9 @@ export class CheckoutStack extends cdk.Stack {
                 bundling: {
                     minify: true,
                     sourceMap: true,
-                    externalModules: [
-                        '@aws-sdk/client-dynamodb',
-                        '@aws-sdk/client-secrets-manager',
-                        '@aws-sdk/client-sesv2',
-                        '@aws-sdk/credential-provider-node',
-                        '@aws-sdk/lib-dynamodb',
-                        '@aws-sdk/protocol-http',
-                        '@aws-sdk/signature-v4',
-                    ],
+                    // The email adapter uses SES attachment support from the
+                    // installed SDK. Do not rely on Lambda's changing version.
+                    bundleAwsSDK: true,
                 },
             })
         }

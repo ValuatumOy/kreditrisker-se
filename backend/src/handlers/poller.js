@@ -189,8 +189,8 @@ async function fail(stripe, order, reason) {
   console.warn('poller: failed', { sessionId: order.sessionId, reason });
 }
 
-// Synchronous-REST products (the basic se_credit_risk report): the webhook
-// claimed the order without a job, so we generate the PDF here in one call via
+// Synchronous-REST products: the webhook claimed the order without a job,
+// so we generate the PDF here in one call via
 // the authenticated Valuatum REST endpoint. A thrown error leaves the order
 // GENERATING for the next tick; the age guard below releases the hold if it
 // never succeeds within the budget.

@@ -147,20 +147,10 @@ Prices must use `tax_behavior: 'exclusive'`. Checkout uses
 `automatic_tax: { enabled: true }`. Verify the final consumer-facing price and
 the account's tax registrations before enabling sales.
 
-This is a **Finnish (Valuatum) company selling electronically-supplied services
-internationally**, so VAT is handled through the existing Stripe Tax setup — NOT
-a Denmark-specific registration:
-
-- **EU B2C** → VAT is due in the customer's country; declared via the EU **OSS**
-  (One-Stop-Shop) scheme from Finland. No per-country (e.g. Danish) registration
-  is needed — add the OSS/EU registration in Stripe Tax, which then applies the
-  correct destination rate (DK 25 %, etc.).
-- **EU B2B** with a valid VAT ID → reverse charge (no VAT collected).
-- **Outside the EU** → generally outside EU VAT scope.
-
-The code is registration-agnostic; which registrations exist in the Stripe
-dashboard is a tax decision (confirm with your accountant + Stripe Tax's
-threshold monitoring), not a code change.
+Valuatum is a Finnish company. The applicable VAT treatment depends on the
+buyer, relevant EU sales thresholds, any OSS election and registrations. The
+code does not establish which rules or registrations apply. Confirm them with
+the accountant and check the live Stripe Tax registrations before enabling sales.
 
 ## Configuration
 
@@ -245,8 +235,8 @@ is no `SES_REGION`.
 - **SDK** — `@aws-sdk/client-sesv2`, **bundled** with the Lambda rather than
   taken from the Node 22 runtime's copy. The runtime's SDK version varies by
   runtime and region and may predate native `Content.Simple.Attachments`, which
-  the report PDF depends on. Keep `@aws-sdk/client-sesv2` out of the CDK's
-  `externalModules` list.
+  the report PDF depends on. CDK bundles the installed AWS SDK dependencies so
+  the deployed code uses the same SES serializer as the tested code.
 
 ### Configuration set and adverse events
 
