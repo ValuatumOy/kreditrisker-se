@@ -14,6 +14,7 @@
 //   testReportEngineArn   its Lambda function ARN (never the shared TEST/PROD engine)
 //   testSecretName        dedicated kreditrisker-se-isolated-* Stripe secret for test
 //   reportAdminEmailTest  test-only operational email recipient
+//   reportAdminEmailProd  production operational email recipient
 //   suppressTestAlertSubscription  1 for isolated simulator-only testing
 //   isolatedFixtureTest   1 to restrict the test API to one synthetic company and SES simulator
 //   checkoutEnabledProd   1 to allow new live checkout sessions after launch checks
@@ -74,7 +75,7 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         environmentName,
         siteUrl: ctx(`siteUrl${environmentName}`) ?? `https://www.${DOMAIN}`,
         reportFromEmail: 'noreply@valuatum.com',
-        reportAdminEmail: environmentName === 'Test' ? ctx('reportAdminEmailTest') ?? 'luottoriskiraportti202605@valuatum.com' : 'luottoriskiraportti202605@valuatum.com',
+        reportAdminEmail: ctx(`reportAdminEmail${environmentName}`) ?? 'luottoriskiraportti202605@valuatum.com',
         contactEmail: ctx('contactEmail'),
         stripeProducts: JSON.parse(ctx(`stripeProducts${environmentName}`) ?? '{}'),
         checkoutEnabled: ctx(`checkoutEnabled${environmentName}`) === '1',

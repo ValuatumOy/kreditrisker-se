@@ -33,6 +33,7 @@ const fulfillment = require('../lib/fulfillment')
 const { stripeClient } = require('../lib/stripe')
 const config = require('../lib/config')
 const { isFixturePurchase } = require('../lib/fixtureTest')
+const { isSwedishCompany } = require('../lib/swedishCompany')
 
 const INTERNAL_TEST_CODES = new Set((process.env.INTERNAL_TEST_CODES || '').split(',').filter(Boolean))
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -194,6 +195,9 @@ exports.handler = async event => {
 
     const product = getProduct(reportType)
     if (!product) return json(400, { error: 'Unknown reportType' })
+
+    if (!config.isolatedFixtureTest && !isSwedishCompany(businessId))
+        return json(400, { error: 'A valid Swedish organisation number is required' })
 
     const language = normalizeLang(lang)
     const { error: packageError, packageCheckout } = parsePackageCheckout(

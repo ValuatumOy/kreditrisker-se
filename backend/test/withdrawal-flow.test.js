@@ -142,6 +142,14 @@ test('Basic confirmation precedes one job and duplicate webhook/polling cannot r
     assert.equal(state.orders.get(ID).status, 'FULFILLED')
 })
 
+test('a checkout event with a personal identifier never starts a report', async () => {
+    const event = completedCheckout({ metadata: { reportType: 'se_credit_risk', businessId: '800101-1231' } })
+    assert.equal((await webhook.handler(event)).statusCode, 200)
+    await poller.handler()
+    assert.equal(state.orders.size, 0)
+    assert.deepEqual(state.timeline, [])
+})
+
 test('a malformed single-report payment retries at the webhook without claiming or generating', async () => {
     for (const overrides of [
         { payment_intent: null },

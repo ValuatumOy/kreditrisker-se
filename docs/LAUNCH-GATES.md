@@ -1,6 +1,8 @@
 # Launch gates
 
-Each gate needs a named owner and a written sign-off before its switch is turned on. Switches are environment variables read by `src/config/site.ts`. The build refuses a few unsafe combinations on its own.
+Valuatum's owners decide how these checks apply to each launch. Switches are environment variables read by `src/config/site.ts`; the build refuses a few unsafe combinations on its own.
+
+2026-10-30: the owner requested launch of the basic report while the IMY question remains open. The Finnish risk model is used without a Swedish predictive validation. AI-report sales and search indexing remain disabled. Verify the first real paid order and delivery after launch.
 
 | # | Gate | Evidence required | Unlocks |
 |---|---|---|---|

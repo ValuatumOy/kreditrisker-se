@@ -27,6 +27,7 @@ const fulfillment = require('../lib/fulfillment')
 const { paymentFunding } = require('../lib/paymentFunding')
 const config = require('../lib/config')
 const { isFixturePurchase } = require('../lib/fixtureTest')
+const { isSwedishCompany } = require('../lib/swedishCompany')
 
 // Manual-capture sessions remain unpaid until the poller captures them. Only
 // immediate-capture products require a settled status here.
@@ -363,6 +364,11 @@ exports.handler = async event => {
             sessionId,
             reportType,
         })
+        return json(200, { received: true })
+    }
+
+    if (!config.isolatedFixtureTest && !isSwedishCompany(session.metadata?.businessId)) {
+        console.error('webhook: invalid Swedish organisation number', { sessionId })
         return json(200, { received: true })
     }
 

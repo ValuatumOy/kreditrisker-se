@@ -12,7 +12,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
 
 <Base title="Beställ rapport" description="Beställ en rapport om ett svenskt företag." path="/bestall/" noindex>
     <NightBand>
-    <div class="od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)} data-checkout={String(FLAGS.checkout)} data-prices={JSON.stringify(VERIFIED_PRICES)}>
+    <div class="od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)} data-checkout={String(FLAGS.checkout)} data-fixture={String(FLAGS.previewFixtureCheckout)} data-prices={JSON.stringify(VERIFIED_PRICES)}>
         <p class="od__back small"><a href="/sok/" data-back>← Tillbaka</a></p>
         <h1>Beställ <span data-product-name>rapport</span></h1>
         <p class="od__co" data-company>Inget företag valt.</p>
@@ -40,6 +40,8 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             </label>
             <p class="od__err small" id="od-terms-err" hidden>Du behöver godkänna villkoren för att beställa.</p>
             <p class="small muted" data-price></p>
+            <p class="small muted">Priset gäller för konsumenter i Sverige. Tillämplig moms och slutbelopp visas i kassan.</p>
+            <p class="small">Läs vår <a href="/integritet/">integritetspolicy</a>.</p>
             <button class="btn" type="submit">Beställ och betala <Icon name="arrow" /></button>
         </form>
 
@@ -99,11 +101,11 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     const root = document.querySelector<HTMLElement>('[data-order]')!
     const params = new URLSearchParams(root.dataset.returnParams ?? location.search)
     const product: ReportProduct = params.get('produkt') === 'ai' ? 'ai' : 'basic'
+    const adapter = root.dataset.adapter
     const parsed = parseOrgnr(params.get('orgnr') ?? '')
-    const orgnr = parsed.ok ? parsed.orgnr : ''
+    const orgnr = parsed.ok && (parsed.kind === 'legal_person' || ((adapter === 'mock' || root.dataset.fixture === 'true') && parsed.kind === 'synthetic')) ? parsed.orgnr : ''
     const fid = /^\d+$/.test(params.get('fid') ?? '') ? params.get('fid')! : undefined
     let companyName: string | undefined
-    const adapter = root.dataset.adapter
     const flags = JSON.parse(root.dataset.flags!) as Record<ReportProduct, string>
     const prices = JSON.parse(root.dataset.prices!) as Partial<Record<ReportProduct, { amountSek: number; vatIncluded: boolean }>>
     const backend = selectBackend(adapter, root.dataset.api)
@@ -125,7 +127,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         if (s.kind === 'available') {
             const price = prices[product]
             root.querySelector('[data-price]')!.textContent = price
-                ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
+                ? `${price.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
                 : 'Priset visas innan du betalar.'
         }
     }

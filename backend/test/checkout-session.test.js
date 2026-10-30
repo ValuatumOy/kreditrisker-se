@@ -89,6 +89,18 @@ test('checkout refuses orders without the current terms version', async () => {
     }
 })
 
+test('real checkout rejects personnummer, synthetic numbers and invalid organisation numbers', async () => {
+    const initialCount = sessions.length
+    for (const businessId of ['800101-1231', '002000-1012', '556036-9200', '', undefined]) {
+        const response = await handler({
+            requestContext: { http: { method: 'POST' } },
+            body: JSON.stringify({ reportType: 'se_credit_risk', businessId, acceptedTermsVersion: 'test-v1' }),
+        })
+        assert.equal(response.statusCode, 400)
+    }
+    assert.equal(sessions.length, initialCount)
+})
+
 test('checkout stays closed at the API even when product IDs exist', async () => {
     process.env.REPORT_CHECKOUT_ENABLED = '0'
     try {

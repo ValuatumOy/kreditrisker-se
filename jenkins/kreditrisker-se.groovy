@@ -58,6 +58,12 @@ The fields below are already set for a production run; leave them as they are.''
         SECRET_VALUATUM_API_TOKEN = credentials('kreditrisker-se-api-token')
         SE_INDEXING = '0' // launch gates 1-3 and 9 (docs/LAUNCH-GATES.md)
         PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> search Lambda (aws-infra)
+        SE_REPORT_BASIC = 'live'
+        SE_REPORT_AI = 'unavailable'
+        SE_CHECKOUT = '1'
+        SE_TERMS_VERSION = '2026-10-30'
+        PUBLIC_SE_REPORT_ADAPTER = 'http'
+        PUBLIC_SE_REPORT_API = '/api/'
     }
 
     stages {
