@@ -12,6 +12,9 @@
 //   checkoutEnabledTest   1 to allow new test checkout sessions
 //   testReportEngineUrl   isolated Lambda Function URL for test reports
 //   testReportEngineArn   its Lambda function ARN (never the shared TEST/PROD engine)
+//   testSecretName        dedicated kreditrisker-se-isolated-* Stripe secret for test
+//   reportAdminEmailTest  test-only operational email recipient
+//   suppressTestAlertSubscription  1 for isolated simulator-only testing
 //   checkoutEnabledProd   1 to allow new live checkout sessions after launch checks
 //   termsVersionTest/Prod version identifier for the approved purchase terms
 //
@@ -70,13 +73,14 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         environmentName,
         siteUrl: ctx(`siteUrl${environmentName}`) ?? `https://www.${DOMAIN}`,
         reportFromEmail: 'noreply@valuatum.com',
-        reportAdminEmail: 'luottoriskiraportti202605@valuatum.com',
+        reportAdminEmail: environmentName === 'Test' ? ctx('reportAdminEmailTest') ?? 'luottoriskiraportti202605@valuatum.com' : 'luottoriskiraportti202605@valuatum.com',
         contactEmail: ctx('contactEmail'),
         stripeProducts: JSON.parse(ctx(`stripeProducts${environmentName}`) ?? '{}'),
         checkoutEnabled: ctx(`checkoutEnabled${environmentName}`) === '1',
         ...(environmentName === 'Test' && (testReportEngineUrl || testReportEngineArn)
             ? { testReportEngine: { url: testReportEngineUrl ?? '', arn: testReportEngineArn ?? '' } }
             : {}),
+        ...(environmentName === 'Test' ? { testSecretName: ctx('testSecretName'), suppressTestAlertSubscription: ctx('suppressTestAlertSubscription') === '1' } : {}),
         termsVersion: ctx(`termsVersion${environmentName}`),
     })
 }

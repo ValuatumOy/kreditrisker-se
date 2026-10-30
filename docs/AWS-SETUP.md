@@ -96,6 +96,15 @@ key belongs to an account with other checkout webhooks; completing a test
 payment there can trigger unrelated systems. Swedish test products and prices
 must be created in the isolated sandbox before connecting it.
 
+An enabled test checkout requires its own Secrets Manager name, passed as
+`testSecretName=kreditrisker-se-isolated-...`; do not overwrite the existing
+`kreditrisker-se-test` secret. For a simulator-only test, set
+`reportAdminEmailTest=success@simulator.amazonses.com` and
+`suppressTestAlertSubscription=1` to avoid emailing the normal operations
+address. The alarms still exist but have no email subscriber in this mode;
+inspect logs and alarm states directly. Never use this setting for a real
+customer environment. The production stack always retains its subscription.
+
 Turning off `checkoutEnabledTest` also removes test-engine access, including
 for ongoing test orders. Finish test orders first: an order with a job ID
 cannot be polled or time out while its engine is disconnected, and may need

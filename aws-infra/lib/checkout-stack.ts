@@ -46,6 +46,24 @@ export interface CheckoutStackProps extends cdk.StackProps {
     testReportEngine?: ReportEngineTarget
     /** Version of the approved purchase terms accepted before checkout. */
     termsVersion?: string
+    /** Separate Stripe credentials for an enabled test checkout. */
+    testSecretName?: string
+    /** Suppress only the test stack's email subscription for simulator-only tests. */
+    suppressTestAlertSubscription?: boolean
+}
+
+export function checkoutSecretName(props: Pick<CheckoutStackProps, 'environmentName' | 'checkoutEnabled' | 'testSecretName'>): string {
+    if (props.environmentName === 'Prod') {
+        if (props.testSecretName) throw new Error('A test secret cannot be configured on the production checkout')
+        return 'kreditrisker-se-prod'
+    }
+    if (props.testSecretName && !/^kreditrisker-se-isolated-[A-Za-z0-9_-]+$/.test(props.testSecretName)) {
+        throw new Error('Test secret must use a dedicated kreditrisker-se-isolated- name')
+    }
+    if (props.checkoutEnabled && !props.testSecretName) {
+        throw new Error('Enabled test checkout requires a dedicated test secret')
+    }
+    return props.testSecretName ?? 'kreditrisker-se-test'
 }
 
 export function resolveReportEngine(props: Pick<CheckoutStackProps, 'environmentName' | 'checkoutEnabled' | 'testReportEngine'>): ReportEngineTarget | undefined {
@@ -95,8 +113,10 @@ export class CheckoutStack extends cdk.Stack {
     ) {
         super(scope, id, props)
         if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
+        if (props.environmentName === 'Prod' && props.suppressTestAlertSubscription) throw new Error('Production alert subscriptions cannot be suppressed')
         validateTestCheckoutSite(props)
         const reportEngine = resolveReportEngine(props)
+        const secretName = checkoutSecretName(props)
 
         const descriptionPrefix = `${props.environmentName} - Kreditrisker.se`
 
@@ -172,7 +192,7 @@ export class CheckoutStack extends cdk.Stack {
         const appSecret = secretsmanager.Secret.fromSecretNameV2(
             this,
             'ReportCheckoutSecrets',
-            `kreditrisker-se-${props.environmentName.toLowerCase()}`
+            secretName
         )
 
         const adminEmail =
@@ -200,9 +220,9 @@ export class CheckoutStack extends cdk.Stack {
         const emailFailureTopic = new sns.Topic(this, 'EmailFailureTopic', {
             displayName: `${descriptionPrefix} SES adverse events`,
         })
-        emailFailureTopic.addSubscription(
-            new subscriptions.EmailSubscription(adminEmail)
-        )
+        if (!(props.environmentName === 'Test' && props.suppressTestAlertSubscription)) {
+            emailFailureTopic.addSubscription(new subscriptions.EmailSubscription(adminEmail))
+        }
         emailConfigurationSet.addEventDestination('EmailFailureEvents', {
             destination: ses.EventDestination.snsTopic(emailFailureTopic),
             events: [

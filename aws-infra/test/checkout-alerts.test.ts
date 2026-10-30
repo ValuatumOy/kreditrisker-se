@@ -12,6 +12,12 @@ const esbuildDir = process.platform === 'win32'
     : '../../backend/node_modules/.bin'
 process.env.PATH = `${path.resolve(__dirname, esbuildDir)}${path.delimiter}${process.env.PATH}`
 
+test('production checkout cannot suppress its alert subscription', () => {
+    assert.throws(() => new CheckoutStack(new cdk.App(), 'NoSuppressedProductionAlerts', {
+        environmentName: 'Prod', siteUrl: 'https://example.test', suppressTestAlertSubscription: true,
+    }), /Production alert subscriptions cannot be suppressed/)
+})
+
 for (const environmentName of ['Test', 'Prod'] as const) {
     test(`${environmentName} checkout alerts on caught order errors and poller runtime errors`, () => {
         const app = new cdk.App()
@@ -19,8 +25,13 @@ for (const environmentName of ['Test', 'Prod'] as const) {
             env: { account: '123456789012', region: 'eu-west-1' },
             environmentName,
             siteUrl: 'https://example.test',
+            ...(environmentName === 'Test' ? { testSecretName: 'kreditrisker-se-isolated-checkout', suppressTestAlertSubscription: true } : {}),
         })
         const resources = Template.fromStack(stack).toJSON().Resources as Record<string, { Type: string; Properties: Record<string, any> }>
+        const subscriptions = Object.values(resources).filter(resource => resource.Type === 'AWS::SNS::Subscription')
+        assert.equal(subscriptions.length, environmentName === 'Test' ? 0 : 1)
+        const checkoutLambda = Object.entries(resources).find(([id, resource]) => id.startsWith('CreateCheckoutFn') && resource.Type === 'AWS::Lambda::Function')?.[1]
+        assert.match(JSON.stringify(checkoutLambda?.Properties.Environment.Variables.APP_SECRETS_ARN), environmentName === 'Test' ? /kreditrisker-se-isolated-checkout/ : /kreditrisker-se-prod/)
         const orderTable = Object.entries(resources).find(([id, resource]) => id.startsWith('OrdersTable') && resource.Type === 'AWS::DynamoDB::Table')?.[1]
         assert.ok(orderTable?.Properties.GlobalSecondaryIndexes.some((index: any) => index.IndexName === 'WithdrawalIndex'
             && index.KeySchema.some((key: any) => key.AttributeName === 'withdrawalState' && key.KeyType === 'HASH')))

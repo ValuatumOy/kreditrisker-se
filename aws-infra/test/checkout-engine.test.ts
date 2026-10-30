@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { resolveReportEngine } from '../lib/checkout-stack'
+import { checkoutSecretName, resolveReportEngine } from '../lib/checkout-stack'
 
 const separate = {
     url: 'https://isolated123.lambda-url.eu-west-1.on.aws/',
@@ -49,4 +49,15 @@ test('test checkout accepts only a plain HTTPS Lambda URL and function ARN', () 
 
 test('production engine remains unchanged', () => {
     assert.deepEqual(resolveReportEngine({ environmentName: 'Prod' }), sharedProd)
+})
+
+test('enabled test checkout requires an isolated Stripe secret without changing production', () => {
+    assert.equal(checkoutSecretName({ environmentName: 'Test' }), 'kreditrisker-se-test')
+    assert.throws(() => checkoutSecretName({ environmentName: 'Test', checkoutEnabled: true }), /dedicated test secret/)
+    for (const name of ['kreditrisker-se-prod', 'kreditrisker-se-test', 'kreditrisker-se-isolated-../prod']) {
+        assert.throws(() => checkoutSecretName({ environmentName: 'Test', checkoutEnabled: true, testSecretName: name }), /dedicated/)
+    }
+    assert.equal(checkoutSecretName({ environmentName: 'Test', checkoutEnabled: true, testSecretName: 'kreditrisker-se-isolated-checkout' }), 'kreditrisker-se-isolated-checkout')
+    assert.equal(checkoutSecretName({ environmentName: 'Prod' }), 'kreditrisker-se-prod')
+    assert.throws(() => checkoutSecretName({ environmentName: 'Prod', testSecretName: 'kreditrisker-se-isolated-checkout' }), /production checkout/)
 })
