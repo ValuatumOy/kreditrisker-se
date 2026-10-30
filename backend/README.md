@@ -109,13 +109,18 @@ customer **authorizes but is not charged** at payment time.
 - Generation `FAILED` or timed out → **cancel** the PaymentIntent, releasing the
   hold — **no charge is ever made**. An admin alert is emailed; there is no
   customer-facing failure email.
+- A report-engine submission can succeed even if its response is lost. In that
+  case the order claim is retained so webhook retries do not submit another job.
+  If no job id is recorded, the poller eventually cancels the authorization (or
+  releases the reserved bundle credit) and alerts an admin. The original job
+  might still be running; check the engine before a manual retry.
 
 ### Stripe Tax
 
-The advertised single-report price is VAT-inclusive, so the Product's default
-Price must use `tax_behavior: 'inclusive'`. With
-`automatic_tax: { enabled: true }`, Checkout collects the customer's location
-and breaks the applicable VAT out of that total per jurisdiction.
+The approved single-report targets are 29 / 69 SEK before VAT, so their Stripe
+Prices must use `tax_behavior: 'exclusive'`. Checkout uses
+`automatic_tax: { enabled: true }`. Verify the final consumer-facing price and
+the account's tax registrations before enabling sales.
 
 This is a **Finnish (Valuatum) company selling electronically-supplied services
 internationally**, so VAT is handled through the existing Stripe Tax setup — NOT

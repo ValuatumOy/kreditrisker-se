@@ -147,6 +147,14 @@ exports.handler = async event => {
     try {
         await fulfillment.startFulfillment(order, product)
     } catch (err) {
+        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
+            console.error('redeem: job submission could not be confirmed', {
+                sessionId,
+                error: err.cause?.message || err.message,
+            })
+            // Keep the reservation while the poller resolves this order.
+            return json(500, { error: 'Could not confirm report generation' })
+        }
         if (err instanceof fulfillment.FulfillmentTrackingError) {
             // The generator accepted the job, so keep the reservation.
             console.error('redeem: submitted job could not be recorded', {

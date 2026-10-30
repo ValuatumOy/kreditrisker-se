@@ -211,4 +211,15 @@ test('a generation that never started returns the report, one that did keeps it'
   assert.equal(release.mock.callCount(), 1, 'the generator already accepted that job');
 });
 
+test('an unconfirmed package job keeps the reservation for the poller', async () => {
+  const { release } = mockCredits();
+  mock.method(fulfillment, 'startFulfillment', async () => {
+    throw new fulfillment.FulfillmentSubmissionUnknownError(new Error('connection lost'));
+  });
+
+  const res = await handler(webhookEvent(completedSession()));
+  assert.equal(res.statusCode, 200);
+  assert.equal(release.mock.callCount(), 0);
+});
+
 

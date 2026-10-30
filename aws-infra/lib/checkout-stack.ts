@@ -23,6 +23,8 @@ const REPORT_ENGINE = {
     Prod: { url: 'https://jdnrhdk37rmqzayy2km4jyrlgq0uapaw.lambda-url.eu-west-1.on.aws/', arn: 'arn:aws:lambda:eu-west-1:892885731254:function:pdf-report-api' },
 }
 
+type ReportEngineTarget = { url: string; arn: string }
+
 export interface CheckoutStackProps extends cdk.StackProps {
     environmentName: 'Test' | 'Prod'
     /** Public site origin used in Stripe redirect URLs. */
@@ -38,10 +40,35 @@ export interface CheckoutStackProps extends cdk.StackProps {
      * _AI_BUNDLE). A product without an id is not sold (backend/src/lib/products.js).
      */
     stripeProducts?: Record<string, string>
-    /** Explicit switch for new Checkout sessions; outstanding orders still finish. */
+    /** Enables new sessions; disabling Test also disconnects its report engine. */
     checkoutEnabled?: boolean
+    /** Dedicated test engine, with its own queues and data. */
+    testReportEngine?: ReportEngineTarget
     /** Version of the approved purchase terms accepted before checkout. */
     termsVersion?: string
+}
+
+export function resolveReportEngine(props: Pick<CheckoutStackProps, 'environmentName' | 'checkoutEnabled' | 'testReportEngine'>): ReportEngineTarget | undefined {
+    if (props.environmentName === 'Prod') return REPORT_ENGINE.Prod
+    // The TEST switch also disconnects the engine to prevent background
+    // webhook or redeem events from launching paid jobs while it is off.
+    if (!props.checkoutEnabled) return undefined
+    const target = props.testReportEngine
+    if (!target) {
+        throw new Error('Enabled test checkout requires a separate report engine URL and ARN')
+    }
+    const url = URL.canParse(target.url) ? new URL(target.url) : null
+    const sharedUrls = Object.values(REPORT_ENGINE).map(engine => new URL(engine.url).hostname)
+    const sharedArns = Object.values(REPORT_ENGINE).map(engine => engine.arn)
+    if (!url || url.protocol !== 'https:' || url.username || url.password || url.port
+        || url.pathname !== '/' || url.search || url.hash
+        || !/^[a-z0-9-]+\.lambda-url\.eu-west-1\.on\.aws$/.test(url.hostname)
+        || sharedUrls.includes(url.hostname)
+        || !/^arn:aws:lambda:eu-west-1:\d{12}:function:[A-Za-z0-9_-]+$/.test(target.arn)
+        || sharedArns.includes(target.arn)) {
+        throw new Error('Test report engine must have a separate Lambda Function URL and function ARN in eu-west-1')
+    }
+    return { url: url.origin, arn: target.arn }
 }
 
 export function validateTestCheckoutSite(props: Pick<CheckoutStackProps, 'environmentName' | 'siteUrl' | 'checkoutEnabled'>): void {
@@ -69,6 +96,7 @@ export class CheckoutStack extends cdk.Stack {
         super(scope, id, props)
         if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
         validateTestCheckoutSite(props)
+        const reportEngine = resolveReportEngine(props)
 
         const descriptionPrefix = `${props.environmentName} - Kreditrisker.se`
 
@@ -187,7 +215,7 @@ export class CheckoutStack extends cdk.Stack {
             FROM_EMAIL: props.reportFromEmail ?? 'noreply@valuatum.com',
             ADMIN_EMAIL: adminEmail,
             SES_CONFIGURATION_SET: emailConfigurationSet.configurationSetName,
-            REPORT_ENGINE_URL: REPORT_ENGINE[props.environmentName].url,
+            REPORT_ENGINE_URL: reportEngine?.url ?? '',
             REPORT_ENGINE_REGION: 'eu-west-1',
             REPORT_ENGINE_USERNAME:
                 props.reportEngineUsername ?? 'kreditrisker.se',
@@ -260,30 +288,31 @@ export class CheckoutStack extends cdk.Stack {
 
         // Invoke the report engine's Function URL (SigV4). The engine owner must
         // ALSO grant access on their side — see report_generation_api.md.
-        const invokePolicy = new iam.PolicyStatement({
-            actions: ['lambda:InvokeFunctionUrl'],
-            resources: [REPORT_ENGINE[props.environmentName].arn],
-            conditions: {
-                StringEquals: {
-                    'lambda:FunctionUrlAuthType': 'AWS_IAM',
+        if (reportEngine) {
+            const invokePolicy = new iam.PolicyStatement({
+                actions: ['lambda:InvokeFunctionUrl'],
+                resources: [reportEngine.arn],
+                conditions: {
+                    StringEquals: {
+                        'lambda:FunctionUrlAuthType': 'AWS_IAM',
+                    },
                 },
-            },
-        })
-        const invokeViaUrlPolicy = new iam.PolicyStatement({
-            actions: ['lambda:InvokeFunction'],
-            resources: [REPORT_ENGINE[props.environmentName].arn],
-            conditions: {
-                Bool: { 'lambda:InvokedViaFunctionUrl': 'true' },
-            },
-        })
-        webhookFn.addToRolePolicy(invokePolicy)
-        webhookFn.addToRolePolicy(invokeViaUrlPolicy)
-        pollerFn.addToRolePolicy(invokePolicy)
-        pollerFn.addToRolePolicy(invokeViaUrlPolicy)
-        // /api/redeem starts a package-funded report itself, so it submits jobs
-        // exactly like the webhook does for a paid one.
-        redeemFn.addToRolePolicy(invokePolicy)
-        redeemFn.addToRolePolicy(invokeViaUrlPolicy)
+            })
+            const invokeViaUrlPolicy = new iam.PolicyStatement({
+                actions: ['lambda:InvokeFunction'],
+                resources: [reportEngine.arn],
+                conditions: {
+                    Bool: { 'lambda:InvokedViaFunctionUrl': 'true' },
+                },
+            })
+            webhookFn.addToRolePolicy(invokePolicy)
+            webhookFn.addToRolePolicy(invokeViaUrlPolicy)
+            pollerFn.addToRolePolicy(invokePolicy)
+            pollerFn.addToRolePolicy(invokeViaUrlPolicy)
+            // /api/redeem submits package-funded report jobs too.
+            redeemFn.addToRolePolicy(invokePolicy)
+            redeemFn.addToRolePolicy(invokeViaUrlPolicy)
+        }
 
         // Send report/alert mail. The poller is the only Lambda that emails, so
         // create-checkout and webhook deliberately get no SES permission. Scoped

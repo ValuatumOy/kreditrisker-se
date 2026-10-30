@@ -77,8 +77,30 @@ credential (username `git`). Nothing in the Jenkinsfile needs editing: bucket,
 distribution, state URI and site origin are read from the
 `KreditriskerSiteStackProd` outputs at run time, the agent is `sweden-build`
 (it reaches sweden-db) and the API token is the Secret text credential
-`kreditrisker-se-api-token`. First load: `COMPANIES=all`. Every run rebuilds
-the search from the whole directory.
+`kreditrisker-se-api-token`. Use an explicit small company batch for tests. A
+`COMPANIES=all` run needs approval and a cost estimate first. Every run
+rebuilds the search from the whole directory.
+
+## Isolated checkout testing
+
+The shared report-engine TEST environment runs other work and must not be
+replaced for Swedish testing. The Swedish test checkout has no engine access by
+default. Enabling it requires `siteUrlTest` plus `testReportEngineUrl` and
+`testReportEngineArn` for a separate engine; the shared TEST and PROD engines
+are rejected. Verify that the supplied function, queues, storage, credentials
+and worker are isolated before using it. This configuration does not itself
+provision that engine.
+
+Turning off `checkoutEnabledTest` also removes test-engine access, including
+for ongoing test orders. Finish test orders first: an order with a job ID
+cannot be polled or time out while its engine is disconnected, and may need
+manual cleanup or reconnection to the same engine. In production the switch
+still stops only new sessions so existing orders can finish.
+
+For a no-network checkout flow test, run `npm test` in `backend/`. The
+`isolated-checkout-flow.test.js` test uses in-memory Stripe, engine, order and
+email substitutes and blocks network transports. It does not establish real
+Stripe, AWS or report-generation behavior.
 
 ## 5. Report checkout (only when reports are launched)
 

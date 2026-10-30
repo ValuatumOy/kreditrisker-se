@@ -10,6 +10,8 @@
 //   stripeProductsTest    JSON: {"STRIPE_PRODUCT_SE_AI":"prod_...", ...}; products without an id are not sold
 //   stripeProductsProd
 //   checkoutEnabledTest   1 to allow new test checkout sessions
+//   testReportEngineUrl   isolated Lambda Function URL for test reports
+//   testReportEngineArn   its Lambda function ARN (never the shared TEST/PROD engine)
 //   checkoutEnabledProd   1 to allow new live checkout sessions after launch checks
 //   termsVersionTest/Prod version identifier for the approved purchase terms
 //
@@ -59,6 +61,8 @@ new SiteStack(app, 'KreditriskerSiteStackProd', {
     buildRoleName,
 })
 
+const testReportEngineUrl = ctx('testReportEngineUrl')
+const testReportEngineArn = ctx('testReportEngineArn')
 for (const environmentName of ['Test', 'Prod'] as const) {
     new CheckoutStack(app, `KreditriskerCheckoutStack${environmentName}`, {
         env,
@@ -70,6 +74,9 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         contactEmail: ctx('contactEmail'),
         stripeProducts: JSON.parse(ctx(`stripeProducts${environmentName}`) ?? '{}'),
         checkoutEnabled: ctx(`checkoutEnabled${environmentName}`) === '1',
+        ...(environmentName === 'Test' && (testReportEngineUrl || testReportEngineArn)
+            ? { testReportEngine: { url: testReportEngineUrl ?? '', arn: testReportEngineArn ?? '' } }
+            : {}),
         termsVersion: ctx(`termsVersion${environmentName}`),
     })
 }

@@ -107,6 +107,15 @@ async function fulfillSingleReport(session, product) {
             product
         ))
     } catch (err) {
+        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
+            console.error('webhook: job submission could not be confirmed', {
+                sessionId,
+                error: err.cause?.message || err.message,
+            })
+            // Keep the claim: a redelivery must not submit another job.
+            // The poller releases the authorization if no job is recorded.
+            return json(200, { received: true })
+        }
         if (err instanceof fulfillment.FulfillmentTrackingError) {
             console.error('webhook: submitted job could not be recorded', {
                 sessionId,
@@ -232,6 +241,15 @@ async function fulfillPackagePurchase(session, product) {
     try {
         await fulfillment.startFulfillment(order, fulfilled)
     } catch (err) {
+        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
+            console.error('webhook: package job submission could not be confirmed', {
+                sessionId,
+                orderId: order.sessionId,
+                error: err.cause?.message || err.message,
+            })
+            // Preserve the reservation until the poller resolves the order.
+            return json(200, { received: true })
+        }
         if (err instanceof fulfillment.FulfillmentTrackingError) {
             // The generator accepted the job, so keep the reservation.
             console.error('webhook: submitted job could not be recorded', {

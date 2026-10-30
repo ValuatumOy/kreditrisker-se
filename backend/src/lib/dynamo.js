@@ -55,7 +55,9 @@ async function claimOrder(item) {
 }
 
 async function getOrder(sessionId) {
-  const res = await doc.send(new GetCommand({ TableName: config.ordersTable, Key: { sessionId } }));
+  const res = await doc.send(new GetCommand({
+    TableName: config.ordersTable, Key: { sessionId }, ConsistentRead: true,
+  }));
   return res.Item || null;
 }
 

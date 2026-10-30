@@ -230,7 +230,7 @@ async function processOrder(stripe, order) {
   // Claimed by the webhook but no jobId recorded yet.
   if (!order.jobId) {
     if (ageMinutes(order) < config.claimGraceMinutes) return; // submit may be in flight
-    await fail(stripe, order, 'Job submission did not complete (no jobId recorded).');
+    await fail(stripe, order, 'Job submission could not be confirmed (no jobId recorded).');
     return;
   }
 
@@ -256,12 +256,16 @@ exports.handler = async () => {
   const orders = await listOrdersByStatus('GENERATING');
   console.log('poller: tick', { count: orders.length });
 
-  for (const order of orders) {
+  for (const indexedOrder of orders) {
     try {
+      // The status index is eventually consistent; it may still show a
+      // jobless or already fulfilled version of an order.
+      const order = await dynamo.getOrder(indexedOrder.sessionId);
+      if (!order || order.status !== 'GENERATING') continue;
       await processOrder(stripe, order);
     } catch (err) {
       console.error('poller: order error', {
-        sessionId: order.sessionId,
+        sessionId: indexedOrder.sessionId,
         error: err.message,
       });
     }
