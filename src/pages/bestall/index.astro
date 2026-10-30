@@ -6,15 +6,13 @@
 import Base from '../../layouts/Base.astro'
 import Icon from '../../components/Icon.astro'
 import NightBand from '../../components/NightBand.astro'
-import { FLAGS } from '../../config/site.ts'
+import { FLAGS, TERMS_VERSION, VERIFIED_PRICES } from '../../config/site.ts'
 import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
-
-const TERMS_VERSION = 'utkast-2026-09'
 ---
 
 <Base title="Beställ rapport" description="Beställ en rapport om ett svenskt företag." path="/bestall/" noindex>
     <NightBand>
-    <div class="od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)}>
+    <div class="od" data-order data-adapter={FLAGS.reportAdapter} data-api={FLAGS.reportApiBase ?? ''} data-terms={TERMS_VERSION} data-flags={JSON.stringify(FLAGS.reports)} data-checkout={String(FLAGS.checkout)} data-prices={JSON.stringify(VERIFIED_PRICES)}>
         <p class="od__back small"><a href="/sok/" data-back>← Tillbaka</a></p>
         <h1>Beställ <span data-product-name>rapport</span></h1>
         <p class="od__co" data-company>Inget företag valt.</p>
@@ -65,7 +63,7 @@ const TERMS_VERSION = 'utkast-2026-09'
 
         <div class="od__panel" data-view="paid" hidden aria-live="polite">
             <p class="od__state"><Icon name="check" /> <span class="tag tag--ok">{STATE_LABEL.paid}</span></p>
-            <p>Tack för din beställning. Rapporten tas fram nu och skickas till din e-post, oftast inom några minuter.</p>
+            <p>Tack för din beställning. Rapporten tas fram nu och skickas till din e-post.</p>
             <p class="small muted">Beloppet reserveras och dras först när rapporten är klar. Om rapporten inte kan tas fram släpps reservationen och du debiteras inget.</p>
         </div>
 
@@ -95,6 +93,7 @@ const TERMS_VERSION = 'utkast-2026-09'
     let companyName: string | undefined
     const adapter = root.dataset.adapter
     const flags = JSON.parse(root.dataset.flags!) as Record<ReportProduct, string>
+    const prices = JSON.parse(root.dataset.prices!) as Partial<Record<ReportProduct, { amountSek: number; vatIncluded: boolean }>>
     const backend = selectBackend(adapter, root.dataset.api)
     const views = [...root.querySelectorAll<HTMLElement>('[data-view]')]
     const $ = <T extends Element>(sel: string) => root.querySelectorAll<T>(sel)
@@ -111,7 +110,12 @@ const TERMS_VERSION = 'utkast-2026-09'
             root.querySelector('[data-code]')!.textContent = s.code
             root.querySelector<HTMLElement>('[data-retry]')!.hidden = !s.retryable
         }
-        if (s.kind === 'available') root.querySelector('[data-price]')!.textContent = 'Priset visas innan du betalar.'
+        if (s.kind === 'available') {
+            const price = prices[product]
+            root.querySelector('[data-price]')!.textContent = price
+                ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
+                : 'Priset visas innan du betalar.'
+        }
     }
 
     async function poll(orderId: string) {
@@ -144,7 +148,7 @@ const TERMS_VERSION = 'utkast-2026-09'
         }
         if (flags[product] === 'unavailable') return show({ kind: 'unavailable', reason: 'not_launched' })
         if (flags[product] === 'sample') return show({ kind: 'sample', sampleHref: `/rapporter/exempel/#${product === 'basic' ? 'basrapport' : 'ai-rapport'}` })
-        if (adapter === 'http' && product === 'basic' && !fid) return show({ kind: 'unavailable', reason: 'insufficient_data' })
+        if (adapter !== 'mock' && root.dataset.checkout !== 'true') return show({ kind: 'unavailable', reason: 'not_launched' })
         show(await backend.availability(orgnr, product))
     }
 

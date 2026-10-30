@@ -74,6 +74,10 @@ const CUSTOMER_COPY = {
 // Address the customer can send questions to (the sender is a no-reply address).
 const CONTACT_EMAIL = config.contactEmail;
 
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
 // Summarize an AWS SDK error for the logs. Keeps the fields that identify the
 // fault (error name, HTTP status, message, request id) and nothing else — the
 // message body and PDF bytes must never reach CloudWatch.
@@ -179,7 +183,6 @@ async function sendReportEmail(
     {
       from: FROM,
       to: toEmail,
-      bcc: 'valuatum@gmail.com',
       sessionId,
       subject: copy.subject(label, company),
       attachments: [{ filename: fileName || copy.fallbackFile, content: pdfBuffer }],
@@ -191,21 +194,21 @@ async function sendReportEmail(
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;">
         <tr><td style="background:#132a21;border-radius:12px 12px 0 0;padding:24px 32px;">
           <p style="color:#9fd4b0;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;margin:0 0 4px;">kreditrisker.se</p>
-          <p style="color:rgba(255,255,255,.45);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin:0;">${label}</p>
+          <p style="color:rgba(255,255,255,.45);font-size:10px;letter-spacing:.08em;text-transform:uppercase;margin:0;">${escapeHtml(label)}</p>
         </td></tr>
         <tr><td style="background:#fff;border:1px solid #E2E9E5;border-top:none;border-radius:0 0 12px 12px;padding:36px 32px;">
           <h1 style="font-size:22px;font-weight:400;color:#1A2420;margin:0 0 6px;">${copy.heading}</h1>
-          <p style="color:#8A9590;margin:0 0 24px;font-size:14px;">${company}</p>
+          <p style="color:#8A9590;margin:0 0 24px;font-size:14px;">${escapeHtml(company)}</p>
           <p style="font-size:14px;color:#1A2420;line-height:1.7;margin:0 0 12px;">
-            ${copy.body(label)}
+            ${escapeHtml(copy.body(label))}
           </p>
           <p style="font-size:14px;color:#1A2420;line-height:1.7;margin:0 0 20px;">
-            ${reportLanguageLine}
+            ${escapeHtml(reportLanguageLine)}
           </p>
           ${Number.isInteger(remainingReports) ? `<div style="background:#f2f8ff;border:1px solid #c8def3;border-radius:8px;padding:16px;margin:0 0 20px;"><strong>${copy.remaining(remainingReports)}</strong><br><span style="font-size:13px;color:#40536a;">${copy.reuse}</span></div>` : ''}
           <div style="border-top:1px solid #E2E9E5;padding-top:20px;">
             <p style="font-size:12px;color:#8A9590;line-height:1.65;margin:0 0 10px;">
-              ${copy.contactPre} <a href="mailto:${CONTACT_EMAIL}" style="color:#0768d9;text-decoration:none;">${CONTACT_EMAIL}</a>.
+              ${copy.contactPre} <a href="mailto:${escapeHtml(CONTACT_EMAIL)}" style="color:#0768d9;text-decoration:none;">${escapeHtml(CONTACT_EMAIL)}</a>.
             </p>
             <p style="font-size:12px;color:#8A9590;line-height:1.65;margin:0;">
               ${copy.disclaimer}
@@ -226,27 +229,32 @@ async function sendReportEmail(
 // Internal alert — kept in English for the team.
 async function sendAdminGenerationAlert(order, errorMessage, productName) {
   const label = productName || 'Credit risk report';
+  const fundingMessage = order?.paymentIntentId
+    ? 'The payment authorization was canceled; the customer was not charged for this order.'
+    : order?.funding === 'package'
+      ? 'Check the package balance and returned credit.'
+      : 'Check the payment status before contacting the customer.';
   await sendEmail(
     {
       from: FROM,
       to: ADMIN,
       sessionId: order?.sessionId,
-      subject: `Report generation failed (${label}): ${order?.companyName || order?.sessionId || 'unknown'}`,
+      subject: `Report order failed (${label}): ${order?.companyName || order?.sessionId || 'unknown'}`,
       html: `
-      <p><strong>${label} — generation failed — no charge was made (payment authorization cancelled).</strong></p>
+      <p><strong>${escapeHtml(label)} — report order failed.</strong></p>
       <table cellpadding="6" style="border-collapse:collapse;font-family:Arial,sans-serif;font-size:14px;">
-        <tr><td style="color:#666;">Company</td><td><strong>${order?.companyName || '—'}</strong></td></tr>
-        <tr><td style="color:#666;">CVR / company code</td><td>${order?.params?.companyCode || '—'}</td></tr>
-        <tr><td style="color:#666;">Report type</td><td>${order?.reportType || '—'}</td></tr>
-        <tr><td style="color:#666;">Customer email</td><td>${order?.email || '—'}</td></tr>
-        <tr><td style="color:#666;">Language</td><td>${order?.lang || '—'}</td></tr>
-        <tr><td style="color:#666;">Report language</td><td>${order?.reportLang || order?.params?.lang || '—'}</td></tr>
-        <tr><td style="color:#666;">Stripe session</td><td>${order?.sessionId || '—'}</td></tr>
-        <tr><td style="color:#666;">PaymentIntent</td><td>${order?.paymentIntentId || '—'}</td></tr>
-        <tr><td style="color:#666;">Job id</td><td>${order?.jobId || '—'}</td></tr>
-        <tr><td style="color:#666;">Error</td><td>${errorMessage || '—'}</td></tr>
+        <tr><td style="color:#666;">Company</td><td><strong>${escapeHtml(order?.companyName || '—')}</strong></td></tr>
+        <tr><td style="color:#666;">Company code</td><td>${escapeHtml(order?.params?.companyCode || '—')}</td></tr>
+        <tr><td style="color:#666;">Report type</td><td>${escapeHtml(order?.reportType || '—')}</td></tr>
+        <tr><td style="color:#666;">Customer email</td><td>${escapeHtml(order?.email || '—')}</td></tr>
+        <tr><td style="color:#666;">Language</td><td>${escapeHtml(order?.lang || '—')}</td></tr>
+        <tr><td style="color:#666;">Report language</td><td>${escapeHtml(order?.reportLang || order?.params?.lang || '—')}</td></tr>
+        <tr><td style="color:#666;">Stripe session</td><td>${escapeHtml(order?.sessionId || '—')}</td></tr>
+        <tr><td style="color:#666;">PaymentIntent</td><td>${escapeHtml(order?.paymentIntentId || '—')}</td></tr>
+        <tr><td style="color:#666;">Job id</td><td>${escapeHtml(order?.jobId || '—')}</td></tr>
+        <tr><td style="color:#666;">Error</td><td>${escapeHtml(errorMessage || '—')}</td></tr>
       </table>
-      <p style="margin-top:16px;">The payment authorization has been cancelled, so the customer was not charged.
+      <p style="margin-top:16px;">${escapeHtml(fundingMessage)}
       The customer receives no automatic notification — contact them manually if needed.</p>
     `,
     },
@@ -274,7 +282,7 @@ function buildCreditEventEmail(toEmail, { kind, count = 1, remainingReports }) {
     from: FROM,
     to: toEmail,
     subject: `${svTitle} / ${enTitle}`,
-    html: `<!DOCTYPE html><html lang="sv"><body style="margin:0;padding:32px 16px;background:#eceee9;font-family:Arial,sans-serif;"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;margin:auto;background:#fff;border-radius:10px;"><tr><td style="background:#1d3d31;color:#fff;padding:22px 28px;border-radius:10px 10px 0 0;"><strong>kreditrisker.se</strong></td></tr><tr><td style="padding:28px;color:#1a2b40;"><h1 style="font-size:21px;margin:0 0 12px;">${svTitle}</h1><p style="font-size:14px;line-height:1.65;">${svBody}</p>${balance}<hr style="border:0;border-top:1px solid #d8e7f5;margin:24px 0;"><h2 style="font-size:18px;margin:0 0 12px;">${enTitle}</h2><p style="font-size:14px;line-height:1.65;">${enBody}</p><p style="font-size:12px;color:#66768a;margin-top:24px;">Questions? <a href="mailto:${CONTACT_EMAIL}">${CONTACT_EMAIL}</a></p></td></tr></table></body></html>`,
+    html: `<!DOCTYPE html><html lang="sv"><body style="margin:0;padding:32px 16px;background:#eceee9;font-family:Arial,sans-serif;"><table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;margin:auto;background:#fff;border-radius:10px;"><tr><td style="background:#1d3d31;color:#fff;padding:22px 28px;border-radius:10px 10px 0 0;"><strong>kreditrisker.se</strong></td></tr><tr><td style="padding:28px;color:#1a2b40;"><h1 style="font-size:21px;margin:0 0 12px;">${svTitle}</h1><p style="font-size:14px;line-height:1.65;">${escapeHtml(svBody)}</p>${balance}<hr style="border:0;border-top:1px solid #d8e7f5;margin:24px 0;"><h2 style="font-size:18px;margin:0 0 12px;">${enTitle}</h2><p style="font-size:14px;line-height:1.65;">${escapeHtml(enBody)}</p><p style="font-size:12px;color:#66768a;margin-top:24px;">Questions? <a href="mailto:${escapeHtml(CONTACT_EMAIL)}">${escapeHtml(CONTACT_EMAIL)}</a></p></td></tr></table></body></html>`,
   };
 }
 

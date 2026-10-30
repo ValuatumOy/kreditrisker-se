@@ -1,3 +1,5 @@
+import priceTargets from '../../backend/src/lib/report-price-targets.json' with { type: 'json' }
+
 // All brand, domain, indexing and launch switches live here and are driven by
 // environment variables so the name and domain can change without code edits.
 // Defaults are the safe pre-launch state: nothing indexable, nothing for sale.
@@ -56,6 +58,13 @@ export const FLAGS = {
 } as const
 
 export type ReportMode = 'unavailable' | 'sample' | 'live'
+export const TERMS_VERSION = env('SE_TERMS_VERSION') ?? 'utkast-2026-09'
+
+/** Approved net prices; they are not shown until Stripe and checkout are verified. */
+export const APPROVED_PRICES = {
+    basic: { amountSek: priceTargets.basic / 100, vatIncluded: false },
+    ai: { amountSek: priceTargets.ai / 100, vatIncluded: false },
+} as const
 
 /**
  * Verified prices, filled in only when pricing is decided and tested end to
@@ -68,8 +77,12 @@ export const siteIndexable = FLAGS.indexing && !FLAGS.preview
 
 if (FLAGS.checkout && (FLAGS.reportAdapter !== 'http' || !FLAGS.reportApiBase))
     throw new Error('SE_CHECKOUT requires PUBLIC_SE_REPORT_ADAPTER=http and PUBLIC_SE_REPORT_API')
+if (FLAGS.checkout && !env('SE_TERMS_VERSION'))
+    throw new Error('SE_CHECKOUT requires SE_TERMS_VERSION for the approved purchase terms')
 if (FLAGS.reportAdapter === 'mock' && siteIndexable)
     throw new Error('The mock report adapter may only be used in non-indexed preview builds')
 for (const p of ['basic', 'ai'] as const)
     if (FLAGS.checkout && FLAGS.reports[p] === 'live' && !VERIFIED_PRICES[p])
         throw new Error(`SE_REPORT_${p.toUpperCase()}=live with checkout needs a verified price in VERIFIED_PRICES`)
+    else if (FLAGS.checkout && FLAGS.reports[p] === 'live' && !VERIFIED_PRICES[p]?.vatIncluded)
+        throw new Error(`SE_REPORT_${p.toUpperCase()}=live needs a verified VAT-inclusive customer price`)

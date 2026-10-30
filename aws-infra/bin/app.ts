@@ -9,6 +9,9 @@
 //   contactEmail          support address in delivery emails (launch gate 8)
 //   stripeProductsTest    JSON: {"STRIPE_PRODUCT_SE_AI":"prod_...", ...}; products without an id are not sold
 //   stripeProductsProd
+//   checkoutEnabledTest   1 to allow new test checkout sessions
+//   checkoutEnabledProd   1 to allow new live checkout sessions after launch checks
+//   termsVersionTest/Prod version identifier for the approved purchase terms
 //
 // Without hostedZoneId the sites run on their *.cloudfront.net domains.
 
@@ -66,5 +69,7 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         reportAdminEmail: 'luottoriskiraportti202605@valuatum.com',
         contactEmail: ctx('contactEmail'),
         stripeProducts: JSON.parse(ctx(`stripeProducts${environmentName}`) ?? '{}'),
+        checkoutEnabled: ctx(`checkoutEnabled${environmentName}`) === '1',
+        termsVersion: ctx(`termsVersion${environmentName}`),
     })
 }

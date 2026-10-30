@@ -19,7 +19,7 @@
 // Charge policy: manual capture (authorize now, capture only after the report
 // generates successfully).
 
-const { json, jsonBody, method, header } = require('../lib/http')
+const { json, jsonBody, method } = require('../lib/http')
 const {
     getProduct,
     grantFor,
@@ -69,26 +69,6 @@ function parsePackageCheckout(product, body) {
     }
 }
 
-function requestOrigin(event) {
-    const origin = header(event, 'origin')
-    if (
-        origin &&
-        /^https:\/\/([a-z0-9-]+\.)?kreditrisker\.se$/i.test(origin)
-    ) {
-        return origin.replace(/\/$/, '')
-    }
-
-    const host =
-        header(event, 'x-forwarded-host') ||
-        header(event, 'host') ||
-        event?.requestContext?.domainName
-    if (host && /^([a-z0-9-]+\.)?kreditrisker\.se$/i.test(host)) {
-        return `https://${host}`
-    }
-
-    return config.siteUrl
-}
-
 function appendParams(path, params) {
     const hashIndex = path.indexOf('#')
     const base = hashIndex >= 0 ? path.slice(0, hashIndex) : path
@@ -127,6 +107,10 @@ async function resolvePrice(stripe, product) {
             throw new Error(
                 `Stripe product default price has no fixed unit amount: ${product.stripeProductId}`
             )
+        if (product.expectedUnitAmount !== undefined && price.unit_amount !== product.expectedUnitAmount)
+            throw new Error(
+                `Stripe product default price differs from approved price: ${product.stripeProductId}`
+            )
 
         return price
     }
@@ -163,6 +147,8 @@ exports.handler = async event => {
     const requestMethod = method(event)
     if (!['GET', 'POST'].includes(requestMethod))
         return json(405, { error: 'Method not allowed' })
+    if (process.env.REPORT_CHECKOUT_ENABLED !== '1')
+        return json(503, { error: 'Report checkout is not available' })
 
     if (requestMethod === 'GET') {
         const reportType = event?.queryStringParameters?.reportType
@@ -194,9 +180,13 @@ exports.handler = async event => {
         cancelPath,
         promotionCode,
         email,
+        acceptedTermsVersion,
         requestId,
         fulfillReportType,
     } = jsonBody(event)
+
+    if (!config.termsVersion || acceptedTermsVersion !== config.termsVersion)
+        return json(400, { error: 'Purchase terms have not been accepted' })
 
     const product = getProduct(reportType)
     if (!product) return json(400, { error: 'Unknown reportType' })
@@ -218,7 +208,7 @@ exports.handler = async event => {
     const langDisclosure = reportLangDisclosure(reportLanguage, language)
 
     // Only same-origin relative paths are honored for Stripe redirects.
-    const origin = requestOrigin(event)
+    const origin = config.siteUrl
     const returnPath =
         typeof cancelPath === 'string' && cancelPath.startsWith('/')
             ? cancelPath
@@ -256,6 +246,7 @@ exports.handler = async event => {
 
         const sessionParams = {
             mode: 'payment',
+            locale: language,
             customer_creation: 'always',
             ...(packageCheckout
                 ? {
@@ -273,8 +264,7 @@ exports.handler = async event => {
             // jurisdiction. Requires Stripe Tax enabled + a registration in the dashboard.
             automatic_tax: { enabled: true },
             // EU B2B: a valid VAT id from another EU country makes Stripe Tax apply
-            // the reverse charge. Prices are VAT-inclusive, so the gross stays the
-            // same and the VAT line becomes 0. Optional for the buyer.
+            // the reverse charge when applicable. Optional for the buyer.
             tax_id_collection: { enabled: true },
             // Post-payment invoice (PDF + hosted page) with the VAT breakdown and
             // both VAT ids (customer_creation above provides the Customer). Stripe
@@ -303,6 +293,8 @@ exports.handler = async event => {
                     : {}),
                 lang: language,
                 reportLang: reportLanguage,
+                acceptedTermsVersion: config.termsVersion,
+                termsAcceptedAt: new Date().toISOString(),
                 fid: fid ? String(fid) : '',
                 businessId: businessId ? String(businessId) : '',
                 fiscalYear: fiscalYear ? String(fiscalYear) : '',

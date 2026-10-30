@@ -99,6 +99,43 @@ test('a balance read failure does not block report delivery', async () => {
     assert.equal(consume.mock.callCount(), 1)
 })
 
+test('a cancelled payment cannot be mistaken for an already captured payment', async () => {
+    const stripe = { paymentIntents: {
+        capture: async () => { throw new Error('PaymentIntent cannot be captured') },
+        cancel: async () => { throw new Error('PaymentIntent already canceled') },
+        retrieve: async () => ({ status: 'canceled' }),
+    } }
+    const updateOrder = mock.method(dynamo, 'updateOrder', async () => undefined)
+    const delivered = await deliver(stripe, { sessionId: 'cs_test_single', paymentIntentId: 'pi_test', email: 'buyer@example.com', reportType: 'se_credit_risk' }, Buffer.from('pdf'))
+    assert.equal(delivered, false)
+    assert.equal(emailService.sendReportEmail.mock.callCount(), 0)
+    assert.equal(updateOrder.mock.callCount(), 1)
+    assert.equal(updateOrder.mock.calls[0].arguments[1].status, 'FAILED')
+    assert.equal(emailService.sendAdminGenerationAlert.mock.callCount(), 1)
+})
+
+test('a captured payment cannot be treated as canceled after generation failure', async () => {
+    const stripe = { paymentIntents: {
+        cancel: async () => { throw new Error('PaymentIntent cannot be canceled') },
+        retrieve: async () => ({ status: 'succeeded' }),
+    } }
+    const updateOrder = mock.method(dynamo, 'updateOrder')
+    await assert.rejects(fail(stripe, { sessionId: 'cs_test_single', paymentIntentId: 'pi_test' }, 'Generation failed'), /cannot be canceled/)
+    assert.equal(updateOrder.mock.callCount(), 0)
+    assert.equal(emailService.sendAdminGenerationAlert.mock.callCount(), 0)
+})
+
+test('a retry after successful capture can still deliver the report', async () => {
+    const stripe = { paymentIntents: {
+        capture: async () => { throw new Error('PaymentIntent already captured') },
+        retrieve: async () => ({ status: 'succeeded' }),
+    } }
+    const updateOrder = mock.method(dynamo, 'updateOrder', async () => undefined)
+    await deliver(stripe, { sessionId: 'cs_test_single', paymentIntentId: 'pi_test', email: 'buyer@example.com', reportType: 'se_credit_risk' }, Buffer.from('pdf'))
+    assert.equal(emailService.sendReportEmail.mock.callCount(), 1)
+    assert.equal(updateOrder.mock.callCount(), 1)
+})
+
 test('package failure relies on the transactional release outbox', async () => {
     const release = mock.method(credits, 'release', async () => ({
         status: 'SETTLED',

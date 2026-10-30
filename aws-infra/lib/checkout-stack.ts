@@ -38,6 +38,20 @@ export interface CheckoutStackProps extends cdk.StackProps {
      * _AI_BUNDLE). A product without an id is not sold (backend/src/lib/products.js).
      */
     stripeProducts?: Record<string, string>
+    /** Explicit switch for new Checkout sessions; outstanding orders still finish. */
+    checkoutEnabled?: boolean
+    /** Version of the approved purchase terms accepted before checkout. */
+    termsVersion?: string
+}
+
+export function validateTestCheckoutSite(props: Pick<CheckoutStackProps, 'environmentName' | 'siteUrl' | 'checkoutEnabled'>): void {
+    if (props.environmentName !== 'Test' || !props.checkoutEnabled) return
+    const site = URL.canParse(props.siteUrl) ? new URL(props.siteUrl) : null
+    const hostname = site?.hostname.replace(/\.$/, '')
+    if (!site || site.protocol !== 'https:' || site.username || site.password || site.pathname !== '/' || site.search || site.hash
+        || hostname === 'kreditrisker.se' || hostname === 'www.kreditrisker.se') {
+        throw new Error('Enabled test checkout requires a separate HTTPS test-site origin; set siteUrlTest')
+    }
 }
 
 /**
@@ -53,6 +67,8 @@ export class CheckoutStack extends cdk.Stack {
         props: CheckoutStackProps
     ) {
         super(scope, id, props)
+        if (props.checkoutEnabled && !props.termsVersion) throw new Error('checkoutEnabled requires an approved termsVersion')
+        validateTestCheckoutSite(props)
 
         const descriptionPrefix = `${props.environmentName} - Kreditrisker.se`
 
@@ -179,6 +195,8 @@ export class CheckoutStack extends cdk.Stack {
             NODE_OPTIONS: '--enable-source-maps',
             CONTACT_EMAIL: props.contactEmail ?? '',
             ...props.stripeProducts,
+            REPORT_CHECKOUT_ENABLED: props.checkoutEnabled ? '1' : '0',
+            REPORT_TERMS_VERSION: props.termsVersion ?? '',
         }
 
         const makeFn = (
@@ -251,11 +269,21 @@ export class CheckoutStack extends cdk.Stack {
                 },
             },
         })
+        const invokeViaUrlPolicy = new iam.PolicyStatement({
+            actions: ['lambda:InvokeFunction'],
+            resources: [REPORT_ENGINE[props.environmentName].arn],
+            conditions: {
+                Bool: { 'lambda:InvokedViaFunctionUrl': 'true' },
+            },
+        })
         webhookFn.addToRolePolicy(invokePolicy)
+        webhookFn.addToRolePolicy(invokeViaUrlPolicy)
         pollerFn.addToRolePolicy(invokePolicy)
+        pollerFn.addToRolePolicy(invokeViaUrlPolicy)
         // /api/redeem starts a package-funded report itself, so it submits jobs
         // exactly like the webhook does for a paid one.
         redeemFn.addToRolePolicy(invokePolicy)
+        redeemFn.addToRolePolicy(invokeViaUrlPolicy)
 
         // Send report/alert mail. The poller is the only Lambda that emails, so
         // create-checkout and webhook deliberately get no SES permission. Scoped

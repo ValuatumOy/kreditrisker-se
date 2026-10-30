@@ -89,18 +89,16 @@ Product and uses its current active `default_price`. The browser sends only the
 catalog `reportType`; it never sends or selects a Product ID, Price ID, or
 amount.
 
-To change a single-report Checkout price without rebuilding the site, add a new
-one-time Price to the existing Product in Stripe Dashboard and set it as the
-Product's default. Stripe Price amounts are immutable, so don't edit the old
-Price amount. The company-page modal reads the same current amount through
-`GET /api/create-checkout?reportType=...`. An inactive Product, missing default
-Price, inactive default Price, wrong currency, recurring Price, incompatible tax
-behavior, or non-fixed unit amount fails closed before Checkout is created.
+The approved single-report prices are 29 / 69 SEK excluding VAT. They are stored
+in `src/lib/report-price-targets.json` and must match the active one-time default
+Prices on the respective Stripe Products. The site displays a separately verified
+VAT-inclusive customer price. If prices change, update both the site and these
+targets alongside Stripe. An inactive Product, missing or inactive default Price,
+wrong currency, recurring Price, incompatible tax behavior, non-fixed amount, or
+an amount that differs from the target fails closed before Checkout is created.
 
-The two bundle products (`dk_credit_risk_bundle`, `dk_ai_credit_risk_bundle`)
-now have stable Product IDs too, and are resolved the same way — every
-product in the catalog prices from its Stripe default Price, with no
-hardcoded amount left in `lib/products.js`.
+The two optional Swedish bundle products also resolve their default Prices from
+Stripe; their prices have not been decided or prepared for launch.
 
 ## Payment policy — manual capture
 

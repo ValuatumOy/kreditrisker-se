@@ -31,20 +31,21 @@ const REPORT_LANG_DISCLOSURE = {
 };
 
 const REST_LANG_CODES = { sv: 'sv', en: 'en' };
+const PRICE_TARGETS = require('./report-price-targets.json');
 
 // Swedish catalog. A product is sold only once it has a Stripe product id
-// (prices live in Stripe, never in code) - see getProduct().
+// (the allowed Stripe price must also match the approved target) - see getProduct().
 //
 // Both reports are rendered by the report engine under the `Sweden` customer
-// (aspQueryKey), whose secret points at sweden.valuatum.com. Until there are
-// enough Swedish companies for models and statistics of their own, the ratings
-// come from the Finnish ValuBooster model that sweden.valuatum.com runs, and
-// the scatter and industry comparison from Finnish companies.
+// (aspQueryKey), whose secret points at sweden.valuatum.com. Swedish reports
+// use the Finnish credit-risk model and Finnish industry
+// comparisons until Swedish alternatives are available.
 const PRODUCTS = {
   se_ai_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_AI || '',
     currency: 'sek',
-    taxBehavior: 'inclusive',
+    taxBehavior: 'exclusive',
+    expectedUnitAmount: PRICE_TARGETS.ai,
     taxCode: 'txcd_10000000',
     name: {
       sv: 'AI-kreditriskrapport',
@@ -66,7 +67,8 @@ const PRODUCTS = {
   se_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_BASIC || '',
     currency: 'sek',
-    taxBehavior: 'inclusive',
+    taxBehavior: 'exclusive',
+    expectedUnitAmount: PRICE_TARGETS.basic,
     taxCode: 'txcd_10000000',
     name: {
       sv: 'Kreditriskrapport',

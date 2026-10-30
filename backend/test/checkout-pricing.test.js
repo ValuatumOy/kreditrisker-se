@@ -125,6 +125,22 @@ test('checkout rejects a default price with the wrong billing contract', async (
     }
 })
 
+test('Swedish single reports accept only the approved SEK amounts excluding VAT', async () => {
+    for (const [reportType, expected] of [['se_credit_risk', 2900], ['se_ai_credit_risk', 6900]]) {
+        const product = getProduct(reportType)
+        assert.equal(product.taxBehavior, 'exclusive')
+        assert.equal(product.expectedUnitAmount, expected)
+        const price = { id: 'price_test', active: true, currency: 'sek', type: 'one_time', tax_behavior: 'exclusive', unit_amount: expected }
+        const stripe = { products: { retrieve: async () => ({ active: true, default_price: price }) } }
+        assert.equal((await resolvePrice(stripe, product)).unit_amount, expected)
+        price.unit_amount += 100
+        await assert.rejects(resolvePrice(stripe, product), /differs from approved price/)
+        price.unit_amount = expected
+        price.tax_behavior = 'inclusive'
+        await assert.rejects(resolvePrice(stripe, product), /invalid tax behavior/)
+    }
+})
+
 test('a product without a Stripe product ID keeps the trusted server-side inline price', async () => {
     // Every catalog product currently has a stripeProductId — this covers the
     // price_data fallback branch itself, in case a future product ships
