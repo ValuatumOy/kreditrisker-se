@@ -127,12 +127,18 @@ customer **authorizes but is not charged** at payment time.
   guarantee that every failure is automatically refunded.
 
 Before opening sales, assign an owner to the SNS alerts and agree the delivery
-and refund procedure. For an alert, use its session ID to inspect the order,
-report job, SES events and Stripe PaymentIntent. If payment was captured but
-delivery failed or is uncertain, arrange redelivery or a Stripe refund after
-checking what happened. A captured payment cannot be released by canceling its
-authorization; SES timeouts can also leave delivery uncertain. Do not submit a
-new report job just to retry an email.
+and refund procedure. For an order-error alarm, find `poller: order error` in
+the poller logs around the alarm time and inspect every affected session ID.
+An alarm that remains in ALARM does not send a new notice for each later error.
+For a runtime-error alarm, inspect the poller logs; there may be no session ID.
+SES bounce notifications carry the session ID in `mail.tags.sessionId`.
+
+Use the session ID to inspect the order, report job, SES events and Stripe
+PaymentIntent. If payment was captured but delivery failed or is uncertain,
+arrange redelivery or a Stripe refund after checking what happened. A captured
+payment cannot be released by canceling its authorization; SES timeouts can
+also leave delivery uncertain. Do not submit a new report job just to retry an
+email.
 
 ### Stripe Tax
 
