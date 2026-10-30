@@ -39,7 +39,7 @@ test('order and withdrawal messages preserve the reference and never claim an au
     const order = {
         sessionId: 'cs_test_reference123456', email: 'buyer@example.com', companyName: '<Wrong company>',
         params: { companyCode: '556036-9208' },
-        amountTotal: 3640, currency: 'sek', acceptedTermsVersion: 'reviewed-version',
+        amountTotal: 2900, currency: 'sek', acceptedTermsVersion: 'reviewed-version',
         withdrawalRequestId: 'withdrawal-123', withdrawalRequestedAt: '2026-10-30T12:00:00Z',
         withdrawalPaymentResolution: 'REFUND_REQUIRED', paymentIntentId: 'pi_local',
     }
@@ -49,7 +49,7 @@ test('order and withdrawal messages preserve the reference and never claim an au
         await sendWithdrawalAdminAlert(order)
         const inputs = send.mock.calls.map(call => call.arguments[0].input)
         const confirmation = inputs[0].Content.Simple.Body.Html.Data
-        assert.match(confirmation, /36,40/)
+        assert.match(confirmation, /29,00/)
         assert.match(confirmation, /Beloppet reserveras/)
         assert.match(confirmation, /14 dagar/)
         assert.match(confirmation, /reviewed-version/)

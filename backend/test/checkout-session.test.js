@@ -11,7 +11,7 @@ stripeModule.stripeClient = async () => ({
             active: true,
             default_price: {
                 id: 'price_test', active: true, currency: 'sek', type: 'one_time',
-                tax_behavior: 'exclusive', unit_amount: id === 'prod_test_se_basic' ? 2900 : 6900,
+                tax_behavior: id === 'prod_test_se_basic' ? 'inclusive' : 'exclusive', unit_amount: id === 'prod_test_se_basic' ? 2900 : 6900,
             },
         }),
     },

@@ -17,7 +17,7 @@ stripeModule.stripeClient = async () => ({
         active: true,
         default_price: {
             id: 'price_test', active: true, currency: 'sek', type: 'one_time',
-            tax_behavior: 'exclusive', unit_amount: 2900,
+            tax_behavior: 'inclusive', unit_amount: 2900,
         },
     }) },
     checkout: { sessions: { create: async params => {
@@ -46,7 +46,7 @@ function request(body) {
 function webhookEvent(overrides = {}) {
     const session = {
         id: 'cs_test_fixture', payment_intent: 'pi_test_fixture',
-        payment_status: 'unpaid', amount_total: 3625, currency: 'sek',
+        payment_status: 'unpaid', amount_total: 2900, currency: 'sek',
         customer_details: { email: fixture.email },
         metadata: { reportType: fixture.reportType, businessId: fixture.businessId },
         ...overrides,

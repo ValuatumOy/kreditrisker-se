@@ -262,7 +262,7 @@ const statement =
                                 ))}
                             </ul>
                             <div class="rcard__foot">
-                                <span class="rcard__price">{s.kind === 'available' && s.price ? `${s.price.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr inkl. moms för konsument i Sverige` : 'Pris: inte fastställt'}</span>
+                                <span class="rcard__price">{s.kind === 'available' && s.price ? `${s.price.amountSek.toLocaleString('sv-SE')} kr inkl. moms för konsument i Sverige` : 'Pris: inte fastställt'}</span>
                                 <a class="btn" href={p === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'}>
                                     Läs mer
                                 </a>

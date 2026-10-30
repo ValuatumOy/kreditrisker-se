@@ -53,7 +53,7 @@ const path = product === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'
                 <p class="rpp__state"><span class:list={['tag', state.kind === 'available' ? 'tag--ok' : 'tag--warn']}>{STATE_LABEL[state.kind]}</span></p>
                 {state.kind === 'unavailable' && <p class="small">{UNAVAILABLE_TEXT[state.reason]}</p>}
                 <dl class="rpp__facts small">
-                    <div><dt>Pris</dt><dd>{price ? `${price.amountSek.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr inkl. moms för konsument i Sverige` : 'Inte fastställt'}</dd></div>
+                    <div><dt>Pris</dt><dd>{price ? `${price.amountSek.toLocaleString('sv-SE')} kr inkl. moms för konsument i Sverige` : 'Inte fastställt'}</dd></div>
                     <div><dt>Leverans</dt><dd>{state.kind === 'available' ? 'PDF via e-post.' : 'PDF. Leveranstid anges vid lansering.'}</dd></div>
                     <div><dt>Betalning</dt><dd>{state.kind === 'available' ? 'Öppen' : 'Inte öppen'}</dd></div>
                 </dl>

@@ -50,7 +50,7 @@ const stripe = {
             active: true,
             default_price: {
                 id: `price_${id}`, active: true, currency: 'sek',
-                type: 'one_time', tax_behavior: 'exclusive',
+                type: 'one_time', tax_behavior: id === 'prod_test_se_basic' ? 'inclusive' : 'exclusive',
                 unit_amount: id === 'prod_test_se_basic' ? 2900 : 6900,
             },
         }),
