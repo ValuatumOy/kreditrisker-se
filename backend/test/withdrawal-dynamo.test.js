@@ -64,3 +64,23 @@ test('the withdrawal worker queries its durable pending index rather than depend
         assert.deepEqual(queries[1].ExclusiveStartKey, { sessionId: 'a' })
     } finally { mock.restoreAll() }
 })
+
+test('withdrawal finalization cannot reopen a closed or changed request', async () => {
+    const order = { sessionId: 'cs_test_order', withdrawalRequestId: 'request-1', withdrawalPaymentResolution: 'REFUND_REQUIRED' }
+    let input
+    mock.method(dynamo.doc, 'send', async command => {
+        input = command.input
+        throw Object.assign(new Error('order changed'), { name: 'ConditionalCheckFailedException' })
+    })
+    try {
+        assert.equal(await dynamo.finishWithdrawal(order), false)
+        assert.match(input.ConditionExpression, /#state = :pending/)
+        assert.match(input.ConditionExpression, /withdrawalRequestId = :request/)
+        assert.match(input.ConditionExpression, /withdrawalPaymentResolution = :resolution/)
+        assert.match(input.ConditionExpression, /attribute_exists\(withdrawalCustomerAcceptedAt\)/)
+        assert.match(input.ConditionExpression, /attribute_exists\(withdrawalAdminAcceptedAt\)/)
+        assert.equal(input.ExpressionAttributeValues[':pending'], 'PENDING')
+        assert.equal(input.ExpressionAttributeValues[':request'], order.withdrawalRequestId)
+        assert.equal(input.ExpressionAttributeValues[':resolution'], 'REFUND_REQUIRED')
+    } finally { mock.restoreAll() }
+})

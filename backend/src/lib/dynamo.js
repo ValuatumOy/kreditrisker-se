@@ -87,6 +87,27 @@ async function updateOrder(sessionId, attrs) {
   }));
 }
 
+async function closeRefundedWithdrawal(order, verifiedAt, refundIds) {
+  try {
+    await doc.send(new UpdateCommand({
+      TableName: config.ordersTable,
+      Key: { sessionId: order.sessionId },
+      ConditionExpression: '#withdrawalState = :review AND #status = :withdrawn AND withdrawalRequestId = :request AND withdrawalPaymentResolution = :required AND paymentIntentId = :intent AND amountTotal = :amount AND currency = :currency',
+      UpdateExpression: 'SET #withdrawalState = :closed, withdrawalRefundVerifiedAt = :verifiedAt, withdrawalRefundIds = :refundIds, updatedAt = :verifiedAt',
+      ExpressionAttributeNames: { '#withdrawalState': 'withdrawalState', '#status': 'status' },
+      ExpressionAttributeValues: {
+        ':review': 'REVIEW_REQUIRED', ':withdrawn': 'WITHDRAWN', ':request': order.withdrawalRequestId, ':required': 'REFUND_REQUIRED',
+        ':intent': order.paymentIntentId, ':amount': order.amountTotal, ':currency': order.currency,
+        ':closed': 'CLOSED', ':verifiedAt': verifiedAt, ':refundIds': refundIds,
+      },
+    }));
+    return true;
+  } catch (err) {
+    if (err?.name === 'ConditionalCheckFailedException') return false;
+    throw err;
+  }
+}
+
 // All orders currently in a given status (e.g. GENERATING), via the status GSI.
 async function listOrdersByStatus(status) {
   const items = [];
@@ -121,6 +142,13 @@ async function claimDelivery(sessionId) {
 async function finishSingleOrder(sessionId, attrs) {
   return conditionalOrderUpdate(sessionId, attrs,
     'attribute_exists(sessionId) AND attribute_not_exists(withdrawalRequestId)');
+}
+
+async function finishWithdrawal(order) {
+  return conditionalOrderUpdate(order.sessionId, {
+    withdrawalState: order.withdrawalPaymentResolution === 'REFUND_REQUIRED' ? 'REVIEW_REQUIRED' : 'CLOSED',
+  }, '#state = :pending AND withdrawalRequestId = :request AND withdrawalPaymentResolution = :resolution AND attribute_exists(withdrawalCustomerAcceptedAt) AND attribute_exists(withdrawalAdminAcceptedAt)',
+  { '#state': 'withdrawalState' }, { ':pending': 'PENDING', ':request': order.withdrawalRequestId, ':resolution': order.withdrawalPaymentResolution });
 }
 
 async function conditionalOrderUpdate(sessionId, attrs, condition, names = {}, values = {}) {
@@ -187,10 +215,12 @@ module.exports = {
   getOrder,
   deleteOrder,
   updateOrder,
+  closeRefundedWithdrawal,
   listOrdersByStatus,
   beginGeneration,
   claimDelivery,
   finishSingleOrder,
+  finishWithdrawal,
   requestWithdrawal,
   listWithdrawals,
 };

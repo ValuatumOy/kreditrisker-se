@@ -79,6 +79,13 @@ dynamo.finishSingleOrder = async (id, attrs) => {
     Object.assign(order, attrs)
     return true
 }
+dynamo.finishWithdrawal = async snapshot => {
+    const current = state.orders.get(snapshot.sessionId)
+    if (current.withdrawalState !== 'PENDING' || current.withdrawalRequestId !== snapshot.withdrawalRequestId ||
+        current.withdrawalPaymentResolution !== snapshot.withdrawalPaymentResolution || !current.withdrawalCustomerAcceptedAt || !current.withdrawalAdminAcceptedAt) return false
+    current.withdrawalState = snapshot.withdrawalPaymentResolution === 'REFUND_REQUIRED' ? 'REVIEW_REQUIRED' : 'CLOSED'
+    return true
+}
 dynamo.requestWithdrawal = async ({ sessionId, email: buyer, requestId, requestedAt, receiptMethod }) => {
     const order = state.orders.get(sessionId)
     if (!order || order.email.toLowerCase() !== buyer || order.reportType !== 'se_credit_risk' || order.funding === 'package') return null
@@ -106,6 +113,7 @@ email.sendWithdrawalAdminAlert = async () => {
 const webhook = require('../src/handlers/webhook')
 const poller = require('../src/handlers/poller')
 const withdrawal = require('../src/handlers/withdrawal')
+const withdrawals = require('../src/lib/withdrawals')
 
 function completedCheckout(overrides = {}) {
     return { requestContext: { http: { method: 'POST' } }, body: JSON.stringify({
@@ -302,6 +310,19 @@ test('capture winning the race preserves the request and queues a manual refund 
     await poller.handler()
     assert.equal(order.withdrawalState, 'REVIEW_REQUIRED', 'manual action remains pending until an operator verifies a refund')
     assert.equal(state.admin, 1, 'the ongoing backlog alarm must not spam another email')
+})
+
+test('a stale withdrawal worker cannot reopen a verified closed refund', async () => {
+    const order = await start()
+    await request()
+    order.status = 'WITHDRAWN'
+    order.withdrawalPaymentResolution = 'REFUND_REQUIRED'
+    order.withdrawalCustomerAcceptedAt = '2026-10-30T00:00:00Z'
+    order.withdrawalAdminAcceptedAt = '2026-10-30T00:00:00Z'
+    const stale = { ...order }
+    order.withdrawalState = 'CLOSED'
+    await withdrawals.processWithdrawal(stripe, stale)
+    assert.equal(order.withdrawalState, 'CLOSED')
 })
 
 test('a lost cancel response is resolved from Stripe status and an unresolved timeout remains queued', async () => {

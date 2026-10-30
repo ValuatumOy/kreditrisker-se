@@ -67,10 +67,8 @@ async function processWithdrawal(stripe, order) {
         }
     }
     if (!failed && order.withdrawalPaymentResolution && order.withdrawalAdminAcceptedAt && order.withdrawalCustomerAcceptedAt) {
-        await dynamo.updateOrder(order.sessionId, {
-            withdrawalState: order.withdrawalPaymentResolution === 'REFUND_REQUIRED' ? 'REVIEW_REQUIRED' : 'CLOSED',
-        })
-        if (order.withdrawalPaymentResolution === 'REFUND_REQUIRED') {
+        const finished = await dynamo.finishWithdrawal(order)
+        if (finished && order.withdrawalPaymentResolution === 'REFUND_REQUIRED') {
             console.warn('withdrawal: manual refund required', { sessionId: order.sessionId })
         }
     }
