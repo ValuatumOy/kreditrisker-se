@@ -16,6 +16,7 @@ import path from 'node:path'
 import { SITE } from '../src/config/site.ts'
 import { validateRecord } from '../src/lib/contract/validate.ts'
 import type { PublishedCompany } from '../src/lib/contract/types.ts'
+import { readJsonl, writeJsonl } from '../src/lib/jsonl.ts'
 import { publishCompany, toRow, type IndexRow } from '../src/lib/publish.ts'
 import { fetchBundle, mapLimit } from '../src/lib/valuatum/api.ts'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
@@ -23,7 +24,6 @@ import { readParams } from '../src/lib/valuatum/params.ts'
 
 const BUILD_DIR = path.join(process.cwd(), 'data', 'build')
 
-const readJsonl = <T>(file: string): T[] => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as T) : [])
 const slugOf = (p: string) => p.split('/')[3]
 
 async function main() {
@@ -80,10 +80,9 @@ async function main() {
                 rows.delete(o)
             }
     fs.mkdirSync(BUILD_DIR, { recursive: true })
-    const jsonl = (xs: unknown[]) => xs.map((x) => JSON.stringify(x)).join('\n') + (xs.length ? '\n' : '')
-    fs.writeFileSync(path.join(BUILD_DIR, 'pages.jsonl'), jsonl(pages))
-    fs.writeFileSync(path.join(BUILD_DIR, 'index.jsonl'), jsonl([...rows.values()]))
-    fs.writeFileSync(path.join(BUILD_DIR, 'rejected.jsonl'), jsonl(rejected))
+    writeJsonl(path.join(BUILD_DIR, 'pages.jsonl'), pages)
+    writeJsonl(path.join(BUILD_DIR, 'index.jsonl'), rows.values())
+    writeJsonl(path.join(BUILD_DIR, 'rejected.jsonl'), rejected)
     // S3 prefixes of companies that left the directory, for the deploy step to delete.
     fs.writeFileSync(path.join(BUILD_DIR, 'removed.txt'), removed.map((r) => r + '\n').join(''))
     const indexable = [...rows.values()].filter((r) => r.ix).length

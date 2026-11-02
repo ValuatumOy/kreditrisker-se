@@ -6,12 +6,12 @@
 //   build                data/build/ written by scripts/fetch.ts: pages for the
 //                        batch, index rows for the whole directory (API builds)
 
-import fs from 'node:fs'
 import path from 'node:path'
 import { publishRelease, stageBatch, emptyRelease, type Release } from './pipeline.ts'
 import { currentReleaseId, readBatchFile, readCurrentRelease, readRelease, readStaged } from './releaseio.ts'
 import { buildSite, siteFromRelease, type IndexRow, type Site } from './publish.ts'
 import type { PublishedCompany } from './contract/types.ts'
+import { readJsonl } from './jsonl.ts'
 
 export const BUILD_DIR = path.join(process.cwd(), 'data', 'build')
 
@@ -30,9 +30,6 @@ export function loadRelease(source = process.env.SE_DATA_SOURCE): Release {
     }
     return currentReleaseId() ? readCurrentRelease() : fixtureRelease()
 }
-
-export const readJsonl = <T>(file: string): T[] =>
-    fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as T) : []
 
 function buildFromFetch(): Site {
     const pages = readJsonl<PublishedCompany>(path.join(BUILD_DIR, 'pages.jsonl'))
