@@ -7,13 +7,13 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { build } from 'esbuild'
 import { buildSearchDb } from '../src/lib/search-db.ts'
+import { readJsonl } from '../src/lib/jsonl.ts'
 import { toSearchHit } from '../src/lib/search.ts'
 import type { IndexRow } from '../src/lib/publish.ts'
 
 const BUILD_DIR = path.join(process.cwd(), 'data', 'build')
 const OUT = path.join(BUILD_DIR, 'search')
 
-const readJsonl = <T>(f: string): T[] => (fs.existsSync(f) ? fs.readFileSync(f, 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l) as T) : [])
 
 async function main() {
     const rows = readJsonl<IndexRow>(path.join(BUILD_DIR, 'index.jsonl')).filter((r) => !r.syn)

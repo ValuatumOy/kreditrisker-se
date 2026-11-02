@@ -127,7 +127,8 @@ The fields below are already set for a production run; leave them as they are.''
 
         stage('Build') {
             steps {
-                sh 'SE_DATA_SOURCE=build npm run build'
+                // ~64 KB of page data per company: a 16k batch is ~1 GB of pages.jsonl, too much for Node's default heap.
+                sh 'SE_DATA_SOURCE=build NODE_OPTIONS=--max-old-space-size=8192 npm run build'
             }
         }
 
