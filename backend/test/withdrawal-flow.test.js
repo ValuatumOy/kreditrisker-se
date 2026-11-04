@@ -158,6 +158,7 @@ test('a malformed single-report payment retries at the webhook without claiming 
         { amount_total: undefined },
         { amount_total: -1 },
         { amount_total: 0, payment_intent: null, payment_status: 'unpaid' },
+        { amount_total: 3640, payment_intent: null, payment_status: 'paid' },
         { amount_total: 3640, payment_intent: null, payment_status: 'no_payment_required' },
     ]) {
         assert.equal((await webhook.handler(completedCheckout(overrides))).statusCode, 503)
@@ -199,10 +200,11 @@ test('incomplete payment blocks a finished report, direct delivery, failure and 
     assert.equal(state.admin, 0, 'must not send an authorization-released notice')
 })
 
-test('only a signed zero-total no_payment_required Checkout can complete without a PaymentIntent', async () => {
-    assert.equal((await webhook.handler(completedCheckout({ amount_total: 0, payment_intent: null, payment_status: 'no_payment_required' }))).statusCode, 200)
+for (const paymentStatus of ['no_payment_required', 'paid']) test(`signed zero-total ${paymentStatus} Checkout can complete without a PaymentIntent`, async () => {
+    assert.equal((await webhook.handler(completedCheckout({ amount_total: 0, payment_intent: null, payment_status: paymentStatus }))).statusCode, 200)
     const order = state.orders.get(ID)
-    assert.equal(order.paymentStatus, 'no_payment_required')
+    assert.equal(order.paymentStatus, paymentStatus)
+    await webhook.handler(completedCheckout({ amount_total: 0, payment_intent: null, payment_status: paymentStatus }))
     await poller.handler()
     assert.deepEqual(state.timeline, ['confirmation', 'submit', 'report email'])
     assert.equal(order.status, 'FULFILLED')
@@ -217,7 +219,7 @@ test('withdrawal keeps an uncertain zero-total payment pending until no_payment_
     order.amountTotal = 0
     order.paymentIntentId = null
     await request()
-    for (const paymentStatus of [undefined, 'unpaid', 'paid']) {
+    for (const paymentStatus of [undefined, 'unpaid']) {
         order.paymentStatus = paymentStatus
         await poller.handler()
         assert.equal(order.withdrawalState, 'PENDING')

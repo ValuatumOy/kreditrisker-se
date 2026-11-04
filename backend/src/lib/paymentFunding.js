@@ -10,7 +10,8 @@ function paymentFunding(order) {
     if (typeof order.paymentIntentId === 'string' && /^pi_[A-Za-z0-9_]+$/.test(order.paymentIntentId)) {
         return 'STRIPE'
     }
-    if (order.paymentIntentId == null && order.amountTotal === 0 && order.paymentStatus === 'no_payment_required') {
+    // A fully discounted Checkout can be completed as either status without a PaymentIntent.
+    if (order.paymentIntentId == null && order.amountTotal === 0 && ['no_payment_required', 'paid'].includes(order.paymentStatus)) {
         return 'FREE'
     }
     throw new Error('Payment review required: no valid PaymentIntent or verified zero-total Checkout')
