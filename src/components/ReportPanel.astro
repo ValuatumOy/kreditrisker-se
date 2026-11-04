@@ -12,7 +12,7 @@ interface Props {
 const { company } = Astro.props
 const DESC: Record<ReportProduct, string> = {
     basic: 'Bokslut, nyckeltal och branschjämförelse samlade i en rapport.',
-    ai: 'Som basrapporten, med en skriven analys och genomgång av offentliga källor.',
+    ai: 'Som kreditrapporten, med en skriven analys och genomgång av offentliga källor.',
 }
 const products = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, company) }))
 // Keep the optional Valuatum model id for compatibility with older order links.

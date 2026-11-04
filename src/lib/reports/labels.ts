@@ -1,6 +1,6 @@
 import type { ReportProduct, ReportState, UnavailableReason } from './types.ts'
 
-export const PRODUCT_NAME: Record<ReportProduct, string> = { basic: 'Basrapport', ai: 'AI-rapport' }
+export const PRODUCT_NAME: Record<ReportProduct, string> = { basic: 'Kreditrapport', ai: 'AI-rapport' }
 
 export const STATE_LABEL: Record<ReportState['kind'], string> = {
     unavailable: 'Inte lanserad',
