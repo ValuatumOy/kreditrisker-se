@@ -164,5 +164,6 @@ outputs for Swedish companies as part of the report review before opening sales.
 
 ## Analytics
 
-Set `PUBLIC_GA_TRACKING_ID` in the Jenkins job when a Swedish GA4 property
-exists. The consent banner appears only then, and nothing loads before consent.
+See `GA4-PRIVACY.md` for the GA4 property, isolated frame and required settings.
+Both `PUBLIC_GA_TRACKING_ID` and `PUBLIC_GA_FRAME_ORIGIN` must be configured;
+the consent banner appears only then, and nothing loads before consent.

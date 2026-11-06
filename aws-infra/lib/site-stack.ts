@@ -129,6 +129,24 @@ export class SiteStack extends cdk.Stack {
                 responseHeadersPolicy: headers,
             }
         }
+        if (props.domain) {
+            const analyticsHeaders = new cloudfront.ResponseHeadersPolicy(this, 'AnalyticsFrameHeaders', {
+                securityHeadersBehavior: {
+                    strictTransportSecurity: { accessControlMaxAge: cdk.Duration.days(365), includeSubdomains: true, override: true },
+                    contentTypeOptions: { override: true },
+                    contentSecurityPolicy: { contentSecurityPolicy: `frame-ancestors https://www.${props.domain}`, override: true },
+                    referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
+                },
+            })
+            additionalBehaviors['/analytics-frame/*'] = {
+                origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+                viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+                cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+                compress: true,
+                functionAssociations: [{ eventType: cloudfront.FunctionEventType.VIEWER_REQUEST, function: siteFunction }],
+                responseHeadersPolicy: analyticsHeaders,
+            }
+        }
 
         const names = props.domain && props.certificate ? [props.domain, `www.${props.domain}`] : undefined
         const distribution = new cloudfront.Distribution(this, 'Distribution', {

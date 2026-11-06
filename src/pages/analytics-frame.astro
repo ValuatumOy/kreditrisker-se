@@ -1,0 +1,57 @@
+---
+import { ANALYTICS_EVENTS, ANALYTICS_PAGES, ANALYTICS_REFERRERS } from '../lib/analytics.ts'
+const id = import.meta.env.PUBLIC_GA_TRACKING_ID || ''
+const siteOrigin = Astro.site?.origin || 'https://www.kreditrisker.se'
+const script = `
+(function () {
+    const pages = ${JSON.stringify(ANALYTICS_PAGES)};
+    const referrers = ${JSON.stringify(ANALYTICS_REFERRERS)};
+    const events = ${JSON.stringify(ANALYTICS_EVENTS)};
+    const id = document.body.dataset.analyticsId || '';
+    const siteOrigin = ${JSON.stringify(siteOrigin)};
+    let ready = false;
+    const dataLayer = window.dataLayer = [];
+    function gtag() { dataLayer.push(arguments); }
+    const allowed = (obj, key) => typeof key === 'string' && Object.hasOwn(obj, key);
+    addEventListener('message', (event) => {
+        if (event.source !== parent || event.origin !== siteOrigin || !event.data || typeof event.data !== 'object') return;
+        const message = event.data;
+        if (message.type === 'init' && !ready) {
+            if (!/^G-[A-Z0-9]+$/.test(id) || !allowed(pages, message.page)) return;
+            const page = pages[message.page];
+            const values = {
+                page_location: 'https://www.kreditrisker.se' + page.path,
+                page_title: page.title,
+                page_referrer: allowed(referrers, message.referrer) ? referrers[message.referrer] : '',
+                allow_google_signals: false,
+                allow_ad_personalization_signals: false,
+                send_page_view: false,
+            };
+            ready = true;
+            gtag('consent', 'default', { analytics_storage: 'granted', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
+            gtag('js', new Date());
+            gtag('set', values);
+            gtag('config', id, values);
+            gtag('event', 'page_view', values);
+            const script = document.createElement('script');
+            script.async = true;
+            script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
+            document.head.appendChild(script);
+        } else if (message.type === 'event' && ready && events.includes(message.name)) {
+            gtag('event', message.name);
+        }
+    });
+})();`
+---
+<!doctype html>
+<html lang="sv">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="robots" content="noindex, nofollow" />
+        <meta name="referrer" content="no-referrer" />
+        <title>Statistik</title>
+    </head>
+    <body data-analytics-id={id}>
+        <script is:inline set:html={script} />
+    </body>
+</html>

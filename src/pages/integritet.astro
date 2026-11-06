@@ -2,7 +2,7 @@
 import Page from '../layouts/Page.astro'
 import Doc from '../components/Doc.astro'
 import { SITE } from '../config/site.ts'
-const analytics = Boolean(import.meta.env.PUBLIC_GA_TRACKING_ID)
+const analytics = Boolean(import.meta.env.PUBLIC_GA_TRACKING_ID && import.meta.env.PUBLIC_GA_FRAME_ORIGIN)
 ---
 
 <Page
@@ -78,6 +78,7 @@ const analytics = Boolean(import.meta.env.PUBLIC_GA_TRACKING_ID)
                 <p>
                     Med ditt samtycke använder vi Google Analytics för besöksstatistik, till exempel vilka sidor som besöks (artikel 6.1 a i GDPR).
                     Verktyget laddas först när du godkänner och kan då sätta statistikkakor. Ditt val sparas i webbläsarens lokala lagring.
+                    Statistiken innehåller sidtyper och steg i beställningen, men inte sökord, företagsnamn, organisationsnummer eller beställningsuppgifter.
                     Du kan återkalla samtycket via <em>Cookieinställningar</em> längst ner på sidan. Läs även
                     <a href="https://policies.google.com/privacy">Googles integritetspolicy</a> om behandlingen av statistikuppgifter och internationella överföringar.
                 </p>

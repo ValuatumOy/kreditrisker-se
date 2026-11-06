@@ -22,7 +22,7 @@ export function siteRequestCode(domain?: string): string {
 function handler(event) {
     var r = event.request
     var host = r.headers.host ? r.headers.host.value : ''
-    if (${JSON.stringify(domain ?? '')} && host === ${JSON.stringify(domain ?? '')}) return redirect('https://www.' + host + r.uri + qs(r.querystring))
+    if (${JSON.stringify(domain ?? '')} && host === ${JSON.stringify(domain ?? '')} && r.uri !== '/analytics-frame/' && r.uri !== '/analytics-frame/index.html') return redirect('https://www.' + host + r.uri + qs(r.querystring))
     var last = r.uri.split('/').pop()
     if (r.uri.endsWith('/')) r.uri += 'index.html'
     else if (last.indexOf('.') === -1) return redirect(r.uri + '/' + qs(r.querystring))

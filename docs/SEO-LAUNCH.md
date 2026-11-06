@@ -48,25 +48,12 @@ Before the indexing switch, also check:
 
 ## Privacy and conversion measurement
 
-`PUBLIC_GA_TRACKING_ID` is optional. The banner requires consent, but consent
-does not make it safe to send identifiers or free-text search terms to GA4.
-The current Google tag can receive the full page URL and referrer; `/sok/?q=`
-can contain arbitrary user input and `/bestall/` can contain order parameters.
-Before enabling or continuing analytics:
-
-1. Inspect real GA4 network requests and DebugView in a test environment with
-   representative sensitive inputs. Check page URLs, referrers, form events,
-   search terms and history-change events after consent and after rejection.
-2. Configure and test GA4 data redaction, disable automatic site-search and
-   form collection where they could capture inputs, and sanitize page URLs and
-   referrers in the tag if needed. Redaction is a backstop, not proof that all
-   personal data is excluded. Retest after any tag or property change.
-3. Measure anonymous stages such as search used, report page viewed and
-   checkout started only after the privacy checks pass. Do not send company
-   queries, email addresses, organisation numbers or order references.
-4. Count `purchase` only from a verified successful payment, with a deduplicated
-   transaction ID and a correct tax treatment. A return URL or button click
-   alone does not establish that an order was paid.
+See `GA4-PRIVACY.md` for the isolated, consent-based measurement setup and its
+maintenance checks. It reports fixed page categories and funnel steps, never
+company queries, email addresses, organisation numbers or order references.
+`checkout_returned` is an unverified return, not evidence of a paid order.
+Verify sales in Stripe or the backend; no transaction identifiers or revenue
+are sent to GA4.
 
 Test the Basic funnel in an isolated mock or test environment: search, company
 profile, report contents and exclusions, checkout validation, payment return,

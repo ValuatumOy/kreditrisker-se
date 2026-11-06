@@ -132,6 +132,11 @@ def audit(root, origin, mode):
             errors.append(f'{path}: expected one nonempty title')
         if len(page.robots) != 1 or not page.robots[0].strip():
             errors.append(f'{path}: expected one robots meta tag')
+        # This isolated frame is an internal measurement endpoint, not a content page.
+        if path == '/analytics-frame/':
+            if not page.robots or 'noindex' not in page.robots[0].lower():
+                errors.append(f'{path}: analytics frame must be noindex')
+            continue
         if len(page.canonicals) != 1 or not page.canonicals[0].startswith(origin + '/'):
             errors.append(f'{path}: expected one canonical on {origin}')
         if page.redirect:

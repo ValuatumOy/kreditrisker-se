@@ -19,4 +19,7 @@ test('site request: index rewrite, trailing slash, apex redirect', () => {
     assert.equal(slash.headers.location.value, '/kommuner/?q=x')
     const apex = h(req('/metod/', {}, 'kreditrisker.se'))
     assert.equal(apex.headers.location.value, 'https://www.kreditrisker.se/metod/')
+    assert.equal(h(req('/analytics-frame/', {}, 'kreditrisker.se')).uri, '/analytics-frame/index.html')
+    assert.equal(h(req('/analytics-frame/index.html', {}, 'kreditrisker.se')).uri, '/analytics-frame/index.html')
+    assert.equal(h(req('/analytics-frame/other/', {}, 'kreditrisker.se')).headers.location.value, 'https://www.kreditrisker.se/analytics-frame/other/')
 })

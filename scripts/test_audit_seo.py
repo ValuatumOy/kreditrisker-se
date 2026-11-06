@@ -52,6 +52,12 @@ class AuditSeoTest(unittest.TestCase):
         self.assertTrue(any('broken internal link /missing/' in error for error in errors))
         self.assertTrue(any('invalid JSON-LD' in error for error in errors))
 
+    def test_analytics_frame_is_noindex_without_content_page_metadata(self):
+        self.write('analytics-frame/index.html', '<html lang="sv"><head><title>Statistik</title><meta name="robots" content="noindex,nofollow"></head></html>')
+        self.assertEqual(audit_seo.audit(self.root, ORIGIN, 'blocked')[0], [])
+        self.write('analytics-frame/index.html', '<html lang="sv"><head><title>Statistik</title><meta name="robots" content="index,follow"></head></html>')
+        self.assertTrue(any('analytics frame must be noindex' in error for error in audit_seo.audit(self.root, ORIGIN, 'indexable')[0]))
+
 
 if __name__ == '__main__':
     unittest.main()

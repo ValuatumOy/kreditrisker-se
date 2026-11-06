@@ -74,9 +74,9 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
 
         <div class="od__panel" data-view="failure" hidden aria-live="assertive">
             <p class="od__state"><Icon name="alert" /> <span class="tag tag--alert">{STATE_LABEL.failure}</span></p>
-            <p>Rapporten kunde inte tas fram (<span class="num" data-code></span>).</p>
+            <p data-failure-message>Beställningen kunde inte startas.</p>
             <button class="btn btn--quiet" type="button" data-retry hidden>Försök igen</button>
-            <p class="small">Kontakta oss via <a href="/om/">kontaktsidan</a> och ange ordernumret om problemet kvarstår.</p>
+            <p class="small">Kontakta oss via <a href="/om/">kontaktsidan</a> om problemet kvarstår. Ange ordernumret om du har ett.</p>
         </div>
     </div>
     </NightBand>
@@ -121,7 +121,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         if (s.kind === 'processing' || s.kind === 'success' || (s.kind === 'failure' && s.orderId)) $('[data-order-id]').forEach((e) => (e.textContent = (s as { orderId: string }).orderId))
         if (s.kind === 'success') root.querySelector<HTMLAnchorElement>('[data-download]')!.href = s.downloadHref
         if (s.kind === 'failure') {
-            root.querySelector('[data-code]')!.textContent = s.code
+            root.querySelector('[data-failure-message]')!.textContent = s.orderId ? 'Rapporten kunde inte tas fram.' : 'Beställningen kunde inte startas.'
             root.querySelector<HTMLElement>('[data-retry]')!.hidden = !s.retryable
         }
         if (s.kind === 'available') {
@@ -183,8 +183,11 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     }
 
     const form = root.querySelector<HTMLFormElement>('form[data-view=available]')!
+    const submit = form.querySelector<HTMLButtonElement>('button[type=submit]')!
+    let submitting = false
     form.addEventListener('submit', async (e) => {
         e.preventDefault()
+        if (submitting) return
         const email = form.elements.namedItem('email') as HTMLInputElement
         const terms = form.elements.namedItem('terms') as HTMLInputElement
         const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())
@@ -193,11 +196,26 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         email.setAttribute('aria-invalid', String(!emailOk))
         if (!emailOk) return email.focus()
         if (!terms.checked) return terms.focus()
+        submitting = true
+        submit.disabled = true
+        window.dispatchEvent(new CustomEvent('kreditrisker:analytics', { detail: 'checkout_submitted' }))
         const returnPath = `/bestall/?orgnr=${orgnr}&produkt=${product === 'ai' ? 'ai' : 'bas'}${fid ? `&fid=${fid}` : ''}`
-        const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!, fid, companyName, returnPath })
-        show(s)
-        if (s.kind === 'redirect') location.assign(s.url)
-        if (s.kind === 'processing') poll(s.orderId)
+        let redirecting = false
+        try {
+            const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!, fid, companyName, returnPath })
+            show(s)
+            if (s.kind === 'failure' || s.kind === 'unavailable') window.dispatchEvent(new CustomEvent('kreditrisker:analytics', { detail: 'checkout_failed' }))
+            if (s.kind === 'redirect') {
+                redirecting = true
+                location.assign(s.url)
+            }
+            if (s.kind === 'processing') poll(s.orderId)
+        } finally {
+            if (!redirecting) {
+                submitting = false
+                submit.disabled = false
+            }
+        }
     })
     root.querySelector('[data-retry]')!.addEventListener('click', () => show({ kind: 'available' }))
     start()

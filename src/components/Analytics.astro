@@ -1,47 +1,12 @@
 ---
-// Google Analytics behind consent, as on the Danish site: Consent Mode v2
-// defaults to denied, gtag.js loads only after "Godkänn", and "Avvisa" is
-// offered on equal terms. No advertising. Off unless PUBLIC_GA_TRACKING_ID is set.
 const id = import.meta.env.PUBLIC_GA_TRACKING_ID || ''
-const script = `
-(function () {
-  var id = ${JSON.stringify(id)}, key = 'kreditrisker_consent', loaded = false;
-  window.dataLayer = window.dataLayer || [];
-  window.gtag = function () { window.dataLayer.push(arguments); };
-  gtag('consent', 'default', { analytics_storage: 'denied', ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied' });
-  function get() { try { return localStorage.getItem(key); } catch (e) { return null; } }
-  function set(v) { try { localStorage.setItem(key, v); } catch (e) {} }
-  function load() {
-    if (loaded) return;
-    loaded = true;
-    gtag('consent', 'update', { analytics_storage: 'granted' });
-    var s = document.createElement('script');
-    s.async = true;
-    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(id);
-    document.head.appendChild(s);
-    gtag('js', new Date());
-    gtag('config', id);
-    var ai = { 'chatgpt.com': 'chatgpt', 'chat.openai.com': 'chatgpt', 'perplexity.ai': 'perplexity', 'www.perplexity.ai': 'perplexity', 'claude.ai': 'claude', 'gemini.google.com': 'gemini', 'copilot.microsoft.com': 'copilot' };
-    try { var src = document.referrer && ai[new URL(document.referrer).hostname]; if (src) gtag('event', 'ai_referral_session', { ai_referrer: src }); } catch (e) {}
-  }
-  var banner = document.getElementById('consent');
-  function open() { banner.hidden = false; }
-  if (get() === 'granted') load();
-  else if (get() !== 'denied') open();
-  banner.querySelector('[data-accept]').addEventListener('click', function () { set('granted'); banner.hidden = true; load(); });
-  banner.querySelector('[data-reject]').addEventListener('click', function () {
-    set('denied');
-    banner.hidden = true;
-    if (loaded) location.reload(); // withdrawing consent stops measurement from the next page
-  });
-  document.querySelectorAll('[data-consent-open]').forEach(function (b) { b.hidden = false; b.addEventListener('click', open); });
-})();`
+const frameOrigin = import.meta.env.PUBLIC_GA_FRAME_ORIGIN || ''
 ---
 
 {
-    id && (
+    id && frameOrigin && (
         <>
-            <aside id="consent" class="consent" aria-label="Cookieinställningar" hidden>
+            <aside id="consent" class="consent" aria-label="Cookieinställningar" data-frame-origin={frameOrigin} data-analytics-id={id} hidden>
                 <p>
                     Vi vill använda Google Analytics för att se hur sajten används. Det sätter kakor och sker bara om du godkänner. <a href="/integritet/#kakor">Läs mer</a>
                 </p>
@@ -50,10 +15,105 @@ const script = `
                     <button type="button" class="btn btn--quiet" data-accept>Godkänn</button>
                 </div>
             </aside>
-            <script is:inline set:html={script} />
         </>
     )
 }
+
+<script>
+    import { ANALYTICS_EVENTS, analyticsPage, analyticsReferrer, type AnalyticsEvent } from '../lib/analytics.ts'
+
+    const banner = document.querySelector<HTMLElement>('#consent')
+    if (banner) {
+        const consentKey = 'kreditrisker_consent'
+        const searchKey = 'kreditrisker_analytics_search'
+        const returnKey = 'kreditrisker_analytics_return'
+        let frame: HTMLIFrameElement | null = null
+        let ready = false
+        let waiting: AnalyticsEvent[] = []
+        const get = (storage: Storage, key: string) => { try { return storage.getItem(key) } catch { return null } }
+        const set = (storage: Storage, key: string, value: string) => { try { storage.setItem(key, value) } catch {} }
+        const remove = (storage: Storage, key: string) => { try { storage.removeItem(key) } catch {} }
+        const consent = () => get(localStorage, consentKey) === 'granted'
+
+        function send(name: AnalyticsEvent) {
+            if (!consent() || !ANALYTICS_EVENTS.includes(name)) return
+            if (frame && ready) frame.contentWindow?.postMessage({ type: 'event', name }, '*')
+            else waiting.push(name)
+        }
+
+        function load() {
+            if (frame || !consent()) return
+            let frameUrl: URL
+            try {
+                frameUrl = new URL('/analytics-frame/', banner.dataset.frameOrigin)
+                const local = ['127.0.0.1', 'localhost'].includes(frameUrl.hostname) && ['127.0.0.1', 'localhost'].includes(location.hostname)
+                if (frameUrl.origin === location.origin || (frameUrl.protocol !== 'https:' && !local)) return
+            } catch { return }
+            frame = document.createElement('iframe')
+            frame.hidden = true
+            frame.setAttribute('title', 'Statistik')
+            frame.setAttribute('sandbox', 'allow-scripts allow-same-origin')
+            frame.referrerPolicy = 'no-referrer'
+            frame.src = frameUrl.href
+            frame.addEventListener('load', () => {
+                if (!frame || !consent()) return
+                frame.contentWindow?.postMessage({ type: 'init', page: analyticsPage(location.pathname), referrer: analyticsReferrer(document.referrer) }, '*')
+                ready = true
+                if (get(sessionStorage, searchKey) === '1') {
+                    remove(sessionStorage, searchKey)
+                    send('search_started')
+                }
+                if (analyticsPage(location.pathname) === 'checkout' && new URLSearchParams(location.search).get('checkout') === 'success' && get(sessionStorage, returnKey) !== '1') {
+                    set(sessionStorage, returnKey, '1')
+                    send('checkout_returned')
+                }
+                const pending = waiting
+                waiting = []
+                pending.forEach(send)
+            })
+            document.body.appendChild(frame)
+        }
+
+        const open = () => { banner.hidden = false }
+        if (consent()) load()
+        else if (get(localStorage, consentKey) !== 'denied') open()
+        banner.querySelector('[data-accept]')?.addEventListener('click', () => {
+            set(localStorage, consentKey, 'granted')
+            banner.hidden = true
+            load()
+        })
+        function stop() {
+            for (const name of ['_ga', `_ga_${banner.dataset.analyticsId?.slice(2) ?? ''}`]) {
+                document.cookie = `${name}=; Max-Age=0; path=/; SameSite=Lax`
+                if (location.hostname.endsWith('.kreditrisker.se')) document.cookie = `${name}=; Max-Age=0; path=/; domain=kreditrisker.se; Secure; SameSite=Lax`
+            }
+            remove(sessionStorage, searchKey)
+            remove(sessionStorage, returnKey)
+            frame?.remove()
+            frame = null
+            ready = false
+            waiting = []
+            banner.hidden = true
+        }
+        banner.querySelector('[data-reject]')?.addEventListener('click', () => {
+            set(localStorage, consentKey, 'denied')
+            stop()
+        })
+        addEventListener('storage', (event) => { if (event.key === consentKey && event.newValue !== 'granted') stop() })
+        document.querySelectorAll<HTMLElement>('[data-consent-open]').forEach((button) => { button.hidden = false; button.addEventListener('click', open) })
+        const queueSearch = () => { if (consent()) set(sessionStorage, searchKey, '1') }
+        document.addEventListener('submit', (event) => { if ((event.target as Element)?.matches('[data-search]')) queueSearch() })
+        document.addEventListener('click', (event) => { if ((event.target as Element)?.closest('[data-search] [role=option] a')) queueSearch() })
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter' && (event.target as Element)?.matches('[data-search] input[aria-activedescendant]')) queueSearch()
+        }, true)
+        window.addEventListener('kreditrisker:analytics', (event) => {
+            const name = (event as CustomEvent).detail
+            if (name === 'checkout_submitted') remove(sessionStorage, returnKey)
+            if (ANALYTICS_EVENTS.includes(name)) send(name)
+        })
+    }
+</script>
 
 <style>
     .consent {
