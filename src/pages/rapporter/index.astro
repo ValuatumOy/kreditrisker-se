@@ -9,8 +9,8 @@ const reportsAvailable = ['basic', 'ai'].some((product) => staticReportState(pro
 
 <Page
     title="Kreditriskrapporter"
-    h1="Basrapport och AI-rapport"
-    description="Två rapporter om svenska företag från Valuatum: en basrapport byggd på bokslut och nyckeltal, och en AI-rapport med skriven analys."
+    h1="Kreditrapport och AI-rapport"
+    description="Rapporter om svenska företag från Valuatum: en kreditrapport med bokslut och nyckeltal, och en AI-rapport med skriven analys."
     path="/rapporter/"
     lede={reportsAvailable ? 'Rapporterna samlar det du behöver för att bedöma en kund eller leverantör innan du ger kredit.' : 'Rapporterna samlar det du behöver för att bedöma en kund eller leverantör innan du ger kredit. Båda är under utveckling för svenska företag och kan inte beställas ännu.'}
 >
@@ -26,17 +26,17 @@ const reportsAvailable = ['basic', 'ai'].some((product) => staticReportState(pro
 
         <section class="rr__two">
             <article>
-                <h2><a href="/rapporter/bas/">Basrapport</a></h2>
+                <h2><a href="/rapporter/bas/">Kreditrapport</a></h2>
                 <p>
                     För den som vill ha siffrorna samlade: registeruppgifter, flera års bokslut, nyckeltal med förklaringar och hur företaget står sig mot sin bransch. Texten skrivs
                     automatiskt utifrån siffrorna.
                 </p>
-                <p><a href="/rapporter/bas/">Om basrapporten</a> · <a href="/rapporter/exempel/#basrapport">Exempel</a></p>
+                <p><a href="/rapporter/bas/">Om kreditrapporten</a> · <a href="/rapporter/exempel/#basrapport">Exempel</a></p>
             </article>
             <article>
                 <h2><a href="/rapporter/ai/">AI-rapport</a></h2>
                 <p>
-                    Allt i basrapporten, plus en längre skriven analys av lönsamhet, soliditet och likviditet och en genomgång av vad som skrivs om företaget i offentliga källor på
+                    Allt i kreditrapporten, plus en längre skriven analys av lönsamhet, soliditet och likviditet och en genomgång av vad som skrivs om företaget i offentliga källor på
                     webben.
                 </p>
                 <p><a href="/rapporter/ai/">Om AI-rapporten</a> · <a href="/rapporter/exempel/#ai-rapport">Exempel</a></p>

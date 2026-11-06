@@ -33,20 +33,20 @@ const salesTo = compactSek(p.income.netSales).text
 
 <Page
     title="Exempelrapporter"
-    description="Så är basrapporten och AI-rapporten uppbyggda, visat på ett syntetiskt exempelföretag."
+    description="Så är kreditrapporten och AI-rapporten uppbyggda, visat på ett syntetiskt exempelföretag."
     path="/rapporter/exempel/"
     lede="Så är rapporterna tänkta att se ut. Exemplen bygger på ett påhittat företag och visar upplägget, inte den slutliga rapporten."
     crumbs={[{ href: '/rapporter/', label: 'Rapporter' }, { label: 'Exempel' }]}
 >
     <nav class="ex__toc small" aria-label="Exempel">
-        <a href="#basrapport">Basrapport</a>
+        <a href="#basrapport">Kreditrapport</a>
         <a href="#ai-rapport">AI-rapport</a>
     </nav>
 
     <article class="sheet" id="basrapport" aria-labelledby="bas-h">
         <header class="sheet__head">
             <div>
-                <p class="sheet__kind">Basrapport · exempel</p>
+                <p class="sheet__kind">Kreditrapport · exempel</p>
                 <h2 id="bas-h">{r.name}</h2>
                 <p class="small muted num">Org.nr {formatOrgnr(r.orgnr)} · {r.municipality && kommunName(r.municipality.name)} · {r.sni[0]?.label}</p>
             </div>
@@ -102,7 +102,7 @@ const salesTo = compactSek(p.income.netSales).text
             </div>
             <p class="sheet__stamp">Syntetiska data<br />Exempeltext</p>
         </header>
-        <p class="small muted">Innehåller allt i basrapporten. Nedan visas de delar som tillkommer.</p>
+        <p class="small muted">Innehåller allt i kreditrapporten. Nedan visas de delar som tillkommer.</p>
 
         <section class="sheet__sec">
             <h3>5 Analys</h3>

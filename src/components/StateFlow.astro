@@ -30,7 +30,7 @@ const TEXT: Record<(typeof STATE_KINDS)[number], string> = {
                     <div>
                         <p class="sf__name">
                             {STATE_LABEL[k]}
-                            {now.basic === k && <span class="tag tag--warn">Basrapport nu</span>}
+                            {now.basic === k && <span class="tag tag--warn">Kreditrapport nu</span>}
                             {now.ai === k && <span class="tag tag--warn">AI-rapport nu</span>}
                         </p>
                         <p class="sf__t">{TEXT[k]}</p>
@@ -40,7 +40,7 @@ const TEXT: Record<(typeof STATE_KINDS)[number], string> = {
         }
     </ol>
     <figcaption class="fig__src">
-        <b>Anm.</b> Basrapport och AI-rapport har var sitt tillstånd. Den ena kan lanseras före den andra.
+        <b>Anm.</b> Kreditrapport och AI-rapport har var sitt tillstånd. Den ena kan lanseras före den andra.
     </figcaption>
 </figure>
 

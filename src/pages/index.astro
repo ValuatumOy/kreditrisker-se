@@ -11,7 +11,7 @@ import { SITE, FLAGS } from '../config/site.ts'
 import { compactSek, percent } from '../lib/format.ts'
 import { FORMULAS, metricsOf, numeric } from '../lib/metrics.ts'
 import { staticReportState } from '../lib/reports/availability.ts'
-import { STATE_LABEL } from '../lib/reports/labels.ts'
+import { PRODUCT_NAME, STATE_LABEL } from '../lib/reports/labels.ts'
 import type { Value } from '../lib/contract/types.ts'
 import { GUIDES } from '../content/guides.ts'
 import cityImg from '../assets/photos/stockholm-blue-hour.jpg'
@@ -174,8 +174,8 @@ const statement =
                         </div>
                         <div class="dr__scan"></div>
                     </div>
-                    <h3>Basrapport och AI-rapport</h3>
-                    <p>Två rapporter från varje profil när de är klara för svenska företag. <a href="/rapporter/">Läs om rapporterna</a>.</p>
+                    <h3>Kreditrapport och AI-rapport</h3>
+                    <p>På företagets sida ser du vilka rapporter som kan beställas. <a href="/rapporter/">Läs om rapporterna</a>.</p>
                 </article>
             </div>
         </div>
@@ -226,7 +226,7 @@ const statement =
                     <li class="reveal" style="--d:3"><b>SCB</b><span>Bransch (SNI) och kommun, där det kompletterar.</span></li>
                     <li class="reveal" style="--d:4"><b>Valuatum</b><span>Nyckeltal med publicerade formler.</span></li>
                 </ul>
-                <p class="small muted reveal">Källorna kräver avtal om datalicens innan publicering. <a href="/kallor/">Om datakällorna</a></p>
+                <p class="small muted reveal"><a href="/kallor/">Om datakällorna</a></p>
             </div>
         </div>
     </section>
@@ -245,16 +245,16 @@ const statement =
                     reports.map(({ p, s }, i) => (
                         <article class="rcard reveal" style={`--d:${i}`} data-spotlight>
                             <div class="rcard__top">
-                                <h3>{p === 'basic' ? 'Basrapport' : 'AI-rapport'}</h3>
+                                <h3>{PRODUCT_NAME[p]}</h3>
                                 <span class:list={['tag', s.kind === 'available' ? 'tag--ok' : 'tag--warn']}>{STATE_LABEL[s.kind]}</span>
                             </div>
                             <p class="rcard__lede">
-                                {p === 'basic' ? 'Bokslut, nyckeltal och branschjämförelse samlade i en PDF.' : 'Basrapporten plus en skriven analys och en genomgång av offentliga källor.'}
+                                {p === 'basic' ? 'Bokslut, nyckeltal och branschjämförelse samlade i en PDF.' : 'Kreditrapporten plus en skriven analys och en genomgång av offentliga källor.'}
                             </p>
                             <ul class="rcard__list">
                                 {(p === 'basic'
                                     ? ['Registeruppgifter och fem års bokslut', 'Nyckeltal med förklaringar', 'Jämförelse med branschen', 'Kreditbetyg och kreditlimit']
-                                    : ['Allt i basrapporten', 'Analys av lönsamhet, soliditet och likviditet', 'Offentliga källor med länkar', 'Slutsatser och begränsningar']
+                                    : ['Allt i kreditrapporten', 'Analys av lönsamhet, soliditet och likviditet', 'Offentliga källor med länkar', 'Slutsatser och begränsningar']
                                 ).map((x) => (
                                     <li>
                                         <Icon name="check" /> {x}
