@@ -12,6 +12,7 @@ For the normal synthetic or pre-launch build:
 npm run build
 npm run seo:audit -- --mode blocked
 npm run seo:audit:test
+npm run test:schema
 ```
 
 After the launch gates are cleared and a complete real-data candidate has been
@@ -88,3 +89,34 @@ following are topic hypotheses, not measured search volumes:
 Do not create bulk city, industry or keyword variants without distinct useful
 content. FAQ markup, `llms.txt`, a fixed word count and AI-bot access are not
 guarantees of Google or AI visibility.
+
+## Structured data
+
+The home page identifies the `WebSite`; the about page identifies Valuatum as
+the provider using its published contact details. Guides identify the same
+publisher and show their actual modification dates. Guide dates are stored only
+to day precision; the Article `dateModified` is omitted until a real timestamp
+with timezone is known, as Google's test flags date-only values. Breadcrumbs
+follow the visible navigation. Company profiles describe available registry
+facts without claiming that the profile URL is the company's own website.
+
+Google no longer shows FAQ rich results. The existing FAQ markup remains as a
+description of the visible questions and answers, not a rich-result promise.
+Google `ProfilePage` is for people or organizations affiliated with the site,
+so it is not used for independent companies in the directory. Do not invent
+author names, publication dates, product reviews, availability or prices.
+The generated report is a service; Google Shopping has separate restrictions
+on services, so its eligibility should not be assumed from `Product` markup.
+
+`test:schema` compares rendered markup with visible page content and canonical
+URLs. After deployment and indexing are approved, use Google's Rich Results
+Test and Search Console URL Inspection on representative live pages. Local
+checks do not guarantee eligibility or a rich result.
+
+Google references: [site names](https://developers.google.com/search/docs/appearance/site-names),
+[organization](https://developers.google.com/search/docs/appearance/structured-data/organization),
+[articles](https://developers.google.com/search/docs/appearance/structured-data/article),
+[breadcrumbs](https://developers.google.com/search/docs/appearance/structured-data/breadcrumb),
+[profile pages](https://developers.google.com/search/docs/appearance/structured-data/profile-page),
+[Search updates](https://developers.google.com/search/updates) and
+[Shopping restrictions](https://support.google.com/merchants/answer/6150006).

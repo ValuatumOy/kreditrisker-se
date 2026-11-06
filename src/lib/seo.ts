@@ -34,6 +34,9 @@ export const providerJsonLd = () => ({
     name: SITE.provider.name,
     url: SITE.provider.url,
     identifier: { '@type': 'PropertyValue', propertyID: 'FO-nummer', value: SITE.provider.businessId },
+    taxID: SITE.provider.businessId,
+    address: { '@type': 'PostalAddress', ...SITE.provider.postalAddress },
+    telephone: SITE.provider.phone,
     ...(SITE.provider.email ? { email: SITE.provider.email } : {}),
 })
 

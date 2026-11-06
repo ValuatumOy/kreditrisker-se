@@ -13,6 +13,13 @@ const flag = (k: string, dflt = false): boolean => {
     return v === undefined ? dflt : v === '1' || v.toLowerCase() === 'true'
 }
 
+const providerAddress = {
+    streetAddress: 'Linnanrakentajantie 6–8 C, Suite 15',
+    postalCode: '00880',
+    addressLocality: 'Helsinki',
+    addressCountry: 'FI',
+} as const
+
 export const SITE = {
     /** Product name shown in the UI. Pending decision, see docs/DOMAIN.md. */
     name: env('SE_SITE_NAME') ?? 'Kreditrisker',
@@ -27,7 +34,8 @@ export const SITE = {
         url: 'https://www.valuatum.com/',
         email: env('SE_CONTACT_EMAIL') ?? 'contact25@valuatum.com',
         phone: '+358 45 123 0308',
-        address: 'Linnanrakentajantie 6–8 C, Suite 15, 00880 Helsinki, Finland',
+        address: `${providerAddress.streetAddress}, ${providerAddress.postalCode} ${providerAddress.addressLocality}, Finland`,
+        postalAddress: providerAddress,
     },
     /** Data as-of date for freshness. Fixed in tests; build date otherwise. */
     asOf: env('SE_DATA_AS_OF') ?? new Date().toISOString().slice(0, 10),

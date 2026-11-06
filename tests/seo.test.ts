@@ -25,6 +25,11 @@ test('provider markup uses the provider details shown on the about page', () => 
     assert.equal(data.name, SITE.provider.name)
     assert.equal(data.url, SITE.provider.url)
     assert.equal(data.identifier.value, SITE.provider.businessId)
+    assert.equal(data.taxID, SITE.provider.businessId)
+    assert.equal(data.telephone, SITE.provider.phone)
+    assert.equal(data.email, SITE.provider.email)
+    assert.deepEqual(data.address, { '@type': 'PostalAddress', ...SITE.provider.postalAddress })
+    assert.equal(`${data.address.streetAddress}, ${data.address.postalCode} ${data.address.addressLocality}, ${SITE.provider.country}`, SITE.provider.address)
 })
 
 test('breadcrumb markup includes absolute links to its visible ancestors', () => {
