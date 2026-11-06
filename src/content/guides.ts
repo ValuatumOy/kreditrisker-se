@@ -1,7 +1,7 @@
 // Editorial guides. Plain structured blocks so they render with the site's
 // own typography; facts are general and link to primary sources.
 
-export type Block = { h: string } | { p: string } | { ul: string[] } | { src: string }
+export type Block = { h: string } | { p: string } | { ul: string[] } | { src: string; href?: string }
 
 export interface Guide {
     slug: string
@@ -16,33 +16,33 @@ export const GUIDES: Guide[] = [
         slug: 'las-en-arsredovisning',
         title: 'Så läser du en årsredovisning',
         description: 'Vad de olika delarna av ett svenskt aktiebolags årsredovisning innehåller och var du hittar det viktigaste.',
-        updated: '2026-09-25',
+        updated: '2026-11-06',
         blocks: [
             { p: 'Ett aktiebolag ska lämna sin årsredovisning till Bolagsverket senast sju månader efter räkenskapsårets slut. Den är offentlig, och för den som ska ge kredit är den den viktigaste källan till hur bolaget går.' },
             { h: 'Förvaltningsberättelsen' },
             { p: 'Här beskriver styrelsen verksamheten, väsentliga händelser under året och hur resultatet ska disponeras. Läs den först: den förklarar ofta varför siffrorna ser ut som de gör.' },
             { h: 'Resultaträkningen' },
-            { p: 'Visar intäkter och kostnader under året. Nettoomsättningen är försäljningen. Rörelseresultatet är vad verksamheten gav före räntor och skatt. Årets resultat är vad som blir kvar till ägarna.' },
+            { p: 'Visar intäkter och kostnader under året. Nettoomsättningen är försäljningen. Rörelseresultatet är vad verksamheten gav före räntor och skatt. Årets resultat visar företagets resultat efter skatt.' },
             { h: 'Balansräkningen' },
             { p: 'Visar vad bolaget äger och hur det är finansierat på bokslutsdagen. Eget kapital och skulder ska tillsammans vara lika stora som tillgångarna. Negativt eget kapital betyder att skulderna är större än tillgångarna.' },
             { h: 'Noter och revisionsberättelse' },
             { p: 'Noterna förklarar posterna och redovisningsprinciperna. Mindre aktiebolag kan sakna revisor; har bolaget en revisor finns revisionsberättelsen sist. En revisionsberättelse med anmärkning är värd att läsa noga.' },
             { h: 'K2 och K3' },
-            { p: 'Mindre företag följer ofta det förenklade regelverket K2, som ger en kortare årsredovisning med färre poster. Därför visas färre rader för små bolag: en post som inte finns i bokslutet är 0, och rader som är 0 alla år visas inte.' },
-            { src: 'Källa: Bolagsverket, bolagsverket.se, om årsredovisning för aktiebolag.' },
+            { p: 'Mindre företag kan i många fall använda det förenklade regelverket K2. En årsredovisning med färre poster ger inte alltid tillräckligt underlag för att fastställa alla detaljer.' },
+            { src: 'Källa: Verksamt.se, årsredovisning för aktiebolag.', href: 'https://verksamt.se/bokforing/arsbokslut-arsredovisning/aktiebolag' },
         ],
     },
     {
         slug: 'nyckeltal',
         title: 'Nyckeltal: soliditet, kassalikviditet och marginaler',
         description: 'Vad de vanligaste nyckeltalen säger om ett företag, hur de räknas och vad de inte säger.',
-        updated: '2026-10-12',
+        updated: '2026-11-06',
         blocks: [
             { p: 'Nyckeltal gör bokslut jämförbara mellan år och mellan företag. Inget enskilt tal säger allt, och alla tal behöver läsas mot branschen.' },
             { h: 'Soliditet' },
-            { p: 'Andelen av tillgångarna som finansieras med eget kapital. Hög soliditet betyder att bolaget tål förluster bättre. Obeskattade reserver räknas som eget kapital, och förskott från kunder räknas bort från tillgångarna.' },
+            { p: 'Soliditet visar förhållandet mellan eget kapital och balansomslutningen. En högre soliditet kan ge större marginal vid förluster. I vårt nyckeltal räknas obeskattade reserver som eget kapital och förskott från kunder räknas bort från balansomslutningen.' },
             { h: 'Kassalikviditet' },
-            { p: 'Kortfristiga fordringar, kassa, bank och kortfristiga placeringar i förhållande till kortfristiga skulder utom förskott från kunder. Ett värde runt 100 procent betyder att bolaget kan betala sina kortfristiga skulder med likvida medel och fordringar.' },
+            { p: 'Kortfristiga fordringar, kassa, bank och kortfristiga placeringar i förhållande till kortfristiga skulder utom förskott från kunder. Runt 100 procent innebär att dessa tillgångar och skulder är ungefär lika stora. Talet visar inte när fordringarna betalas eller skulderna förfaller.' },
             { h: 'Rörelsemarginal och vinstmarginal' },
             { p: 'Hur stor del av omsättningen som blir resultat, före respektive efter finansiella poster. Marginalerna skiljer sig mycket mellan branscher: en grossist har ofta låga marginaler, ett konsultbolag högre.' },
             { h: 'Vad nyckeltalen inte säger' },
@@ -90,34 +90,35 @@ export const GUIDES: Guide[] = [
         slug: 'negativt-eget-kapital',
         title: 'Negativt eget kapital och kontrollbalansräkning',
         description: 'Vad det betyder när ett aktiebolag har förbrukat sitt eget kapital, och vad styrelsen då måste göra enligt aktiebolagslagen.',
-        updated: '2026-10-02',
+        updated: '2026-11-06',
         blocks: [
             { p: 'Eget kapital är skillnaden mellan bolagets tillgångar och skulder. Är det negativt är skulderna större än tillgångarna. Det är en tydlig varningssignal för den som ska ge kredit, men inte samma sak som att bolaget är på obestånd.' },
             { h: 'När är kapitalet förbrukat?' },
-            { p: 'Aktiebolagslagen kräver att styrelsen agerar när det egna kapitalet understiger hälften av det registrerade aktiekapitalet. Då ska styrelsen genast upprätta en kontrollbalansräkning och, om den bekräftar läget, kalla till en kontrollstämma.' },
+            { p: 'Styrelsen ska genast upprätta en kontrollbalansräkning när det finns skäl att anta att eget kapital, beräknat enligt lagens regler, understiger hälften av det registrerade aktiekapitalet. Visar kontrollbalansräkningen att kapitalet understiger denna gräns ska styrelsen snarast kalla till en kontrollstämma. En kontrollbalansräkning krävs också om en utmätning visar att bolaget saknar tillgångar för att betala hela den aktuella fordran.' },
             { h: 'Vad händer sedan?' },
-            { ul: ['På den första kontrollstämman beslutar aktieägarna om bolaget ska gå i likvidation eller fortsätta.', 'Fortsätter bolaget måste det egna kapitalet vara återställt inom åtta månader, vilket prövas på en andra kontrollstämma.', 'Gör styrelsen inte det lagen kräver kan ledamöterna bli personligt ansvariga för bolagets nya skulder.'] },
+            { ul: ['På den första kontrollstämman beslutar aktieägarna om bolaget ska gå i likvidation eller fortsätta.', 'Om kapitalet inte är återställt vid den första stämman och bolaget fortsätter, ska en andra kontrollstämma normalt hållas inom åtta månader. Vid företagsrekonstruktion gäller särskilda tidsfrister.', 'Gör styrelsen inte det lagen kräver kan ledamöterna bli personligt ansvariga för bolagets nya skulder.'] },
             { h: 'Hur du läser det i bokslutet' },
-            { p: 'Jämför eget kapital med aktiekapitalet i balansräkningen och läs förvaltningsberättelsen: där ska styrelsen beskriva läget och vad som görs. Ett aktieägartillskott eller en nyemission efter bokslutsdagen syns inte i siffrorna, så fråga gärna bolaget.' },
-            { src: 'Källa: aktiebolagslagen (2005:551), 25 kap. 13–20 §§.' },
+            { p: 'Jämför eget kapital med aktiekapitalet i balansräkningen och läs förvaltningsberättelsen. Årsredovisningen ensam avgör inte om kontrollbalansräkning krävs: den kan bygga på andra värderingar, och bolagets situation kan ha ändrats efter bokslutsdagen. Fråga gärna bolaget om underlaget är oklart.' },
+            { src: 'Källa: aktiebolagslagen (2005:551), 25 kap. 13–20 §§.', href: 'https://www.riksdagen.se/sv/dokument-och-lagar/dokument/svensk-forfattningssamling/aktiebolagslag-2005551_sfs-2005-551/' },
         ],
     },
     {
         slug: 'likvidation-konkurs-rekonstruktion',
         title: 'Likvidation, konkurs och företagsrekonstruktion',
         description: 'Vad de olika statusarna betyder och vad de innebär för dig som kund, leverantör eller långivare.',
-        updated: '2026-10-02',
+        updated: '2026-11-06',
         blocks: [
             { p: 'Ett företag som inte är aktivt kan befinna sig i flera olika lägen. Statusen registreras hos Bolagsverket och visas på företagets profil här.' },
             { h: 'Likvidation' },
             { p: 'Bolaget avvecklas. En likvidator tar över från styrelsen, säljer tillgångarna, betalar skulderna och delar ut det som blir över till ägarna. Likvidation kan vara frivillig eller beslutas av Bolagsverket eller domstol, till exempel om bolaget inte har lämnat årsredovisning.' },
             { h: 'Konkurs' },
-            { p: 'Tingsrätten försätter bolaget i konkurs när det inte kan betala sina skulder. En konkursförvaltare tar hand om tillgångarna och fördelar dem mellan borgenärerna i den ordning lagen anger. Leverera inte mot faktura till ett bolag i konkurs utan att ha talat med förvaltaren.' },
+            { p: 'Tingsrätten kan försätta bolaget i konkurs när det är på obestånd: det kan inte betala sina skulder och oförmågan är inte bara tillfällig. En konkursförvaltare tar hand om tillgångarna och fördelar dem mellan borgenärerna i den ordning lagen anger. Leverera inte mot faktura till ett bolag i konkurs utan att ha talat med förvaltaren.' },
             { h: 'Företagsrekonstruktion' },
             { p: 'Ett bolag med betalningssvårigheter men en livskraftig kärna får tid att lösa sin situation under ledning av en rekonstruktör. Verksamheten fortsätter. Under rekonstruktionen kan gamla skulder skrivas ned genom en rekonstruktionsplan, så skilj på fordringar från före och efter beslutet.' },
             { h: 'Avregistrerat' },
             { p: 'Bolaget finns inte längre, till exempel efter avslutad likvidation eller konkurs, eller efter en fusion med ett annat bolag.' },
-            { src: 'Källor: Bolagsverket; konkurslagen (1987:672); lag (2022:964) om företagsrekonstruktion.' },
+            { src: 'Källa om konkurs: Sveriges Domstolar.', href: 'https://www.domstol.se/amnen/skulder-konkurs-och-foretagsrekonstruktion/konkurs/nar-nagon-forsatts-i-konkurs/' },
+            { src: 'Övriga källor: Bolagsverket och lag (2022:964) om företagsrekonstruktion.' },
         ],
     },
 ]

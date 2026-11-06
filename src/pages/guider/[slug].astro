@@ -23,7 +23,7 @@ const ld = {
     <article class="prose guide">
         {
             g.blocks.map((b) =>
-                'h' in b ? <h2>{b.h}</h2> : 'p' in b ? <p>{b.p}</p> : 'ul' in b ? <ul>{b.ul.map((x) => <li>{x}</li>)}</ul> : <p class="small muted">{b.src}</p>,
+                'h' in b ? <h2>{b.h}</h2> : 'p' in b ? <p>{b.p}</p> : 'ul' in b ? <ul>{b.ul.map((x) => <li>{x}</li>)}</ul> : <p class="small muted">{b.href ? <a href={b.href}>{b.src}</a> : b.src}</p>,
             )
         }
         <p class="small muted">Uppdaterad {date(g.updated)}. Formler för nyckeltalen finns på <a href="/metod/">metodsidan</a>.</p>

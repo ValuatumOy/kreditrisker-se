@@ -22,6 +22,8 @@
     "audit:statements": "node --env-file-if-exists=.env scripts/statement-audit.ts",
     "audit:batch": "node --env-file-if-exists=.env scripts/statement-audit.ts --batch",
     "test:audit": "python -m unittest discover -s scripts/statement-audit -p test_*.py",
+    "seo:audit": "python scripts/audit-seo.py",
+    "seo:audit:test": "python -m unittest scripts/test_audit_seo.py",
     "build:vercel": "node scripts/build-vercel.ts",
     "build:scripts": "sh build/get_static_params/build.sh"
   },
