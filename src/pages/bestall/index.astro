@@ -100,7 +100,8 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     import { UNAVAILABLE_TEXT, PRODUCT_NAME } from '../../lib/reports/labels.ts'
     import { formatOrgnr, parseOrgnr } from '../../lib/orgnr.ts'
     import { findCompanies, type SearchHit } from '../../lib/search.ts'
-    import { offerLabel, type ReportOffer } from '../../lib/reports/offers.ts'
+    import { offerLabel, offerRemainingMs, type ReportOffer } from '../../lib/reports/offers.ts'
+    import { observePriceExposure } from '../../lib/price-analytics.ts'
 
     const root = document.querySelector<HTMLElement>('[data-order]')!
     const params = new URLSearchParams(root.dataset.returnParams ?? location.search)
@@ -117,10 +118,12 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     const $ = <T extends Element>(sel: string) => root.querySelectorAll<T>(sel)
     let currentOffer: ReportOffer | undefined
     let priceTimer: ReturnType<typeof setTimeout> | undefined
+    const priceExposure = observePriceExposure(root.querySelector<HTMLElement>('[data-price]')!, 'order')
 
     root.querySelector('[data-product-name]')!.textContent = product === 'ai' ? PRODUCT_NAME.ai : PRODUCT_NAME.basic.toLowerCase()
 
     function show(s: ReportState) {
+        priceExposure.setOffer()
         if (s.kind === 'available' && adapter === 'http' && product === 'basic' && !s.offer)
             s = { kind: 'unavailable', reason: 'backend_unreachable' }
         views.forEach((v) => (v.hidden = v.dataset.view !== s.kind))
@@ -141,9 +144,11 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             root.querySelector('[data-price]')!.textContent = currentOffer ? offerLabel(currentOffer) : price
                 ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
                 : 'Priset visas innan du betalar.'
+            priceExposure.setOffer(currentOffer)
             if (currentOffer) priceTimer = setTimeout(() => {
+                priceExposure.setOffer()
                 root.querySelector('[data-price]')!.textContent = 'Priset behöver hämtas på nytt innan du beställer.'
-            }, Math.max(0, currentOffer.expiresAt * 1000 - Date.now()))
+            }, offerRemainingMs(currentOffer))
         }
     }
 
@@ -209,7 +214,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     form.addEventListener('submit', async (e) => {
         e.preventDefault()
         if (submitting) return
-        if (adapter === 'http' && product === 'basic' && (!currentOffer || currentOffer.expiresAt * 1000 <= Date.now())) {
+        if (adapter === 'http' && product === 'basic' && (!currentOffer || offerRemainingMs(currentOffer) <= 0)) {
             submitting = true
             submit.disabled = true
             try { await refreshPrice() } finally { submitting = false; submit.disabled = false }
@@ -223,6 +228,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         email.setAttribute('aria-invalid', String(!emailOk))
         if (!emailOk) return email.focus()
         if (!terms.checked) return terms.focus()
+        priceExposure.attempt()
         submitting = true
         submit.disabled = true
         window.dispatchEvent(new CustomEvent('kreditrisker:analytics', { detail: 'checkout_submitted' }))

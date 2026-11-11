@@ -1,5 +1,6 @@
 ---
 import { ANALYTICS_EVENTS, ANALYTICS_PAGES, ANALYTICS_REFERRERS } from '../lib/analytics.ts'
+import { sanitizePriceAnalytics } from '../lib/price-analytics.ts'
 const id = import.meta.env.PUBLIC_GA_TRACKING_ID || ''
 const siteOrigin = Astro.site?.origin || 'https://www.kreditrisker.se'
 const script = `
@@ -7,6 +8,7 @@ const script = `
     const pages = ${JSON.stringify(ANALYTICS_PAGES)};
     const referrers = ${JSON.stringify(ANALYTICS_REFERRERS)};
     const events = ${JSON.stringify(ANALYTICS_EVENTS)};
+    const sanitizePriceAnalytics = ${sanitizePriceAnalytics.toString()};
     const id = document.body.dataset.analyticsId || '';
     const siteOrigin = ${JSON.stringify(siteOrigin)};
     let ready = false;
@@ -39,6 +41,9 @@ const script = `
             document.head.appendChild(script);
         } else if (message.type === 'event' && ready && events.includes(message.name)) {
             gtag('event', message.name);
+        } else if (message.type === 'price_event' && ready) {
+            const value = sanitizePriceAnalytics(message);
+            if (value) gtag('event', value.name, { experiment_id: value.experiment, variant_id: value.variant, price_surface: value.surface });
         }
     });
 })();`

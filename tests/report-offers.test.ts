@@ -1,9 +1,9 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { loadReportOffer, offerLabel } from '../src/lib/reports/offers.ts'
+import { loadReportOffer, offerLabel, offerRemainingMs } from '../src/lib/reports/offers.ts'
 import { httpBackend } from '../src/lib/reports/adapter.ts'
 
-const offer = () => ({ reportType: 'se_credit_risk', unitAmount: 1100, currency: 'sek', taxBehavior: 'inclusive', expiresAt: Math.floor(Date.now() / 1000) + 300, quote: 'mock-signed-quote' })
+const offer = () => ({ reportType: 'se_credit_risk', unitAmount: 1100, currency: 'sek', taxBehavior: 'inclusive', expiresAt: Math.floor(Date.now() / 1000) + 300, remainingMs: 300000, quote: 'mock-signed-quote' })
 
 test('runtime availability gets uncached, company-specific offer and sends its quote to checkout', async () => {
     const calls: { url: string; init?: RequestInit }[] = []
@@ -26,7 +26,7 @@ test('runtime availability gets uncached, company-specific offer and sends its q
 })
 
 test('unavailable, expired and invalid offers leave HTTP availability closed', async () => {
-    for (const value of [{ ...offer(), expiresAt: 0 }, { ...offer(), unitAmount: 1.5 }, { ...offer(), taxBehavior: 'exclusive' }, { ...offer(), currency: 'usd' }, { ...offer(), quote: 123 }]) {
+    for (const value of [{ ...offer(), remainingMs: 0 }, { ...offer(), unitAmount: 1.5 }, { ...offer(), taxBehavior: 'exclusive' }, { ...offer(), currency: 'usd' }, { ...offer(), quote: 123 }]) {
         const backend = httpBackend('/api/', async () => Response.json(value), 'https://www.kreditrisker.se')
         assert.deepEqual(await backend.availability('5560369208', 'basic'), { kind: 'unavailable', reason: 'backend_unreachable' })
     }
@@ -54,4 +54,30 @@ test('version conflicts remain errors for the UI to reload and reconfirm, with n
     const backend = httpBackend('/api/', async () => { count++; return new Response('', { status: 409 }) }, 'https://www.kreditrisker.se')
     assert.deepEqual(await backend.createOrder({ orgnr: '5560369208', product: 'basic', email: 'buyer@example.test', acceptedTermsVersion: 'v', priceQuote: 'stale' }), { kind: 'failure', code: 'http_409', retryable: false })
     assert.equal(count, 1)
+})
+
+test('device clock skew in either direction never rejects the current 29 SEK offer', async t => {
+    const serverNow = 1700000000000
+    const deviceClock = t.mock.method(Date, 'now', () => serverNow)
+    for (const skew of [-86400000, -20000, 20000, 86400000]) {
+        deviceClock.mock.mockImplementation(() => serverNow + skew)
+        let tick = 1000
+        const value = await loadReportOffer('/api/', '5560369208', async () => {
+            tick = 1500
+            return Response.json({ ...offer(), expiresAt: serverNow / 1000 + 300, unitAmount: 2900, quote: undefined })
+        }, 'https://www.kreditrisker.se', () => tick)
+        assert.equal(offerLabel(value), '29 kr inkl. moms för konsument i Sverige')
+        assert.equal(value.validUntil, 301000)
+        assert.equal(offerRemainingMs(value, 1500), 299500)
+        assert.equal(offerRemainingMs(value, 301000), 0)
+        assert.equal(value.quote, undefined)
+    }
+})
+
+test('network elapsed time is deducted with a monotonic clock and an exhausted offer is rejected', async () => {
+    let tick = 0
+    await assert.rejects(loadReportOffer('/api/', '5560369208', async () => {
+        tick = 300001
+        return Response.json(offer())
+    }, 'https://www.kreditrisker.se', () => tick), /Expired/)
 })
