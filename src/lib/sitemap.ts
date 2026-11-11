@@ -16,12 +16,12 @@ export interface SitemapUrl {
     lastmod?: string
 }
 
-export function staticUrls(site: Site): SitemapUrl[] {
+export function staticUrls(site: Site, indexable = isIndexable(false, site.synthetic)): SitemapUrl[] {
     const pages = ['/', '/rapporter/', '/rapporter/bas/', '/rapporter/ai/', '/rapporter/exempel/', '/metod/', '/kallor/', '/fragor/', '/om/', '/guider/', '/konkurser/om-konkurs/', ...GUIDES.map((g) => `/guider/${g.slug}/`)]
-    return pages.filter(() => isIndexable(false, site.synthetic)).map((path) => ({ path }))
+    return pages.filter(() => indexable).map((path) => ({ path }))
 }
 
-export function hubUrls(site: Site): SitemapUrl[] {
+export function hubUrls(site: Site, asOf = SITE.asOf, indexable = isIndexable(false, site.synthetic)): SitemapUrl[] {
     const out: SitemapUrl[] = []
     if (site.industries.some((h) => h.indexable)) out.push({ path: '/branscher/' })
     if (site.municipalities.some((h) => h.indexable)) out.push({ path: '/kommuner/' })
@@ -32,18 +32,18 @@ export function hubUrls(site: Site): SitemapUrl[] {
                 out.push({ path: pagePath(base, page) })
         }
     }
-    const cases = bankruptcyRows(site.rows, SITE.asOf)
+    const cases = bankruptcyRows(site.rows, asOf)
     if (bankruptcyIndexable(cases)) out.push({ path: '/konkurser/' })
     for (const [kind, hubs] of [['branscher', site.industries], ['kommuner', site.municipalities]] as const) {
-        const groups = bankruptcyGroups(hubs, SITE.asOf)
+        const groups = bankruptcyGroups(hubs, asOf)
         for (const page of pageNumbers(groups.length, BANKRUPTCY_PAGE_SIZE)) {
             if (bankruptcyIndexable(pageRows(groups, page, BANKRUPTCY_PAGE_SIZE).flatMap((g) => g.hub.companies)))
                 out.push({ path: pagePath(`/konkurser/${kind}/`, page) })
         }
     }
     const bankruptcyLists = [{ base: '/konkurser/foretag/', rows: cases },
-        ...[...bankruptcyGroups(site.industries, SITE.asOf), ...bankruptcyGroups(site.municipalities, SITE.asOf)]
-            .map(({ hub }) => ({ base: bankruptcyHubPath(hub), rows: bankruptcyRows(hub.companies, SITE.asOf) }))]
+        ...[...bankruptcyGroups(site.industries, asOf), ...bankruptcyGroups(site.municipalities, asOf)]
+            .map(({ hub }) => ({ base: bankruptcyHubPath(hub), rows: bankruptcyRows(hub.companies, asOf) }))]
     for (const list of bankruptcyLists) {
         for (const page of pageNumbers(list.rows.length, BANKRUPTCY_PAGE_SIZE))
             if (bankruptcyIndexable(pageRows(list.rows, page, BANKRUPTCY_PAGE_SIZE))) out.push({ path: pagePath(list.base, page) })
@@ -52,7 +52,7 @@ export function hubUrls(site: Site): SitemapUrl[] {
     if (recentlyUpdated(site.rows).length) out.push({ path: '/senast-uppdaterade/' })
     if (rankings.length) out.push({ path: '/topplistor/' })
     for (const r of rankings) out.push({ path: `/topplistor/${r.slug}/` })
-    return out.filter(() => isIndexable(false, site.synthetic))
+    return out.filter(() => indexable)
 }
 
 export function companyUrls(site: Site): SitemapUrl[] {

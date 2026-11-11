@@ -6,7 +6,8 @@ import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { assertBundleIdentity } from '../src/lib/valuatum/identity.ts'
 import { fetchConcurrency } from '../src/lib/valuatum/batch-limit.ts'
-import { toRow } from '../src/lib/publish.ts'
+import { staticUrls, hubUrls } from '../src/lib/sitemap.ts'
+import { buildSite, toRow } from '../src/lib/publish.ts'
 import { assertPublicFiles, checkSitemaps, createPlan, writePlan, readPlan, candidateConfig, runNext, selectCompanies, verifyCandidate, stageCandidate, type BuildSteps, type Context } from '../scripts/lib/candidate.ts'
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'se-candidate-'))
@@ -19,12 +20,12 @@ function setup() {
     writePlan(dir, createPlan(rows.join('\n'), '', context, 2))
     return { repo, dir }
 }
-function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean; fail?: boolean; wrongIdentity?: boolean; noindex?: boolean; missingSitemap?: boolean; missingHtml?: boolean; directoryCount?: number; mutateExisting?: boolean; changedName?: boolean; includeNonselected?: boolean; omitRobots?: boolean; wrongRedirect?: boolean; omitRequiredSitemap?: boolean } = {}): BuildSteps {
+function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean; fail?: boolean; wrongIdentity?: boolean; noindex?: boolean; missingSitemap?: boolean; missingHtml?: boolean; directoryCount?: number; mutateExisting?: boolean; changedName?: boolean; includeNonselected?: boolean; omitRobots?: boolean; wrongRedirect?: boolean; omitRequiredSitemap?: boolean; emptyStaticSitemap?: boolean; emptyHubSitemap?: boolean; omitRedirectManifest?: boolean; wrongRedirectManifest?: boolean } = {}): BuildSteps {
     return {
         fetch(env) {
             const selected = read(env.BUILD_STATIC_PARAMS_FILE!).trim().split('\n').map((l) => l.split('\t')).filter((c) => !c[4].endsWith('K'))
             assert.equal(env.SE_INDEXING, '1')
-            const pages = selected.map((c) => ({ record: { orgnr: settings.wrongIdentity ? '5560659475' : c[4], name: c[2] + (settings.changedName ? ' changed' : ''), status: {code: 'active'}, periods: [], provenance: {importedAt: '2026-11-11T00:00:00.000Z'}, synthetic: false, formerNames: [], sni: [] }, path: `/foretag/${c[4]}/company-${c[0]}/`, redirectsFrom: [], freshness: 'current', quality: {indexable: true, meetsThreshold: true} }))
+            const pages = selected.map((c) => ({ record: { orgnr: settings.wrongIdentity ? '5560659475' : c[4], name: c[2] + (settings.changedName ? ' changed' : ''), status: {code: 'active'}, periods: [], provenance: {importedAt: '2026-11-11T00:00:00.000Z'}, synthetic: false, formerNames: [], sni: [{code: '1', label: 'Synthetic sector', version: '2025'}], municipality: {code: '0180', name: 'Stockholm'} }, path: `/foretag/${c[4]}/company-${c[0]}/`, redirectsFrom: [], freshness: 'current', quality: {indexable: true, meetsThreshold: true} }))
             const index = new Map(read(env.SE_INDEX_IN!).split('\n').filter(Boolean).map((l) => { const r = JSON.parse(l); return [r.o, r] }))
             for (const p of pages) index.set(p.record.orgnr, toRow(p as any))
             if (settings.mutateExisting && index.size) { const first = index.values().next().value; first.ix = false; first.n = 'corrupted'; first.ns = -999 }
@@ -45,8 +46,12 @@ function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean;
             for (const p of pages) if (!settings.missingHtml) write(path.join(env.SE_OUT_DIR!, p.path.slice(1), 'index.html'), html(p.path))
             for (const prefix of ['branscher', 'kommuner', 'konkurser']) write(path.join(env.SE_OUT_DIR!, prefix, 'index.html'), html(`/${prefix}/`))
             write(path.join(env.SE_OUT_DIR!, 'sitemap-index.xml'), (settings.omitRequiredSitemap ? ['sitemap-companies-1.xml'] : ['sitemap-pages.xml', 'sitemap-hubs.xml', 'sitemap-companies-1.xml']).map((f) => `<loc>https://www.kreditrisker.se/${f}</loc>`).join(''))
-            write(path.join(env.SE_OUT_DIR!, 'sitemap-pages.xml'), '<urlset/>')
-            write(path.join(env.SE_OUT_DIR!, 'sitemap-hubs.xml'), '<urlset/>')
+            const site = buildSite([], index, 'fixture')
+            for (const [file, urls, empty] of [['sitemap-pages.xml', staticUrls(site, true), settings.emptyStaticSitemap], ['sitemap-hubs.xml', hubUrls(site, env.SE_DATA_AS_OF!, true), settings.emptyHubSitemap]] as const) {
+                for (const {path: route} of urls) write(path.join(env.SE_OUT_DIR!, route.slice(1), 'index.html'), html(route))
+                write(path.join(env.SE_OUT_DIR!, file), empty ? '<urlset/>' : urls.map((u) => `<loc>https://www.kreditrisker.se${u.path}</loc>`).join(''))
+            }
+            if (!settings.omitRedirectManifest) write(path.join(env.SE_OUT_DIR!, 'redirects.json'), JSON.stringify(site.redirects.map((r) => ({...r, to: settings.wrongRedirectManifest ? '/wrong/' : r.to, status: 301}))))
             if (!settings.omitRobots) write(path.join(env.SE_OUT_DIR!, 'robots.txt'), 'User-agent: *\nDisallow: /bestall/\nDisallow: /sok/\n\nSitemap: https://www.kreditrisker.se/sitemap-index.xml\n')
             const selectedOrgnrs = new Set(read(env.SE_COMPANY_SITEMAP_FILE!).trim().split('\n').map((l) => l.split('\t')[4]))
             const sitemapRows = settings.includeNonselected ? index : index.filter((r) => selectedOrgnrs.has(r.o))
@@ -281,4 +286,14 @@ test('public junctions/symlinks are refused before recursive copying', () => {
     const target = temp()
     fs.symlinkSync(target, path.join(repo, 'public', 'linked'), process.platform === 'win32' ? 'junction' : 'dir')
     assert.throws(() => assertPublicFiles(repo, []), /Symlink/)
+})
+
+
+test('staging requires exact static/hub sitemap coverage and full directory redirect manifest', () => {
+    for (const settings of [{emptyStaticSitemap: true}, {emptyHubSitemap: true}, {omitRedirectManifest: true}, {wrongRedirectManifest: true}]) {
+        const s = complete(settings)
+        const out = path.join(temp(), 'overlay')
+        assert.throws(() => stageCandidate(s.dir, out), /Staging failed/)
+        assert.equal(fs.existsSync(out), false)
+    }
 })

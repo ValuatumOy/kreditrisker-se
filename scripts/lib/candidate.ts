@@ -3,7 +3,8 @@ import path from 'node:path'
 import { createHash } from 'node:crypto'
 import { StringDecoder } from 'node:string_decoder'
 import { isDeepStrictEqual } from 'node:util'
-import { toRow, type IndexRow } from '../../src/lib/publish.ts'
+import { staticUrls, hubUrls } from '../../src/lib/sitemap.ts'
+import { buildSite, toRow, type IndexRow } from '../../src/lib/publish.ts'
 import { readParams } from '../../src/lib/valuatum/params.ts'
 import { parseOrgnr } from '../../src/lib/orgnr.ts'
 import { assertBatchSize, fetchConcurrency } from '../../src/lib/valuatum/batch-limit.ts'
@@ -372,15 +373,26 @@ export function checkSitemaps(output: string, index: string, config: Record<stri
     const sitemapFiles = locs(sitemapIndex)
     for (const file of ['sitemap-pages.xml', 'sitemap-hubs.xml']) assert(sitemapFiles.includes(origin + '/' + file), `Missing required sitemap: ${file}`)
     assert(new Set(sitemapFiles).size === sitemapFiles.length, 'Duplicate sitemap files')
+    const site = buildSite([], rows, 'candidate-check')
+    const redirects = JSON.parse(read(path.join(output, 'redirects.json')))
+    const ordered = (list: {from: string; to: string; status: number}[]) => [...list].sort((a, b) => (a.from + '\0' + a.to).localeCompare(b.from + '\0' + b.to))
+    assert(Array.isArray(redirects) && isDeepStrictEqual(ordered(redirects), ordered(site.redirects.map((r) => ({...r, status: 301})))), 'Redirect manifest differs from the full frozen directory')
+    const segments = new Map([['sitemap-pages.xml', new Set(staticUrls(site, open).map((u) => u.path))], ['sitemap-hubs.xml', new Set(hubUrls(site, config.SE_DATA_AS_OF, open).map((u) => u.path))]])
     const found = new Set<string>()
     for (const url of locs(sitemapIndex)) {
         assert(url.startsWith(origin + '/'), `Unexpected sitemap origin: ${url}`)
         const file = url.slice(origin.length + 1)
         assert(/^sitemap-[a-z0-9-]+\.xml$/.test(file), `Invalid sitemap path: ${file}`)
+        const segment = segments.get(file)
+        const segmentFound = new Set<string>()
         for (const loc of locs(read(path.join(output, file)))) {
             assert(loc.startsWith(origin + '/'), `Unexpected sitemap URL: ${loc}`)
             const route = loc.slice(origin.length)
             assert(/^\/(?:[a-z0-9-]+\/)*$/.test(route), `Invalid sitemap route: ${route}`)
+            if (segment) {
+                assert(segment.has(route) && !segmentFound.has(route), `Unexpected or duplicate ${file} URL: ${route}`)
+                segmentFound.add(route)
+            }
             const html = read(path.join(output, route.slice(1), 'index.html'))
             assert(/<meta\b[^>]*name=["']robots["'][^>]*content=["']index,follow["']/i.test(html), `Sitemap page is not indexable: ${route}`)
             assert(html.includes(`rel="canonical" href="${loc}"`), `Sitemap canonical differs: ${route}`)
@@ -389,6 +401,7 @@ export function checkSitemaps(output: string, index: string, config: Record<stri
                 found.add(route)
             }
         }
+        if (segment) assert(segmentFound.size === segment.size, `${file} coverage differs: ${segmentFound.size}/${segment.size}`)
     }
     assert(found.size === expected.size, `Company sitemap coverage differs: ${found.size}/${expected.size}`)
 }
