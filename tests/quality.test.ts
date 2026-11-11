@@ -88,3 +88,20 @@ test('summary states facts only and flags stale data', () => {
     assert.doesNotMatch(sparse, /Soliditeten/)
     assert.doesNotMatch(sparse, /rörelseresultatet/)
 })
+
+test('missing SNI alone does not hide a useful profile; core data, status and freshness still gate indexing', () => {
+    const r = asReal(byName(batch1(), 'Exempel Mjukvara'))
+    r.sni = []
+    const c = publishCompany(r, undefined, AS_OF)
+    assert.equal(c.quality.indexable, true)
+    assert.deepEqual(c.quality.reasons, [])
+    const site = buildSite([c], [toRow(c)], 'test')
+    assert.equal(site.industries.length, 0)
+    assert.doesNotMatch(summarize(c).join(' '), /SNI/)
+    assert.equal(assessQuality(r, 'stale', opts).indexable, false)
+    r.status.code = 'unknown'
+    assert.equal(assessQuality(r, 'current', opts).indexable, false)
+    const sparse = asReal(byName(batch1(), 'Exempel Fastigheter'))
+    sparse.sni = []
+    assert.equal(assessQuality(sparse, 'current', opts).indexable, false)
+})

@@ -1,0 +1,26 @@
+---
+import Page from '../../../layouts/Page.astro'
+import BankruptcyGroups from '../../../components/BankruptcyGroups.astro'
+import Pagination from '../../../components/Pagination.astro'
+import { SITE } from '../../../config/site.ts'
+import { getSite } from '../../../lib/store.ts'
+import { bankruptcyGroups, bankruptcyIndexable } from '../../../lib/bankruptcy.ts'
+import { BANKRUPTCY_PAGE_SIZE, pageNumbers, pageRows, pagePath } from '../../../lib/pagination.ts'
+export function getStaticPaths() {
+    const site = getSite()
+    return [{ kind: 'branscher', hubs: site.industries }, { kind: 'kommuner', hubs: site.municipalities }].flatMap(({ kind, hubs }) =>
+        pageNumbers(bankruptcyGroups(hubs, SITE.asOf).length, BANKRUPTCY_PAGE_SIZE).map((page) => ({ params: { kind, page: page === 1 ? undefined : String(page) }, props: { page } })))
+}
+const { page } = Astro.props
+const kind = Astro.params.kind!
+const groups = bankruptcyGroups(kind === 'branscher' ? getSite().industries : getSite().municipalities, SITE.asOf)
+const listed = pageRows(groups, page, BANKRUPTCY_PAGE_SIZE)
+const title = `Konkurser efter ${kind === 'branscher' ? 'bransch' : 'kommun'}${page > 1 ? ` – sida ${page}` : ''}`
+const base = `/konkurser/${kind}/`
+---
+<Page title={title} description={`Företag med konkursstatus i Kreditriskers underlag, grupperade efter ${kind === 'branscher' ? 'bransch' : 'kommun'}. Sida ${page}.`} path={pagePath(base, page)} noindex={!bankruptcyIndexable(listed.flatMap((g) => g.hub.companies))} crumbs={[{ href: '/konkurser/', label: 'Konkurser' }, { label: title }]} lede="Grupper med registrerad konkursstatus i vårt underlag, sorterade efter antalet företag med konkursstatus.">
+    <p>Andelen jämför med samtliga profiler i samma grupp i underlaget, oavsett startdatum. Den visar varken en nationell konkursandel eller en uppskattning av konkursrisken. <a href="/konkurser/">Om urval och källor</a>.</p>
+    <Pagination base={base} page={page} count={groups.length} size={BANKRUPTCY_PAGE_SIZE} />
+    {listed.length ? <BankruptcyGroups groups={listed} /> : <p>Inga grupper med konkursstatus finns i underlaget.</p>}
+    <Pagination base={base} page={page} count={groups.length} size={BANKRUPTCY_PAGE_SIZE} />
+</Page>

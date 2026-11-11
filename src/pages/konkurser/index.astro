@@ -1,0 +1,69 @@
+---
+import Page from '../../layouts/Page.astro'
+import BankruptcyTable from '../../components/BankruptcyTable.astro'
+import BankruptcyGroups from '../../components/BankruptcyGroups.astro'
+import { SITE } from '../../config/site.ts'
+import { getSite } from '../../lib/store.ts'
+import { bankruptcySummary, bankruptcyGroups, bankruptcyIndexable } from '../../lib/bankruptcy.ts'
+import { date } from '../../lib/format.ts'
+const site = getSite()
+const summary = bankruptcySummary(site.rows, SITE.asOf)
+const industries = bankruptcyGroups(site.industries, SITE.asOf)
+const municipalities = bankruptcyGroups(site.municipalities, SITE.asOf)
+const maxMonth = Math.max(1, ...summary.months.map((m) => m.count))
+---
+<Page title="Konkurser i svenska företag" description="Företag med registrerad konkursstatus i Kreditriskers underlag. Se företag, registrerade startdatum, branscher och kommuner samt hur urvalet avgränsas." path="/konkurser/"
+    lede="Företag med konkursstatus i vårt företagsunderlag, med länkar till bokslut och registeruppgifter." noindex={!bankruptcyIndexable(site.rows)}>
+    <div class="bankruptcy">
+        <div class="prose">
+            <p>{site.synthetic ? 'Syntetiska testdata. ' : ''}Översikten byggdes {date(SITE.asOf)} och omfattar {site.rows.length.toLocaleString('sv-SE')} företagsprofiler. Den visar den senast hämtade statusen för varje företag. Den är ingen fullständig konkursstatistik för Sverige; avslutade konkurser och företag utanför underlaget kan saknas.</p>
+            <p><a href="/konkurser/om-konkurs/">Vad innebär konkurs och hur kontrollerar du ett företag?</a></p>
+        </div>
+        <section aria-labelledby="underlaget">
+            <h2 id="underlaget">Konkursstatus i underlaget</h2>
+            <dl class="totals">
+                <div><dt>Företag med konkursstatus</dt><dd>{summary.cases.length.toLocaleString('sv-SE')}</dd></div>
+                <div><dt>Start under de senaste 12 kalendermånaderna</dt><dd>{summary.recent.length.toLocaleString('sv-SE')}</dd></div>
+                <div><dt>Äldre registrerad start</dt><dd>{summary.older.toLocaleString('sv-SE')}</dd></div>
+                <div><dt>Startdatum saknas eller kan inte användas</dt><dd>{summary.undated.toLocaleString('sv-SE')}</dd></div>
+            </dl>
+        </section>
+        <section aria-labelledby="manader">
+            <h2 id="manader">När de nu registrerade förfarandena började</h2>
+            <p>Endast företag som fortfarande har konkursstatus i underlaget och ett användbart startdatum ingår. Perioden är {summary.months[0].month}–{SITE.asOf}; den sista månaden är ofullständig. Siffrorna visar inte alla nya konkurser under respektive månad och kan ändras när företag får en annan status.</p>
+            {summary.recent.length ? <div class="table-wrap" tabindex="0" role="region" aria-label="Registrerad startmånad för nuvarande konkursstatus">
+                <table class="data"><thead><tr><th scope="col">Startmånad</th><th scope="col">Företag i urvalet</th></tr></thead><tbody>{summary.months.map((m) => <tr><th scope="row">{m.month}</th><td class="month"><span class="month__bar" aria-hidden="true" style={`width: ${100 * m.count / maxMonth}%`}></span><span class="month__count">{m.count}</span></td></tr>)}</tbody></table>
+            </div> : <p>Inga användbara startdatum finns under perioden. En tom period visar inte att det saknas konkurser i Sverige.</p>}
+        </section>
+        {[{ title: 'Branscher', kind: 'branscher', groups: industries }, { title: 'Kommuner', kind: 'kommuner', groups: municipalities }].map(({ title, kind, groups }) => <section>
+            <h2>{title}</h2>
+            <p>Företag med konkursstatus och deras andel av samtliga profiler i samma {title === 'Branscher' ? 'bransch' : 'kommun'} i vårt underlag. Alla registrerade startdatum ingår. Andelen är ingen uppskattning av konkursrisken.</p>
+            {groups.length ? <><BankruptcyGroups groups={groups.slice(0, 10)} /><p>De {Math.min(10, groups.length)} grupperna med flest företag med konkursstatus. <a href={`/konkurser/${kind}/`}>Visa alla {title.toLowerCase()} i urvalet</a>.</p></> : <p>Inga grupper med konkursstatus finns i underlaget.</p>}
+        </section>)}
+        <section aria-labelledby="storlek">
+            <h2 id="storlek">Företagens storlek</h2>
+            <p>Av de {summary.recent.length} företagen med start under perioden har {summary.withEmployees.length} ett användbart personalantal i senaste bokslutet, högst 31 månader gammalt. Uppgiften gäller bokslutsperioden och visar varken antalet anställda vid konkursen eller förlorade arbetstillfällen.</p>
+            {summary.withEmployees.length > 0 && <div class="table-wrap" tabindex="0" role="region" aria-label="Storlek efter medelantal anställda i senaste bokslut">
+                <table class="data"><thead><tr><th scope="col">Medelantal anställda</th><th scope="col">Företag med uppgift</th><th scope="col">Summa personalantal</th></tr></thead><tbody>{summary.sizes.map((s) => <tr><th scope="row">{s.label}</th><td>{s.count}</td><td>{s.employees.toLocaleString('sv-SE')}</td></tr>)}</tbody></table>
+            </div>}
+        </section>
+        <section aria-labelledby="foretag">
+            <h2 id="foretag">Företag med konkursstatus</h2>
+            <p>Sorterat efter registrerat startdatum, nyast först. Företag utan användbart datum visas sist.</p>
+            <BankruptcyTable rows={summary.cases.slice(0, 25)} asOf={SITE.asOf} />
+            <p><a href="/konkurser/foretag/">Visa hela listan med företag</a></p>
+        </section>
+        <p class="small muted">Källa: respektive företags statusuppgift och bokslut i tjänstens underlag. Källor och hämtningsdatum visas i listan och på företagsprofilerna. <a href="/kallor/">Om datakällorna</a>.</p>
+    </div>
+</Page>
+<style>
+    .bankruptcy { display: grid; gap: 48px; }
+    h2 { margin-bottom: 16px; }
+    p + p, p + .table-wrap { margin-top: 16px; }
+    .totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 24px; }
+    .totals dt { color: var(--ink-2); }
+    .totals dd { margin: 8px 0 0; font: 2rem var(--mono); }
+    .month { position: relative; width: 70%; }
+    .month__bar { position: absolute; inset: 6px auto 6px 0; background: var(--forest); opacity: 0.12; }
+    .month__count { position: relative; }
+</style>

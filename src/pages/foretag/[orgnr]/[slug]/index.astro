@@ -113,6 +113,7 @@ const desc = summary.slice(0, 2).join(' ')
                         </span>
                         {r.formerNames[0] && <span class="tag tag--plain">Tidigare {r.formerNames[0].name}</span>}
                     </div>
+                    {r.status.code === 'bankruptcy' && <p><a href="/konkurser/">Företag med konkursstatus i underlaget</a> · <a href="/konkurser/om-konkurs/">Vad innebär konkurs?</a></p>}
                 </header>
                 {latest ? (
                     <div class="co__kpis">

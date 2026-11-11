@@ -2,7 +2,7 @@
 // quality verdicts, hubs and rankings. Pure; no IO.
 
 import { FLAGS, SITE } from '../config/site.ts'
-import type { CompanyRecord, CompanyStatusCode, Freshness, Municipality, PublishedCompany, SniCode } from './contract/types.ts'
+import type { CompanyRecord, CompanyStatusCode, Freshness, Municipality, PublishedCompany, SniCode, SourceRef } from './contract/types.ts'
 import { freshnessOf } from './freshness.ts'
 import { metricsOf, numeric, periodsConsecutive, type MetricKey } from './metrics.ts'
 import type { Release } from './pipeline.ts'
@@ -32,6 +32,9 @@ export interface IndexRow {
     p: string
     rf: string[]
     st: CompanyStatusCode
+    /** Source's procedure start date and status provenance; absent in older index rows. */
+    ss?: string
+    sr?: SourceRef
     k?: Municipality
     s?: SniCode
     fr: Freshness
@@ -66,6 +69,8 @@ export function toRow(c: PublishedCompany): IndexRow {
     const r = c.record
     const [p, prior] = r.periods
     const row: IndexRow = { o: r.orgnr, n: r.name, p: c.path, rf: c.redirectsFrom, st: r.status.code, fr: c.freshness, ix: c.quality.indexable, q: c.quality.meetsThreshold, syn: r.synthetic, im: r.provenance.importedAt.slice(0, 10) }
+    row.ss = r.status.since
+    row.sr = r.status.source
     if (r.formerNames.length) row.f = r.formerNames.map((x) => x.name).join(' ')
     if (r.municipality) row.k = r.municipality
     if (r.sni[0]) row.s = r.sni[0]

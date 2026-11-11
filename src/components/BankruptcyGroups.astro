@@ -1,0 +1,10 @@
+---
+import { bankruptcyHubPath, type bankruptcyGroups } from '../lib/bankruptcy.ts'
+interface Props { groups: ReturnType<typeof bankruptcyGroups> }
+const { groups } = Astro.props
+---
+<ul class="groups">{groups.map(({ hub, count, total }) => <li><a href={bankruptcyHubPath(hub)}>{hub.name}</a><span>{count} av {total.toLocaleString('sv-SE')} företag ({(100 * count / total).toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %)</span></li>)}</ul>
+<style>
+    .groups { display: grid; gap: 12px; list-style: none; padding: 0; margin-top: 16px; }
+    .groups li { display: flex; flex-wrap: wrap; gap: 8px 24px; justify-content: space-between; border-bottom: 1px solid var(--rule); padding-bottom: 12px; }
+</style>
