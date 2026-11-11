@@ -5,6 +5,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
 import { assertBundleIdentity } from '../src/lib/valuatum/identity.ts'
+import { inventory, prepareRelease, verifyRelease, type Capture } from '../scripts/lib/release-plan.ts'
+import { createHash } from 'node:crypto'
 import { fetchConcurrency } from '../src/lib/valuatum/batch-limit.ts'
 import { staticUrls, hubUrls } from '../src/lib/sitemap.ts'
 import { buildSite, toRow } from '../src/lib/publish.ts'
@@ -13,6 +15,7 @@ import { assertPublicFiles, checkSitemaps, createPlan, writePlan, readPlan, cand
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'se-candidate-'))
 const jsonl = (rows: unknown[]) => rows.map((r) => JSON.stringify(r) + '\n').join('')
 const read = (file: string) => fs.readFileSync(file, 'utf8')
+const hash = (text: string) => createHash('sha256').update(text).digest('hex')
 const rows = ['1\ta\tAlfa AB\t1\t5564480282', '2\ta\tAlfa AB\t1\t5564480282K', '3\tb\tBeta AB\t1\t5565675906', '4\tc\tGamma AB\t1\t5591844112']
 const context: Context = { revision: 'a'.repeat(40), config: candidateConfig({ SE_INDEXING: '1', SE_COMPANY_SITEMAP: '1', SE_SITE_ORIGIN: 'https://www.kreditrisker.se', SECRET_VALUATUM_API_TOKEN: 'secret' }, '2026-11-11') }
 function setup(customContext = context) {
@@ -326,4 +329,49 @@ test('plans pin a usable default API origin and reject invalid or unsafe API end
     assert.equal(candidateConfig({}, '2026-11-11').PUBLIC_VALUATUM_API_BASE_URL, 'https://sweden.valuatum.com')
     assert.equal(candidateConfig({PUBLIC_VALUATUM_API_BASE_URL: 'https://sweden.valuatum.com/'}, '2026-11-11').PUBLIC_VALUATUM_API_BASE_URL, 'https://sweden.valuatum.com')
     for (const endpoint of ['not-a-url', 'http://sweden.valuatum.com', 'https://user:secret@sweden.valuatum.com', 'https://sweden.valuatum.com/rest', 'https://sweden.valuatum.com/?token=secret']) assert.throws(() => candidateConfig({PUBLIC_VALUATUM_API_BASE_URL: endpoint}, '2026-11-11'))
+})
+
+test('offline promotion package verifies the candidate, preserves 857 nonselected profiles, and detects package corruption', () => {
+    const s = complete(), stage = path.join(temp(), 'stage')
+    stageCandidate(s.dir, stage)
+    const captureDir = temp(), site = path.join(captureDir, 'site')
+    fs.mkdirSync(site)
+    const write = (key: string, text: string) => {
+        const file = path.join(site, key); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text)
+    }
+    for (let i = 0; i < 857; i++) write(`foretag/${9000000000 + i}/legacy/index.html`, `synthetic nonselected profile ${i} with noindex`)
+    write('_astro/legacy.js', 'synthetic retained old asset')
+    write('sitemap-companies-99.xml', '<old-synthetic-sitemap/>')
+    const before = inventory(site), liveIndex = read(path.join(s.dir, 'seed-index.jsonl'))
+    fs.writeFileSync(path.join(captureDir, 'index.jsonl'), liveIndex)
+    const capture: Capture = {
+        version: 1, capturedAt: '2026-11-11T12:00:00Z', complete: true,
+        site: { bucket: 'synthetic-site', versioning: 'Enabled', objects: Object.fromEntries(Object.entries(before).map(([key, value]) => [key, { ...value, versionId: 'synthetic-original', head: {} }])) },
+        state: { uri: 's3://synthetic-state/index.jsonl', versioning: 'Enabled', versionId: 'synthetic-index', sha256: hash(liveIndex), head: {} },
+        policy: { uri: 's3://synthetic-state/sitemap-policy.json', versionId: null, sha256: null },
+        search: { function: 'synthetic-search', imageUri: 'example.invalid/search@sha256:' + 'a'.repeat(64), revisionId: 'synthetic-revision', indexSha256: hash(liveIndex) },
+        distributionId: 'SYNTHETIC',
+    }
+    fs.writeFileSync(path.join(captureDir, 'capture.json'), JSON.stringify(capture, null, 2) + '\n')
+    const out = path.join(temp(), 'release')
+    const result = prepareRelease(s.dir, stage, captureDir, out)
+    assert.equal(result.promotionAllowed, false)
+    assert.equal(verifyRelease(out).preservedCompanyKeys, 857)
+    assert.deepEqual(inventory(path.join(out, 'backup', 'site')), before)
+    const release = JSON.parse(read(path.join(out, 'release.json')))
+    assert.equal(release.preserved.companyKeys.length, 857)
+    assert.equal(inventory(path.join(out, 'overlay'))['foretag/9000000000/legacy/index.html'], undefined)
+    const simulated = { ...before, ...Object.fromEntries(Object.entries(release.writes).map(([key, value]: [string, any]) => [key, value.after])) }
+    for (const key of release.rollback.removeNew) delete simulated[key]
+    for (const key of release.rollback.restore) simulated[key] = before[key]
+    assert.deepEqual(simulated, before, 'rollback plan restores exact original inventory including newly created keys')
+    fs.appendFileSync(path.join(out, 'overlay', 'sitemap-companies-99.xml'), 'tampered')
+    assert.throws(() => verifyRelease(out), /overlay differs/)
+    assert.deepEqual(inventory(site), before, 'preparation never mutates the snapshot')
+    const edited = path.join(temp(), 'edited')
+    fs.cpSync(stage, edited, { recursive: true })
+    fs.appendFileSync(path.join(edited, 'index.html'), 'tampered')
+    const failed = path.join(temp(), 'failed')
+    assert.throws(() => prepareRelease(s.dir, edited, captureDir, failed), /Offline release preparation failed/)
+    assert.equal(fs.existsSync(failed), false)
 })
