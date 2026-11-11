@@ -1,5 +1,24 @@
 # Search and measurement before launch
 
+## Opening indexing while existing profiles are refreshed
+
+The production indexing decision has been made. `SE_INDEXING=1` opens robots.txt
+and gives eligible pages `index,follow`. The CloudFront production indexing
+context removes the site-wide `X-Robots-Tag`; the analytics frame remains
+`noindex`. Pages with an individual quality or privacy exclusion remain noindex.
+
+Existing company HTML was built with the old noindex setting and does not change
+when these switches are flipped. Until the pilot refreshes it, the production
+job sets `SE_COMPANY_SITEMAP=0`: this keeps those profiles out of the sitemap,
+while the common pages and eligible hubs can be indexed. Refreshed profiles can
+be found through links even before the company sitemap is enabled.
+
+Before removing `SE_COMPANY_SITEMAP=0`, verify that every company URL in the
+candidate sitemap has an existing, canonical, indexable HTML page in the release
+being published. Do not assume that a row in `index.jsonl` proves that HTML was
+refreshed. A failed or partial pilot must leave the company sitemap off.
+Changing the settings alone does not cause Google to crawl or index a page.
+
 This checklist complements `LAUNCH-GATES.md`; it does not approve indexing, a
 credit model, payments or production deployment. Run it against a complete
 build, not an incremental `SE_BUILD_ONLY` build.

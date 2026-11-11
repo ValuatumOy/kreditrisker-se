@@ -56,7 +56,10 @@ The fields below are already set for a production run; leave them as they are.''
         SE_INDEX_IN = 'prev-index.jsonl'
         PUBLIC_VALUATUM_API_BASE_URL = 'https://sweden.valuatum.com'
         SECRET_VALUATUM_API_TOKEN = credentials('kreditrisker-se-api-token')
-        SE_INDEXING = '0' // launch gates 1-3 and 9 (docs/LAUNCH-GATES.md)
+        SE_INDEXING = '1'
+        // Existing profiles still contain the old noindex meta. Turn the company sitemap on only
+        // after the full candidate has been built and verified against the HTML to be published.
+        SE_COMPANY_SITEMAP = '0'
         PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> search Lambda (aws-infra)
         PUBLIC_GA_TRACKING_ID = 'G-10WF1WRH4W'
         PUBLIC_GA_FRAME_ORIGIN = 'https://kreditrisker.se'

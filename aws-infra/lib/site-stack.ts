@@ -88,6 +88,18 @@ export class SiteStack extends cdk.Stack {
             customHeadersBehavior: prod && props.indexing ? undefined : { customHeaders: [{ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true }] },
         })
 
+        // API responses are not content pages. Keep their existing noindex header
+        // even when the site's normal HTML pages are opened to search engines.
+        const apiHeaders = prod && props.indexing ? new cloudfront.ResponseHeadersPolicy(this, 'ApiHeaders', {
+            securityHeadersBehavior: {
+                strictTransportSecurity: { accessControlMaxAge: cdk.Duration.days(365), includeSubdomains: true, override: true },
+                contentTypeOptions: { override: true },
+                frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
+                referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
+            },
+            customHeadersBehavior: { customHeaders: [{ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true }] },
+        }) : headers
+
         const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {}
         let searchFunction: lambda.Function | undefined
         if (props.searchRepository) {
@@ -119,7 +131,7 @@ export class SiteStack extends cdk.Stack {
                     maxTtl: cdk.Duration.hours(1),
                     queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList('q', 'size'),
                 }),
-                responseHeadersPolicy: headers,
+                responseHeadersPolicy: apiHeaders,
             }
         }
         if (props.checkoutApiDomain) {
@@ -129,7 +141,7 @@ export class SiteStack extends cdk.Stack {
                 allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
                 cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
                 originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
-                responseHeadersPolicy: headers,
+                responseHeadersPolicy: apiHeaders,
             }
         }
         if (props.domain) {
