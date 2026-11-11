@@ -53,7 +53,7 @@ A profile is indexed only if all of these hold:
 - the newest period reports at least **5 of 7** core items: net sales, operating result, net profit, total assets, equity, current liabilities, employees
 - the global switch is on
 
-Industry (SNI) and municipality are optional; a profile missing either field is not listed in that type of hub. Missing SNI never creates an inferred industry. In a sample of 300 live profiles on 2026-11-11, 11 % failed only on a missing SNI, which is why that rule was dropped.
+Industry (SNI) and municipality are optional; a profile missing either field is not listed in that type of hub. Missing SNI never creates an inferred industry.
 
 Everything else is `noindex,follow` and left out of the sitemaps. The reasons are listed by `npm run data:status`.
 

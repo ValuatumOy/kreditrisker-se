@@ -10,7 +10,7 @@ const row = (i: number, extra: Partial<IndexRow> = {}): IndexRow =>
     ({ o: String(5560000000 + i), n: `Bolag ${i}`, p: `/foretag/${5560000000 + i}/bolag-${i}/`, rf: [], st: 'active', fr: 'current', ix: true, q: true, syn: false, im: '2026-11-01', s: sni, per: { start: '2025-01-01', end: '2025-12-31', months: 12 }, ns: 1000 * (i + 1), er: (i + 1) / 100, ...extra }) as IndexRow
 
 test('median and place come from comparable companies only', () => {
-    const rows = [...Array.from({ length: 11 }, (_, i) => row(i)), row(50, { fr: 'stale', ns: 9e9 }), row(51, { per: { start: '2025-07-01', end: '2025-12-31', months: 6 }, ns: 9e9 })]
+    const rows = [...Array.from({ length: 11 }, (_, i) => row(i)), row(50, { fr: 'stale', ns: 9e9 }), row(51, { per: { start: '2025-07-01', end: '2025-12-31', months: 6 }, ns: 9e9 }), row(52, { q: false, ns: 9e9 })]
     const [hub] = buildSite([], rows, 't').industries
     const b = benchmark(hub, rows[0])!
     const sales = b.rows.find((r) => r.field === 'ns')!
@@ -20,6 +20,7 @@ test('median and place come from comparable companies only', () => {
     assert.equal(benchmark(hub, rows[10])!.place, 1)
     assert.equal(b.rows.some((r) => r.field === 'om'), false, 'no row for a figure the company lacks')
     assert.equal(benchmark(hub, rows[11]), null, 'a stale company is not compared')
+    assert.equal(benchmark(hub, rows[13]), null, 'a company below the content threshold is not compared')
 })
 
 test('no comparison without enough companies behind the median', () => {

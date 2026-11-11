@@ -345,3 +345,16 @@ test('batch selection: modes, orgnr with or without hyphen, fids, group rows, un
     assert.equal(batchMode(' ALL '), 'all')
     assert.equal(batchMode('556448-0282'), 'listed')
 })
+
+test('oversized batches are stopped before the API is read or files are written', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'se-fetch-limit-'))
+    const file = path.join(dir, 'batch.txt')
+    fs.writeFileSync(file, '900001\tx\tTest AB\t47599\t5569876542\n'.repeat(10_001))
+    const env = { ...process.env, BUILD_STATIC_PARAMS_FILE: file, PUBLIC_VALUATUM_API_BASE_URL: '', SECRET_VALUATUM_API_TOKEN: '' }
+    try {
+        assert.throws(() => execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'fetch.ts')], { cwd: dir, env, stdio: 'pipe' }), /maximum is 10000/)
+        assert.equal(fs.existsSync(path.join(dir, 'data', 'build')), false)
+    } finally {
+        fs.rmSync(dir, { recursive: true, force: true })
+    }
+})

@@ -19,6 +19,7 @@ import type { PublishedCompany } from '../src/lib/contract/types.ts'
 import { readJsonl, writeJsonl } from '../src/lib/jsonl.ts'
 import { publishCompany, toRow, type IndexRow } from '../src/lib/publish.ts'
 import { fetchBundle, mapLimit } from '../src/lib/valuatum/api.ts'
+import { assertBatchSize } from '../src/lib/valuatum/batch-limit.ts'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
 import { readParams } from '../src/lib/valuatum/params.ts'
 
@@ -30,6 +31,7 @@ async function main() {
     const batchFile = process.env.BUILD_STATIC_PARAMS_FILE
     if (!batchFile) throw new Error('BUILD_STATIC_PARAMS_FILE is not set')
     const batch = readParams(batchFile)
+    assertBatchSize(batch.length)
     const allFile = process.env.BUILD_STATIC_PARAMS_FILE_ALL
     const all = allFile ? readParams(allFile) : null
     const keep = all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))

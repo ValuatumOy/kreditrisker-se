@@ -64,7 +64,7 @@ test('missing municipality preserves indexing and rankings but creates no munici
 
 test('related links keep industry first, deduplicate, then fill from the municipality', () => {
     const company = publishCompany(byName(batch1(), 'Exempel Mjukvara'), undefined, AS_OF)
-    const row = (o: string) => ({ o } as IndexRow)
+    const row = (o: string) => ({ o, q: true } as IndexRow)
     const self = row(company.record.orgnr)
     const a = row('a'), b = row('b'), c = row('c')
     const site = {

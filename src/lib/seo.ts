@@ -2,6 +2,7 @@ import { SITE, htmlIndexable, siteIndexable } from '../config/site.ts'
 import type { CompanyStatusCode, PublishedCompany } from './contract/types.ts'
 import { LEGAL_FORM_TEXT } from './format.ts'
 import { formatOrgnr } from './orgnr.ts'
+import { numeric } from './metrics.ts'
 
 export type Crumb = { href?: string; label: string }
 
@@ -26,7 +27,9 @@ const PROCEDURE: Partial<Record<CompanyStatusCode, string>> = { bankruptcy: 'kon
 export function companyTitle(c: PublishedCompany): string {
     const r = c.record
     const procedure = PROCEDURE[r.status.code]
-    return `${r.name} (${formatOrgnr(r.orgnr)}) – ${procedure ? `${procedure}, ` : ''}${r.periods[0] ? 'omsättning, bokslut och nyckeltal' : 'företagsuppgifter'}`
+    const latest = r.periods[0]
+    const topic = !latest ? 'företagsuppgifter' : numeric(latest.income.netSales) === undefined ? 'bokslut och nyckeltal' : 'omsättning, bokslut och nyckeltal'
+    return `${r.name} (${formatOrgnr(r.orgnr)}) – ${procedure ? `${procedure}, ` : ''}${topic}`
 }
 
 /** Organization markup with registry facts only (no ratings, no reviews). */

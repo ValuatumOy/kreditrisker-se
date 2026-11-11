@@ -140,6 +140,7 @@ export class SiteStack extends cdk.Stack {
                     contentSecurityPolicy: { contentSecurityPolicy: `frame-ancestors https://www.${props.domain}`, override: true },
                     referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
                 },
+                customHeadersBehavior: { customHeaders: [{ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true }] },
             })
             additionalBehaviors['/analytics-frame/*'] = {
                 origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),

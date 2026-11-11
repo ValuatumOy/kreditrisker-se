@@ -11,7 +11,7 @@ Jenkins.
 ```
 get_static_params (Go, DB)      staticparams.txt        every company: fid, slug, name, SNI, orgnr
                                 staticparams_batch.txt  the batch: the companies in COMPANIES; if empty, those updated
-                                                        since SINCE; COMPANIES=all: every company (scripts/select-batch.ts)
+                                                        since SINCE; COMPANIES=all: every company, up to 10,000 rows
         │
 scripts/fetch.ts                for each batch fid: POST /rest/modeldata + GET /rest/company/:id
         │                       → map (src/lib/valuatum/map.ts) → validate → publish
@@ -130,7 +130,7 @@ Setup, once (nothing in the Jenkinsfile needs editing):
    whole index, the job builds `search/Dockerfile` (the agent needs Docker), pushes
    the image and points the Lambda at it (docs/AWS-SETUP.md)
 
-The first full build, and any full rebuild: `COMPANIES=all`.
+`COMPANIES=all` is limited to 10,000 rows. Larger builds require a separately verified, bounded process; the limit is a safeguard, not a capacity guarantee.
 
 Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
 the full directory `PUBLIC_SE_SEARCH_ENDPOINT` is `/api/search`, the search
@@ -216,8 +216,8 @@ key-figure cards are shown only between consecutive fiscal periods, and the grow
 ranking only compares two consecutive 12-month years.
 
 When updating an existing production dataset to these quality/calculation rules,
-run a full rebuild (`COMPANIES=all`): an incremental batch retains old index rows and
-profile HTML for companies outside the batch.
+rebuild all affected profiles: an incremental batch retains old index rows and
+profile HTML for companies outside the batch. A rebuild over 10,000 rows requires a separately verified process.
 
 ## First sample review (2026-10-09)
 
@@ -367,4 +367,4 @@ The five-period S M Entreprenad table has 18 overview rows and 53 expanded rows.
 toggle it while preserving focus; the control is 44 px tall. At 320 px, the page has no
 horizontal overflow and the table retains its own horizontal scroll. Printing and disabled
 JavaScript both expose all 53 rows. No AWS/Jenkins build was triggered; rebuild company
-pages with `COMPANIES=all` to release this UI and remap existing profiles on CloudFront.
+pages to release this UI and remap existing profiles on CloudFront. A rebuild over 10,000 rows requires a separately verified process.

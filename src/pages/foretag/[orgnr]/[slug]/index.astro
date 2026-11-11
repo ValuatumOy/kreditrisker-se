@@ -65,7 +65,7 @@ const crumbs = [
 const sources = [...[r.status.source, ...r.periods.map((p) => p.source), ...(r.provenance.sources ?? [])]
     .reduce((m, s) => {
         const e = m.get(s.source) ?? { source: s.source, docs: [] as string[], retrievedAt: s.retrievedAt }
-        if (s.documentId && !e.docs.includes(s.documentId)) e.docs.push(s.documentId)
+        if (s.documentId && !(s.source === 'valuatum-rest' && /^fid:\d+$/.test(s.documentId)) && !e.docs.includes(s.documentId)) e.docs.push(s.documentId)
         if (s.retrievedAt > e.retrievedAt) e.retrievedAt = s.retrievedAt
         return m.set(s.source, e)
     }, new Map<string, { source: string; docs: string[]; retrievedAt: string }>())
@@ -257,8 +257,7 @@ const desc = summary.slice(0, 2).join(' ')
                                     <li>
                                         <a href={x.p}>{x.n}</a>
                                         <span class="small muted">
-                                            {x.k?.name}
-                                            {x.s && ` · ${x.s.label}`}
+                                            {[x.k?.name, x.s?.label].filter(Boolean).join(' · ')}
                                         </span>
                                     </li>
                                 ))}
