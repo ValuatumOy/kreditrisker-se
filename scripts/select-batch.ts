@@ -9,6 +9,7 @@
 // get_static_params wrote (absent when nothing changed); overwrites BUILD_STATIC_PARAMS_FILE.
 
 import fs from 'node:fs'
+import { assertBatchSize } from '../src/lib/valuatum/batch-limit.ts'
 import { batchMode, selectBatch } from '../src/lib/valuatum/params.ts'
 
 const read = (file: string) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8').split('\n') : [])
@@ -20,6 +21,7 @@ const mode = batchMode(companies)
 const all = read(allFile)
 if (!all.some((l) => l.trim())) throw new Error(`${allFile} is empty`)
 const batch = selectBatch(all, read(batchFile), mode, companies)
+assertBatchSize(batch.length)
 fs.writeFileSync(batchFile, batch.map((l) => l + '\n').join(''))
 console.log(`${mode}: ${batch.length} of ${all.filter((l) => l.trim()).length} directory rows in ${batchFile}`)
 for (const l of batch.slice(0, 10)) console.log('  ' + l.split('\t').filter((_, i) => i !== 1).join('  '))

@@ -12,14 +12,16 @@ import ModelSection from '../../../../components/ModelSection.astro'
 import Icon from '../../../../components/Icon.astro'
 import NightBand from '../../../../components/NightBand.astro'
 import KpiStrip from '../../../../components/KpiStrip.astro'
+import Benchmark from '../../../../components/Benchmark.astro'
 import { getSite } from '../../../../lib/store.ts'
-import { relatedCompanies, type Site } from '../../../../lib/publish.ts'
+import { relatedCompanies, toRow, type Site } from '../../../../lib/publish.ts'
+import { benchmark } from '../../../../lib/peers.ts'
 import type { FiscalPeriod, PublishedCompany, Value } from '../../../../lib/contract/types.ts'
 import { SITE } from '../../../../config/site.ts'
 import { formatOrgnr } from '../../../../lib/orgnr.ts'
 import { date, FRESHNESS_TEXT, kommunName, LEGAL_FORM_TEXT, periodLabel, SOURCE_TEXT, STATUS_TEXT } from '../../../../lib/format.ts'
 import { summarize } from '../../../../lib/summary.ts'
-import { companyJsonLd, crumbsJsonLd } from '../../../../lib/seo.ts'
+import { companyJsonLd, companyTitle, crumbsJsonLd } from '../../../../lib/seo.ts'
 
 export function getStaticPaths() {
     const site = getSite()
@@ -51,6 +53,7 @@ const sni = r.sni[0]
 const industryHub = sni && site.industries.find((h) => h.code === sni.code)
 const kommunHub = r.municipality && site.municipalities.find((h) => h.code === r.municipality!.code)
 const related = relatedCompanies(site, c)
+const peers = industryHub ? benchmark(industryHub, toRow(c)) : null
 const summary = summarize(c)
 const fresh = FRESHNESS_TEXT[c.freshness]
 const statusTone = r.status.code === 'active' ? 'tag--ok' : r.status.code === 'unknown' ? '' : 'tag--alert'
@@ -62,14 +65,13 @@ const crumbs = [
 const sources = [...[r.status.source, ...r.periods.map((p) => p.source), ...(r.provenance.sources ?? [])]
     .reduce((m, s) => {
         const e = m.get(s.source) ?? { source: s.source, docs: [] as string[], retrievedAt: s.retrievedAt }
-        if (s.documentId && !e.docs.includes(s.documentId)) e.docs.push(s.documentId)
+        if (s.documentId && !(s.source === 'valuatum-rest' && /^fid:\d+$/.test(s.documentId)) && !e.docs.includes(s.documentId)) e.docs.push(s.documentId)
         if (s.retrievedAt > e.retrievedAt) e.retrievedAt = s.retrievedAt
         return m.set(s.source, e)
     }, new Map<string, { source: string; docs: string[]; retrievedAt: string }>())
     .values()]
 const figCount: Record<string, number> = {}
 const nextFig = (kind = 'Diagram') => `${kind} ${(figCount[kind] = (figCount[kind] ?? 0) + 1)}`
-const title = `${r.name} (${formatOrgnr(r.orgnr)})`
 const desc = summary.slice(0, 2).join(' ')
 ---
 
@@ -78,7 +80,7 @@ const desc = summary.slice(0, 2).join(' ')
         <RedirectPage to={redirectTo} />
     ) : (
         <Base
-            title={`${title} – bokslut och nyckeltal`}
+            title={companyTitle(c)}
             description={desc}
             path={c.path}
             noindex={!c.quality.indexable}
@@ -113,6 +115,7 @@ const desc = summary.slice(0, 2).join(' ')
                         </span>
                         {r.formerNames[0] && <span class="tag tag--plain">Tidigare {r.formerNames[0].name}</span>}
                     </div>
+                    {r.status.code === 'bankruptcy' && <p><a href="/konkurser/">Företag med konkursstatus i underlaget</a> · <a href="/konkurser/om-konkurs/">Vad innebär konkurs?</a></p>}
                 </header>
                 {latest ? (
                     <div class="co__kpis">
@@ -174,6 +177,13 @@ const desc = summary.slice(0, 2).join(' ')
                         <section class="co__sec" aria-labelledby="bokslut">
                             <h2 id="bokslut">Bokslut</h2>
                             <FinancialTable periods={r.periods} orgnr={r.orgnr} no={nextFig('Tabell')} />
+                        </section>
+                    )}
+
+                    {peers && industryHub && (
+                        <section class="co__sec" aria-labelledby="jamforelse">
+                            <h2 id="jamforelse">Jämfört med företag i samma bransch</h2>
+                            <Benchmark data={peers} hub={industryHub} name={r.name} no={nextFig('Tabell')} />
                         </section>
                     )}
 
@@ -247,8 +257,7 @@ const desc = summary.slice(0, 2).join(' ')
                                     <li>
                                         <a href={x.p}>{x.n}</a>
                                         <span class="small muted">
-                                            {x.k?.name}
-                                            {x.s && ` · ${x.s.label}`}
+                                            {[x.k?.name, x.s?.label].filter(Boolean).join(' · ')}
                                         </span>
                                     </li>
                                 ))}

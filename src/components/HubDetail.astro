@@ -3,52 +3,61 @@ import Page from '../layouts/Page.astro'
 import HubStats from './HubStats.astro'
 import CompanyTable from './CompanyTable.astro'
 import Icon from './Icon.astro'
+import Pagination from './Pagination.astro'
+import { HUB_PAGE_SIZE, pageRows, pagePath } from '../lib/pagination.ts'
+import { bankruptcyRows, bankruptcyHubPath } from '../lib/bankruptcy.ts'
+import { SITE } from '../config/site.ts'
 import { MIN_HUB_COMPANIES, type Hub, type Site } from '../lib/publish.ts'
 import { kommunName } from '../lib/format.ts'
 
 interface Props {
     hub: Hub
     site: Site
+    page?: number
 }
-const { hub, site } = Astro.props
+const { hub, site, page = 1 } = Astro.props
 const isIndustry = hub.kind === 'bransch'
 const base = isIndustry ? '/branscher/' : '/kommuner/'
-const title = isIndustry ? `${hub.name} – företag och nyckeltal` : `Företag i ${kommunName(hub.name)}`
+const title = (isIndustry ? `${hub.name} – företag och nyckeltal` : `Företag i ${kommunName(hub.name)}`) + (page > 1 ? ` – sida ${page}` : '')
 const h1 = isIndustry ? hub.name : `Företag i ${kommunName(hub.name)}`
 const lede = isIndustry
     ? `Företag med huvudbransch SNI ${hub.code}, ${hub.name.toLowerCase()}, med bokslut och nyckeltal från senaste räkenskapsåret.`
     : `Företag med säte i ${kommunName(hub.name)}${hub.detail ? `, ${hub.detail}` : ''}, med bokslut och nyckeltal från senaste räkenskapsåret.`
 // Cross links: where companies in this industry sit, or which industries this municipality has.
 const cross = new Map<string, { href: string; label: string; n: number }>()
-const kommunHubs = new Map(site.municipalities.map((h) => [h.code, h]))
-const industryHubs = new Map(site.industries.map((h) => [h.code, h]))
-// Large hubs list the biggest companies only; the full set is in the sitemaps.
-const LIST_MAX = 200
-const listed = hub.companies.slice(0, LIST_MAX)
-for (const c of hub.companies) {
-    const other = isIndustry
-        ? c.k && kommunHubs.get(c.k.code)
-        : c.s && industryHubs.get(c.s.code)
-    if (!other) continue
-    const href = `${isIndustry ? '/kommuner/' : '/branscher/'}${other.slug}/`
-    const e = cross.get(href) ?? { href, label: other.name, n: 0 }
-    e.n++
-    cross.set(href, e)
+const listed = pageRows(hub.companies, page, HUB_PAGE_SIZE)
+const canonicalBase = `${base}${hub.slug}/`
+const pageIndexable = hub.indexable && (page === 1 || listed.filter((c) => c.ix).length >= MIN_HUB_COMPANIES)
+const bankruptcies = bankruptcyRows(hub.companies, SITE.asOf)
+if (page === 1) {
+    const kommunHubs = new Map(site.municipalities.map((h) => [h.code, h]))
+    const industryHubs = new Map(site.industries.map((h) => [h.code, h]))
+    for (const c of hub.companies) {
+        const other = isIndustry
+            ? c.k && kommunHubs.get(c.k.code)
+            : c.s && industryHubs.get(c.s.code)
+        if (!other) continue
+        const href = `${isIndustry ? '/kommuner/' : '/branscher/'}${other.slug}/`
+        const e = cross.get(href) ?? { href, label: other.name, n: 0 }
+        e.n++
+        cross.set(href, e)
+    }
 }
 const crossList = [...cross.values()].sort((a, b) => b.n - a.n)
 ---
 
 <Page
     title={title}
-    h1={h1}
+    h1={page > 1 ? `${h1} – sida ${page}` : h1}
     description={lede}
-    path={`${base}${hub.slug}/`}
+    path={pagePath(canonicalBase, page)}
     lede={lede}
-    noindex={!hub.indexable}
+    noindex={!pageIndexable}
     crumbs={[{ href: base, label: isIndustry ? 'Branscher' : 'Kommuner' }, { label: hub.name }]}
 >
     <div class="hd">
-        <HubStats companies={hub.companies} no="Tabell 1" title={isIndustry ? 'Branschen i siffror' : 'Kommunens företag i siffror'} />
+        {page === 1 && <HubStats companies={hub.companies} no="Tabell 1" title={isIndustry ? 'Branschen i siffror' : 'Kommunens företag i siffror'} />}
+        {bankruptcies.length > 0 && <p><a href={bankruptcyHubPath(hub)}>{bankruptcies.length} företag med konkursstatus i underlaget</a>. Statusen gäller senast hämtade uppgifter, inte alla konkurser under en viss period.</p>}
         {
             !hub.substantial && (
                 <div class="notice" role="note">
@@ -59,13 +68,15 @@ const crossList = [...cross.values()].sort((a, b) => b.n - a.n)
                 </div>
             )
         }
+        <Pagination base={canonicalBase} page={page} count={hub.companies.length} size={HUB_PAGE_SIZE} />
         <CompanyTable
             companies={listed}
             no="Tabell 2"
-            title={listed.length < hub.companies.length ? `De ${LIST_MAX} största av ${hub.companies.length.toLocaleString('sv-SE')} företag, efter nettoomsättning` : `Företag, sorterade efter nettoomsättning`}
+            title={listed.length < hub.companies.length ? `Företag ${(page - 1) * HUB_PAGE_SIZE + 1}–${(page - 1) * HUB_PAGE_SIZE + listed.length} av ${hub.companies.length.toLocaleString('sv-SE')}, efter nettoomsättning` : `Företag, sorterade efter nettoomsättning`}
             source={`${site.synthetic ? 'Syntetiska testdata' : 'Bolagsverket'}, senaste inlämnade årsredovisning per företag. Äldre bokslut markeras i sista kolumnen.`}
             show={isIndustry ? 'kommun' : 'bransch'}
         />
+        <Pagination base={canonicalBase} page={page} count={hub.companies.length} size={HUB_PAGE_SIZE} />
         {
             crossList.length > 0 && (
                 <section>

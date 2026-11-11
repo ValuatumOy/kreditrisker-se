@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { assessQuality } from '../src/lib/quality.ts'
 import { freshnessOf } from '../src/lib/freshness.ts'
 import { summarize } from '../src/lib/summary.ts'
-import { buildSite, publishCompany, toRow } from '../src/lib/publish.ts'
+import { buildSite, publishCompany, relatedCompanies, toRow, type Site, type IndexRow } from '../src/lib/publish.ts'
 import { AS_OF, batch1, byName } from './helpers.ts'
 import type { CompanyRecord } from '../src/lib/contract/types.ts'
 
@@ -62,6 +62,20 @@ test('missing municipality preserves indexing and rankings but creates no munici
     assert.doesNotMatch(summarize(c).join(' '), /kommun/)
 })
 
+test('related links keep industry first, deduplicate, then fill from the municipality', () => {
+    const company = publishCompany(byName(batch1(), 'Exempel Mjukvara'), undefined, AS_OF)
+    const row = (o: string) => ({ o, q: true } as IndexRow)
+    const self = row(company.record.orgnr)
+    const a = row('a'), b = row('b'), c = row('c')
+    const site = {
+        industries: [{ code: company.record.sni[0].code, companies: [self, a, b] }],
+        municipalities: [{ code: company.record.municipality!.code, companies: [self, b, c] }],
+    } as Site
+    assert.deepEqual(relatedCompanies(site, company, 3).map((r) => r.o), ['a', 'b', 'c'])
+    assert.deepEqual(relatedCompanies(site, company, 1).map((r) => r.o), ['a'])
+    assert.deepEqual(relatedCompanies(site, company, 0), [])
+})
+
 test('summary states facts only and flags stale data', () => {
     const stale = publishCompany(byName(batch1(), 'Exempel Metall'), undefined, AS_OF)
     const text = summarize(stale).join(' ')
@@ -73,4 +87,22 @@ test('summary states facts only and flags stale data', () => {
     assert.match(sparse, /Umeå kommun/)
     assert.doesNotMatch(sparse, /Soliditeten/)
     assert.doesNotMatch(sparse, /rörelseresultatet/)
+})
+
+test('missing SNI alone does not hide a useful profile; core data, status and freshness still gate indexing', () => {
+    const r = asReal(byName(batch1(), 'Exempel Mjukvara'))
+    r.sni = []
+    const c = publishCompany(r, undefined, AS_OF)
+    assert.equal(c.quality.indexable, true)
+    assert.deepEqual(c.quality.reasons, [])
+    const site = buildSite([c], [toRow(c)], 'test')
+    assert.equal(site.industries.length, 0)
+    assert.equal(site.municipalities.length, 1)
+    assert.doesNotMatch(summarize(c).join(' '), /SNI|verksamhet inom/)
+    assert.equal(assessQuality(r, 'stale', opts).indexable, false)
+    r.status.code = 'unknown'
+    assert.equal(assessQuality(r, 'current', opts).indexable, false)
+    const sparse = asReal(byName(batch1(), 'Exempel Fastigheter'))
+    sparse.sni = []
+    assert.equal(assessQuality(sparse, 'current', opts).indexable, false)
 })

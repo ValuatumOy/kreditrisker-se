@@ -7,10 +7,11 @@
 // A publishable profile is indexable only if ALL of these hold:
 //   1. not synthetic
 //   2. registration status is known
-//   3. a primary SNI code is present
-//   4. at least one fiscal period exists and the newest is not stale
-//   5. the newest period reports at least MIN_CORE_ITEMS of the CORE_ITEMS as
+//   3. at least one fiscal period exists and the newest is not stale
+//   4. the newest period reports at least MIN_CORE_ITEMS of the CORE_ITEMS as
 //      non-zero values (the backend stores no zeros, so a 0 is an absent item)
+// Industry (SNI) and municipality are optional: a profile without them has its
+// statements and is found by name, it just is not listed on a hub page.
 // Everything else gets <meta name="robots" content="noindex,follow"> and is
 // left out of the sitemaps. The global INDEXING flag overrides to noindex.
 
@@ -49,7 +50,6 @@ export function assessQuality(
     if (!publishable) reasons.push('enskild näringsidkare: personuppgifter, sidan genereras inte')
     if (record.synthetic) reasons.push(SYNTHETIC_REASON)
     if (record.status.code === 'unknown') reasons.push('registreringsstatus okänd')
-    if (!record.sni[0]) reasons.push('SNI-kod saknas')
     if (freshness === 'none') reasons.push('inget bokslut')
     if (freshness === 'stale') reasons.push('senaste bokslut äldre än 31 månader')
     const core = coreItemsReported(record)

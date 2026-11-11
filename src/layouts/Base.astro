@@ -1,7 +1,7 @@
 ---
 import '../styles/global.css'
 import { FLAGS, SITE } from '../config/site.ts'
-import { isIndexable, serializeJsonLd } from '../lib/seo.ts'
+import { pageIndexable, serializeJsonLd } from '../lib/seo.ts'
 import Nav from '../components/Nav.astro'
 import Footer from '../components/Footer.astro'
 import Analytics from '../components/Analytics.astro'
@@ -19,7 +19,7 @@ interface Props {
 
 const { title, description, path, noindex = false, jsonLd = [] } = Astro.props
 // A synthetic dataset is never indexable, whatever the flags say.
-const robots = isIndexable(noindex, getSite().synthetic) ? 'index,follow' : 'noindex,follow'
+const robots = pageIndexable(noindex, getSite().synthetic) ? 'index,follow' : 'noindex,follow'
 const canonical = SITE.origin + path
 const fullTitle = path === '/' ? `${SITE.name} – ${title}` : `${title} | ${SITE.name}`
 ---
@@ -43,19 +43,10 @@ const fullTitle = path === '/' ? `${SITE.name} – ${title}` : `${title} | ${SIT
         <meta name="theme-color" content="#050a15" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-        <meta name="theme-color" content="#1d3d31" />
         <link rel="sitemap" href="/sitemap-index.xml" />
         {jsonLd.map((d) => <script type="application/ld+json" set:html={serializeJsonLd(d)} />)}
     </head>
     <body>
-        <Fragment set:html={`<!--
-THESIS: Blå timmen. Swedish company facts shown the way a premium fintech shows money: night-navy chrome over Stockholm at blue hour, product panels in glass, every number still sourced, dated and honest about gaps. Refuses the flat grey directory table and the generic purple SaaS gradient.
-OWN-WORLD: night #050a15, ice text #eef3fa, glow blue #7fb2ff for data, city-light gold #f4bf72 for emphasis and gaps; day surfaces #f3f5f9 with white 20px cards; Source Serif 4 light display, Geist UI, Geist Mono numerals; glass panels, grain, photography.
-STORY: the visitor sees the city, types a company, watches real-looking figures assemble, understands what is missing and what is not launched yet.
-FIRST VIEWPORT: full-bleed Stockholm blue-hour photo; left, a light serif headline and a glass search with a typing placeholder; right, a floating glass profile card whose numbers count up while a gold line traces the skyline.
-FORM: user-pinned redesign, no roll: "luxurious, modern, financial saas ... add animations, cool graphics", inspiration 21st.dev / Dribbble fintech; supersedes seed 1b69662a.
-FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
--->`} />
         <a class="skip" href="#main">Hoppa till innehållet</a>
         {
             FLAGS.preview && (

@@ -2,7 +2,7 @@
 // quality verdicts, hubs and rankings. Pure; no IO.
 
 import { FLAGS, SITE } from '../config/site.ts'
-import type { CompanyRecord, CompanyStatusCode, Freshness, Municipality, PublishedCompany, SniCode } from './contract/types.ts'
+import type { CompanyRecord, CompanyStatusCode, Freshness, Municipality, PublishedCompany, SniCode, SourceRef } from './contract/types.ts'
 import { freshnessOf } from './freshness.ts'
 import { metricsOf, numeric, periodsConsecutive, type MetricKey } from './metrics.ts'
 import type { Release } from './pipeline.ts'
@@ -32,6 +32,9 @@ export interface IndexRow {
     p: string
     rf: string[]
     st: CompanyStatusCode
+    /** Source's procedure start date and status provenance; absent in older index rows. */
+    ss?: string
+    sr?: SourceRef
     k?: Municipality
     s?: SniCode
     fr: Freshness
@@ -66,6 +69,8 @@ export function toRow(c: PublishedCompany): IndexRow {
     const r = c.record
     const [p, prior] = r.periods
     const row: IndexRow = { o: r.orgnr, n: r.name, p: c.path, rf: c.redirectsFrom, st: r.status.code, fr: c.freshness, ix: c.quality.indexable, q: c.quality.meetsThreshold, syn: r.synthetic, im: r.provenance.importedAt.slice(0, 10) }
+    row.ss = r.status.since
+    row.sr = r.status.source
     if (r.formerNames.length) row.f = r.formerNames.map((x) => x.name).join(' ')
     if (r.municipality) row.k = r.municipality
     if (r.sni[0]) row.s = r.sni[0]
@@ -226,20 +231,67 @@ export function buildSite(pages: PublishedCompany[], rows: IndexRow[], releaseId
     }
 }
 
-/** Companies in the same industry, then same municipality, for internal links. */
-export function relatedCompanies(site: Site, c: PublishedCompany, limit = 6): IndexRow[] {
-    const r = c.record
-    const ind = r.sni[0] && site.industries.find((h) => h.code === r.sni[0].code)
-    const kom = r.municipality && site.municipalities.find((h) => h.code === r.municipality!.code)
-    const seen = new Set<string>([r.orgnr])
-    const out: IndexRow[] = []
-    for (const x of [...(ind?.companies ?? []), ...(kom?.companies ?? [])]) {
-        if (out.length >= limit) break
-        if (!seen.has(x.o)) {
-            out.push(x)
-            seen.add(x.o)
-        }
+const hubLookups = new WeakMap<Site, { industries: Map<string, Hub>; municipalities: Map<string, Hub> }>()
+
+// Per hub: the threshold-passing companies in list order, and every company's place in the list.
+const peerCache = new WeakMap<Hub, { peers: IndexRow[]; at: number[]; place: Map<string, number> }>()
+
+/** The `n` threshold-passing companies closest to `orgnr` in the hub's list (ordered by net sales). */
+function neighbours(hub: Hub | undefined, orgnr: string, n: number, seen: Set<string>): IndexRow[] {
+    if (!hub || n <= 0) return []
+    let cache = peerCache.get(hub)
+    if (!cache) {
+        const place = new Map(hub.companies.map((x, i) => [x.o, i]))
+        const peers = hub.companies.filter((x) => x.q)
+        peerCache.set(hub, (cache = { peers, at: peers.map((x) => place.get(x.o)!), place }))
     }
+    const { peers, at } = cache
+    const here = cache.place.get(orgnr) ?? 0
+    // First peer at or after this company, then walk outwards, nearest first.
+    let lo = 0
+    let hi = peers.length
+    while (lo < hi) {
+        const mid = (lo + hi) >> 1
+        if (at[mid] < here) lo = mid + 1
+        else hi = mid
+    }
+    lo = hi - 1
+    const out: IndexRow[] = []
+    while (out.length < n && (lo >= 0 || hi < peers.length)) {
+        const below = lo >= 0 && (hi >= peers.length || here - at[lo] <= at[hi] - here)
+        const x = below ? peers[lo--] : peers[hi++]
+        if (seen.has(x.o)) continue
+        seen.add(x.o)
+        out.push(x)
+    }
+    return out
+}
+
+/**
+ * Internal links from a profile: the companies nearest in size in its industry,
+ * then in its municipality. Neighbours rather than the top of each list, so
+ * every profile that passes the threshold is linked from its peers and not
+ * only from a hub page. Profiles below the threshold are not linked to.
+ */
+export function relatedCompanies(site: Site, c: PublishedCompany, limit = 8): IndexRow[] {
+    const r = c.record
+    let lookup = hubLookups.get(site)
+    if (!lookup) {
+        const firstByCode = (hubs: Hub[]) => {
+            const result = new Map<string, Hub>()
+            for (const hub of hubs) if (!result.has(hub.code)) result.set(hub.code, hub)
+            return result
+        }
+        lookup = { industries: firstByCode(site.industries), municipalities: firstByCode(site.municipalities) }
+        hubLookups.set(site, lookup)
+    }
+    const ind = r.sni[0] && lookup.industries.get(r.sni[0].code)
+    const kom = r.municipality && lookup.municipalities.get(r.municipality.code)
+    const seen = new Set<string>([r.orgnr])
+    const out = neighbours(ind || undefined, r.orgnr, kom ? Math.ceil(limit * 0.6) : limit, seen)
+    out.push(...neighbours(kom || undefined, r.orgnr, limit - out.length, seen))
+    // A small municipality leaves room for more of the industry.
+    out.push(...neighbours(ind || undefined, r.orgnr, limit - out.length, seen))
     return out
 }
 

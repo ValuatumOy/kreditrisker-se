@@ -1,0 +1,16 @@
+---
+import { pagePath } from '../lib/pagination.ts'
+interface Props { base: string; page: number; count: number; size: number }
+const { base, page, count, size } = Astro.props
+const pages = Math.max(1, Math.ceil(count / size))
+---
+{pages > 1 && <nav class="pagination" aria-label="Sidindelning">
+    {page > 2 && <a href={base}>Första sidan</a>}
+    {page > 1 && <a href={pagePath(base, page - 1)} rel="prev">← Föregående</a>}
+    <span>Sida {page} av {pages}</span>
+    {page < pages && <a href={pagePath(base, page + 1)} rel="next">Nästa →</a>}
+</nav>}
+<style>
+    .pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 12px 24px; margin-block: 24px; }
+    .pagination a { padding: 10px 0; }
+</style>

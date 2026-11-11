@@ -49,3 +49,25 @@ test('real dataset: hubs need three indexable profiles; index lists segments', (
     assert.match(xml, /sitemap-companies-1\.xml/)
     assert.match(urlset(companyUrls(site)), /<loc>https:\/\/.+\/foretag\/5\d{9}\/exempel-/)
 })
+
+test('paginated hub and bankruptcy sitemap URLs match per-page indexing thresholds', async () => {
+    const { buildSite, toRow } = await import('../src/lib/publish.ts')
+    const { bankruptcyHubPath } = await import('../src/lib/bankruptcy.ts')
+    const company = siteFromRelease(realRelease(), AS_OF).companies.find((c) => c.quality.indexable)!
+    const first = { ...toRow(company), st: 'bankruptcy' as const, ss: '2026-08-01' }
+    const rows = Array.from({ length: 203 }, (_, i) => ({ ...first, o: String(i), n: `Företag ${i}`, p: `/foretag/${i}/test/` }))
+    let site = buildSite([], rows, 'test')
+    let paths = hubUrls(site).map((u) => u.path)
+    assert.ok(paths.includes('/konkurser/'))
+    assert.ok(paths.includes('/konkurser/foretag/2/'))
+    assert.ok(paths.includes('/konkurser/foretag/3/'))
+    for (const h of [...site.industries, ...site.municipalities]) {
+        assert.ok(paths.includes(`${bankruptcyHubPath(h)}3/`))
+        assert.ok(paths.includes(`/${h.kind === 'bransch' ? 'branscher' : 'kommuner'}/${h.slug}/2/`))
+    }
+    site = buildSite([], rows.slice(0, 202), 'test')
+    paths = hubUrls(site).map((u) => u.path)
+    assert.ok(!paths.includes('/konkurser/foretag/3/'), 'a two-company last page is crawlable but noindex and outside sitemap')
+    assert.ok(!paths.some((p) => /^\/(branscher|kommuner)\/.+\/2\/$/.test(p)), 'a two-company hub last page is noindex')
+    assert.ok(staticUrls(site).some((u) => u.path === '/konkurser/om-konkurs/'))
+})

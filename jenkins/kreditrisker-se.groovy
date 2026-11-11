@@ -36,7 +36,7 @@ pipeline {
 
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
-Empty: the nightly run (companies updated since SINCE). "all": every company.
+Empty: the nightly run (companies updated since SINCE). "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
@@ -121,16 +121,32 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 sh '''#!/bin/bash
                     set -e
-                    aws s3 cp "$STATE_URI" "$SE_INDEX_IN" || echo "No previous index state; starting empty."
+                    # Never use a stale workspace file or publish an empty directory after a download error.
+                    rm -f "$SE_INDEX_IN"
+                    aws s3 cp "$STATE_URI" "$SE_INDEX_IN"
+                    if [ ! -s "$SE_INDEX_IN" ]; then
+                        echo "Existing index state is empty; refusing to build." >&2
+                        exit 1
+                    fi
                     SE_API_REFRESH=1 npm run fetch
                 '''
+                script {
+                    def rejected = readFile('data/build/rejected.jsonl').readLines().count { it.trim() }
+                    if (rejected) unstable("${rejected} companies were not built; review data/build/rejected.jsonl in the build artifacts")
+                }
             }
         }
 
         stage('Build') {
             steps {
                 // ~64 KB of page data per company: a 16k batch is ~1 GB of pages.jsonl, too much for Node's default heap.
-                sh 'SE_DATA_SOURCE=build NODE_OPTIONS=--max-old-space-size=8192 npm run build'
+                sh '''#!/bin/bash
+                    set -e
+                    SE_DATA_SOURCE=build NODE_OPTIONS=--max-old-space-size=8192 npm run build
+                    for prefix in branscher kommuner konkurser; do
+                        [ -s "dist/$prefix/index.html" ] || { echo "Missing complete $prefix output" >&2; exit 1; }
+                    done
+                '''
             }
         }
 
@@ -139,7 +155,16 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 sh '''#!/bin/bash
                     set -e
+                    if [ -n "$(echo "$COMPANIES" | tr -d '[:space:]')" ] && [ "$COMPANIES" != "all" ] && [ -s data/build/removed.txt ]; then
+                        echo "A named-company build would remove other company pages; review data/build/removed.txt first." >&2
+                        exit 1
+                    fi
                     aws s3 cp --recursive dist "s3://$BUILD_BUCKET" --only-show-errors
+                    # These directories are rebuilt in full on every run. Remove obsolete
+                    # list pages, but never sync-delete incremental company pages or assets.
+                    for prefix in branscher kommuner konkurser; do
+                        aws s3 sync "dist/$prefix/" "s3://$BUILD_BUCKET/$prefix/" --delete --only-show-errors
+                    done
                     while read -r prefix; do
                         [ -n "$prefix" ] && aws s3 rm --recursive "s3://$BUILD_BUCKET/$prefix" --only-show-errors
                     done < data/build/removed.txt
@@ -178,7 +203,7 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
-            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/removed.txt', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt', allowEmptyArchive: true, fingerprint: true
         }
     }
 }

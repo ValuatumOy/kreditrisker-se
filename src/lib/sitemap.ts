@@ -3,7 +3,9 @@
 
 import { SITE } from '../config/site.ts'
 import { GUIDES } from '../content/guides.ts'
-import { MIN_RANKING_ENTRIES, recentlyUpdated, type Site } from './publish.ts'
+import { MIN_HUB_COMPANIES, MIN_RANKING_ENTRIES, recentlyUpdated, type Site } from './publish.ts'
+import { BANKRUPTCY_PAGE_SIZE, HUB_PAGE_SIZE, pageNumbers, pagePath, pageRows } from './pagination.ts'
+import { bankruptcyRows, bankruptcyIndexable, bankruptcyGroups, bankruptcyHubPath } from './bankruptcy.ts'
 import { isIndexable } from './seo.ts'
 
 export const COMPANIES_PER_SITEMAP = 40_000
@@ -14,7 +16,7 @@ export interface SitemapUrl {
 }
 
 export function staticUrls(site: Site): SitemapUrl[] {
-    const pages = ['/', '/rapporter/', '/rapporter/bas/', '/rapporter/ai/', '/rapporter/exempel/', '/metod/', '/kallor/', '/fragor/', '/om/', '/guider/', ...GUIDES.map((g) => `/guider/${g.slug}/`)]
+    const pages = ['/', '/rapporter/', '/rapporter/bas/', '/rapporter/ai/', '/rapporter/exempel/', '/metod/', '/kallor/', '/fragor/', '/om/', '/guider/', '/konkurser/om-konkurs/', ...GUIDES.map((g) => `/guider/${g.slug}/`)]
     return pages.filter(() => isIndexable(false, site.synthetic)).map((path) => ({ path }))
 }
 
@@ -22,8 +24,29 @@ export function hubUrls(site: Site): SitemapUrl[] {
     const out: SitemapUrl[] = []
     if (site.industries.some((h) => h.indexable)) out.push({ path: '/branscher/' })
     if (site.municipalities.some((h) => h.indexable)) out.push({ path: '/kommuner/' })
-    for (const h of site.industries) if (h.indexable) out.push({ path: `/branscher/${h.slug}/` })
-    for (const h of site.municipalities) if (h.indexable) out.push({ path: `/kommuner/${h.slug}/` })
+    for (const h of [...site.industries, ...site.municipalities]) {
+        const base = `/${h.kind === 'bransch' ? 'branscher' : 'kommuner'}/${h.slug}/`
+        for (const page of pageNumbers(h.companies.length, HUB_PAGE_SIZE)) {
+            if (h.indexable && (page === 1 || pageRows(h.companies, page, HUB_PAGE_SIZE).filter((c) => c.ix).length >= MIN_HUB_COMPANIES))
+                out.push({ path: pagePath(base, page) })
+        }
+    }
+    const cases = bankruptcyRows(site.rows, SITE.asOf)
+    if (bankruptcyIndexable(cases)) out.push({ path: '/konkurser/' })
+    for (const [kind, hubs] of [['branscher', site.industries], ['kommuner', site.municipalities]] as const) {
+        const groups = bankruptcyGroups(hubs, SITE.asOf)
+        for (const page of pageNumbers(groups.length, BANKRUPTCY_PAGE_SIZE)) {
+            if (bankruptcyIndexable(pageRows(groups, page, BANKRUPTCY_PAGE_SIZE).flatMap((g) => g.hub.companies)))
+                out.push({ path: pagePath(`/konkurser/${kind}/`, page) })
+        }
+    }
+    const bankruptcyLists = [{ base: '/konkurser/foretag/', rows: cases },
+        ...[...bankruptcyGroups(site.industries, SITE.asOf), ...bankruptcyGroups(site.municipalities, SITE.asOf)]
+            .map(({ hub }) => ({ base: bankruptcyHubPath(hub), rows: bankruptcyRows(hub.companies, SITE.asOf) }))]
+    for (const list of bankruptcyLists) {
+        for (const page of pageNumbers(list.rows.length, BANKRUPTCY_PAGE_SIZE))
+            if (bankruptcyIndexable(pageRows(list.rows, page, BANKRUPTCY_PAGE_SIZE))) out.push({ path: pagePath(list.base, page) })
+    }
     const rankings = site.rankings.filter((r) => r.entries.length >= MIN_RANKING_ENTRIES)
     if (recentlyUpdated(site.rows).length) out.push({ path: '/senast-uppdaterade/' })
     if (rankings.length) out.push({ path: '/topplistor/' })

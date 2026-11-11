@@ -1,0 +1,23 @@
+---
+import Page from '../../../layouts/Page.astro'
+import BankruptcyTable from '../../../components/BankruptcyTable.astro'
+import Pagination from '../../../components/Pagination.astro'
+import { SITE } from '../../../config/site.ts'
+import { getSite } from '../../../lib/store.ts'
+import { bankruptcyRows, bankruptcyIndexable } from '../../../lib/bankruptcy.ts'
+import { BANKRUPTCY_PAGE_SIZE, pageNumbers, pageRows, pagePath } from '../../../lib/pagination.ts'
+export function getStaticPaths() {
+    return pageNumbers(bankruptcyRows(getSite().rows, SITE.asOf).length, BANKRUPTCY_PAGE_SIZE).map((page) => ({ params: { page: page === 1 ? undefined : String(page) }, props: { page } }))
+}
+const { page } = Astro.props
+const cases = bankruptcyRows(getSite().rows, SITE.asOf)
+const rows = pageRows(cases, page, BANKRUPTCY_PAGE_SIZE)
+const base = '/konkurser/foretag/'
+const title = `Företag med konkursstatus${page > 1 ? ` – sida ${page}` : ''}`
+---
+<Page title={title} description={`Registrerad konkursstatus, startdatum och länkar till företagsprofiler. Sida ${page} i listan över företag i Kreditriskers underlag.`} path={pagePath(base, page)} noindex={!bankruptcyIndexable(rows)} crumbs={[{ href: '/konkurser/', label: 'Konkurser' }, { label: title }]} lede="Företag vars senast hämtade status är konkurs. Listan omfattar vårt underlag och är inget fullständigt konkursregister.">
+    <p>Sorterat efter registrerad start, nyast först. Okända eller oanvändbara datum visas sist. <a href="/konkurser/">Se urval, källor och fördelning per bransch och kommun.</a></p>
+    <Pagination base={base} page={page} count={cases.length} size={BANKRUPTCY_PAGE_SIZE} />
+    <BankruptcyTable rows={rows} asOf={SITE.asOf} />
+    <Pagination base={base} page={page} count={cases.length} size={BANKRUPTCY_PAGE_SIZE} />
+</Page>

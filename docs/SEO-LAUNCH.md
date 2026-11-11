@@ -46,6 +46,44 @@ Before the indexing switch, also check:
   help monitor visibility when enough data is available. Neither measures
   revenue or guarantees mentions.
 
+## Mass build before the indexing decision
+
+A company page is rebuilt only when that company is in a batch, so whatever its
+HTML says at the mass build stays until the next rebuild. With `SE_INDEXING=0`
+alone every page is written with `noindex`, and opening the site later would mean
+building every company again. `SE_HTML_FINAL=1` avoids that: each page carries
+its own verdict (`index,follow` if it passes the quality threshold), while
+robots.txt stays `Disallow: /` and the sitemaps stay empty.
+
+Order, each step needing the same approval as any indexing change:
+
+1. Deploy `KreditriskerSiteStackProd` without the `indexing` context. CloudFront
+   then adds `X-Robots-Tag: noindex, nofollow` to every response. Check it with
+   `curl -sI https://www.kreditrisker.se/ | grep -i x-robots-tag`.
+2. Add `SE_HTML_FINAL = '1'` to the Jenkins job and run the mass build. Check a
+   complete candidate with `npm run seo:audit -- --mode gated`.
+3. At launch, in this order:
+   1. Set `"indexing": "1"` in `aws-infra/cdk.json` and deploy the stack. Confirm
+      with the same `curl` that the header is gone. robots.txt is still closed,
+      so nothing is crawled yet.
+   2. Set `SE_INDEXING = '1'` in the Jenkins job and run it with an ordinary
+      nightly batch. That run rewrites robots.txt and the sitemaps; no company
+      page outside the batch is rebuilt.
+
+   The header must be gone before robots.txt opens, or the first crawl reads
+   `noindex` on every page. A local check on 2026-11-11 built the same data
+   gated and open, and the `foretag/` trees were identical.
+
+What else is frozen into a company page until its next rebuild: title and
+description, the navigation and footer links, the price in the report panel, the
+related-company links, the industry comparison (it states its calculation date),
+breadcrumbs and hub links (hub slugs include the SNI name), and the hashed CSS
+and script file names, so old files under `/_astro/` must never be deleted from
+the bucket. Decide these before the mass build. Related links and the industry
+comparison are computed from the directory index: build the index for the whole
+directory before rendering the first page, or early batches compare against a
+partial directory.
+
 ## Privacy and conversion measurement
 
 See `GA4-PRIVACY.md` for the isolated, consent-based measurement setup and its

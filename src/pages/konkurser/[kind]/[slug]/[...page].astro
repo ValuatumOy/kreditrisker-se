@@ -1,0 +1,28 @@
+---
+import Page from '../../../../layouts/Page.astro'
+import BankruptcyTable from '../../../../components/BankruptcyTable.astro'
+import Pagination from '../../../../components/Pagination.astro'
+import { SITE } from '../../../../config/site.ts'
+import { getSite } from '../../../../lib/store.ts'
+import { bankruptcyRows, bankruptcyGroups, bankruptcyHubPath, bankruptcyIndexable } from '../../../../lib/bankruptcy.ts'
+import { BANKRUPTCY_PAGE_SIZE, pageNumbers, pageRows, pagePath } from '../../../../lib/pagination.ts'
+export function getStaticPaths() {
+    const site = getSite()
+    return [...bankruptcyGroups(site.industries, SITE.asOf), ...bankruptcyGroups(site.municipalities, SITE.asOf)].flatMap(({ hub, count }) =>
+        pageNumbers(count, BANKRUPTCY_PAGE_SIZE).map((page) => ({ params: { kind: hub.kind === 'bransch' ? 'branscher' : 'kommuner', slug: hub.slug, page: page === 1 ? undefined : String(page) }, props: { page } })))
+}
+const { page } = Astro.props
+const kind = Astro.params.kind!
+const hub = (kind === 'branscher' ? getSite().industries : getSite().municipalities).find((h) => h.slug === Astro.params.slug)!
+const cases = bankruptcyRows(hub.companies, SITE.asOf)
+const rows = pageRows(cases, page, BANKRUPTCY_PAGE_SIZE)
+const base = bankruptcyHubPath(hub)
+const title = `Konkurser ${hub.kind === 'bransch' ? 'inom' : 'i'} ${hub.name}${page > 1 ? ` – sida ${page}` : ''}`
+---
+<Page title={title} description={`${cases.length} företag med registrerad konkursstatus i Kreditriskers urval: ${hub.name}. Startdatum, källor och företagsprofiler. Sida ${page}.`} path={pagePath(base, page)} noindex={!bankruptcyIndexable(rows)} crumbs={[{ href: '/konkurser/', label: 'Konkurser' }, { label: title }]}>
+    <div class="prose"><p>{cases.length} av {hub.companies.length.toLocaleString('sv-SE')} företagsprofiler i det här urvalet har konkursstatus. Startdatumen kan vara äldre än ett år eller saknas. Detta är en ögonblicksbild av vårt underlag, ingen fullständig statistik över konkurser {hub.kind === 'bransch' ? 'i branschen' : 'i kommunen'}.</p>
+    <p><a href={`/${kind}/${hub.slug}/`}>Alla företag: {hub.name}</a> · <a href="/konkurser/">Om urval och källor</a></p></div>
+    <Pagination base={base} page={page} count={cases.length} size={BANKRUPTCY_PAGE_SIZE} />
+    <BankruptcyTable rows={rows} asOf={SITE.asOf} />
+    <Pagination base={base} page={page} count={cases.length} size={BANKRUPTCY_PAGE_SIZE} />
+</Page>

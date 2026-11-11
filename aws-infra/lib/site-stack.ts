@@ -33,6 +33,9 @@ export interface SiteStackProps extends cdk.StackProps {
     /** IAM role of the Jenkins build agent (an existing role, not managed here): gets write access to both buckets,
      *  CloudFront invalidation and read access to this stack's outputs, which the job reads instead of hardcoded ids. */
     buildRoleName?: string
+    /** Search indexing is approved (launch gates). Until then every response carries X-Robots-Tag: noindex,
+     *  so pages built with SE_HTML_FINAL can sit in the bucket with their final robots meta. */
+    indexing?: boolean
 }
 
 /**
@@ -81,8 +84,8 @@ export class SiteStack extends cdk.Stack {
                 frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
                 referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
             },
-            // The test environment must never be indexed, whatever the pages say.
-            customHeadersBehavior: prod ? undefined : { customHeaders: [{ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true }] },
+            // Test is never indexed and Prod only once `indexing` is set, whatever the pages say.
+            customHeadersBehavior: prod && props.indexing ? undefined : { customHeaders: [{ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true }] },
         })
 
         const additionalBehaviors: Record<string, cloudfront.BehaviorOptions> = {}
@@ -137,6 +140,7 @@ export class SiteStack extends cdk.Stack {
                     contentSecurityPolicy: { contentSecurityPolicy: `frame-ancestors https://www.${props.domain}`, override: true },
                     referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.NO_REFERRER, override: true },
                 },
+                customHeadersBehavior: { customHeaders: [{ header: 'X-Robots-Tag', value: 'noindex, nofollow', override: true }] },
             })
             additionalBehaviors['/analytics-frame/*'] = {
                 origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),

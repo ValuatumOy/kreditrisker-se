@@ -1,0 +1,11 @@
+---
+import HubDetail from '../../../components/HubDetail.astro'
+import { getSite } from '../../../lib/store.ts'
+import { HUB_PAGE_SIZE, pageNumbers } from '../../../lib/pagination.ts'
+export function getStaticPaths() {
+    return getSite().municipalities.flatMap((hub) => pageNumbers(hub.companies.length, HUB_PAGE_SIZE).map((page) => ({ params: { slug: hub.slug, page: page === 1 ? undefined : String(page) }, props: { page } })))
+}
+const site = getSite()
+const hub = site.municipalities.find((h) => h.slug === Astro.params.slug)!
+---
+<HubDetail hub={hub} site={site} page={Astro.props.page} />
