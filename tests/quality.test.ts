@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { assessQuality } from '../src/lib/quality.ts'
 import { freshnessOf } from '../src/lib/freshness.ts'
 import { summarize } from '../src/lib/summary.ts'
-import { buildSite, publishCompany, toRow } from '../src/lib/publish.ts'
+import { buildSite, publishCompany, relatedCompanies, toRow, type Site, type IndexRow } from '../src/lib/publish.ts'
 import { AS_OF, batch1, byName } from './helpers.ts'
 import type { CompanyRecord } from '../src/lib/contract/types.ts'
 
@@ -60,6 +60,20 @@ test('missing municipality preserves indexing and rankings but creates no munici
     assert.equal(site.industries.length, 1)
     assert.ok(site.rankings.find((x) => x.slug === 'storst-omsattning')!.entries.some((x) => x.company.o === r.orgnr))
     assert.doesNotMatch(summarize(c).join(' '), /kommun/)
+})
+
+test('related links keep industry first, deduplicate, then fill from the municipality', () => {
+    const company = publishCompany(byName(batch1(), 'Exempel Mjukvara'), undefined, AS_OF)
+    const row = (o: string) => ({ o } as IndexRow)
+    const self = row(company.record.orgnr)
+    const a = row('a'), b = row('b'), c = row('c')
+    const site = {
+        industries: [{ code: company.record.sni[0].code, companies: [self, a, b] }],
+        municipalities: [{ code: company.record.municipality!.code, companies: [self, b, c] }],
+    } as Site
+    assert.deepEqual(relatedCompanies(site, company, 3).map((r) => r.o), ['a', 'b', 'c'])
+    assert.deepEqual(relatedCompanies(site, company, 1).map((r) => r.o), ['a'])
+    assert.deepEqual(relatedCompanies(site, company, 0), [])
 })
 
 test('summary states facts only and flags stale data', () => {
