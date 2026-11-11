@@ -20,6 +20,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         <div class="od__panel" data-view="unavailable" hidden>
             <p class="od__state"><Icon name="clock" /> <span class="tag tag--warn">{STATE_LABEL.unavailable}</span></p>
             <p data-reason>{UNAVAILABLE_TEXT.not_launched}</p>
+            <button type="button" class="btn btn--quiet" data-price-reload hidden>Hämta aktuellt pris</button>
             <p><a href="/rapporter/">Läs om rapporterna</a> · <a href="/rapporter/exempel/">Se exempel</a></p>
         </div>
 
@@ -40,6 +41,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             </label>
             <p class="od__err small" id="od-terms-err" hidden>Du behöver godkänna villkoren för att beställa.</p>
             <p class="small muted" data-price></p>
+            <p class="small" data-price-note role="status"></p>
             <p class="small muted">Priset gäller för konsumenter i Sverige. Tillämplig moms och slutbelopp visas i kassan.</p>
             <p class="small">Läs vår <a href="/integritet/">integritetspolicy</a>.</p>
             <button class="btn" type="submit">Beställ och betala <Icon name="arrow" /></button>
@@ -79,6 +81,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             <p class="small">Kontakta oss via <a href="/om/">kontaktsidan</a> om problemet kvarstår. Ange ordernumret om du har ett.</p>
         </div>
     </div>
+    <noscript><p>Aktuellt pris visas innan du betalar. Aktivera JavaScript för att hämta priset och beställa rapporten.</p></noscript>
     </NightBand>
     <script is:inline>
         const orderReturnRoot = document.querySelector('[data-order]')
@@ -97,6 +100,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     import { UNAVAILABLE_TEXT, PRODUCT_NAME } from '../../lib/reports/labels.ts'
     import { formatOrgnr, parseOrgnr } from '../../lib/orgnr.ts'
     import { findCompanies, type SearchHit } from '../../lib/search.ts'
+    import { offerLabel, type ReportOffer } from '../../lib/reports/offers.ts'
 
     const root = document.querySelector<HTMLElement>('[data-order]')!
     const params = new URLSearchParams(root.dataset.returnParams ?? location.search)
@@ -111,12 +115,17 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     const backend = selectBackend(adapter, root.dataset.api)
     const views = [...root.querySelectorAll<HTMLElement>('[data-view]')]
     const $ = <T extends Element>(sel: string) => root.querySelectorAll<T>(sel)
+    let currentOffer: ReportOffer | undefined
+    let priceTimer: ReturnType<typeof setTimeout> | undefined
 
     root.querySelector('[data-product-name]')!.textContent = product === 'ai' ? PRODUCT_NAME.ai : PRODUCT_NAME.basic.toLowerCase()
 
     function show(s: ReportState) {
+        if (s.kind === 'available' && adapter === 'http' && product === 'basic' && !s.offer)
+            s = { kind: 'unavailable', reason: 'backend_unreachable' }
         views.forEach((v) => (v.hidden = v.dataset.view !== s.kind))
         if (s.kind === 'unavailable') root.querySelector('[data-reason]')!.textContent = UNAVAILABLE_TEXT[s.reason]
+        root.querySelector<HTMLElement>('[data-price-reload]')!.hidden = !(s.kind === 'unavailable' && s.reason === 'backend_unreachable')
         if (s.kind === 'sample') root.querySelector<HTMLAnchorElement>('[data-sample]')!.href = s.sampleHref
         if (s.kind === 'processing' || s.kind === 'success' || (s.kind === 'failure' && s.orderId)) $('[data-order-id]').forEach((e) => (e.textContent = (s as { orderId: string }).orderId))
         if (s.kind === 'success') root.querySelector<HTMLAnchorElement>('[data-download]')!.href = s.downloadHref
@@ -125,10 +134,16 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             root.querySelector<HTMLElement>('[data-retry]')!.hidden = !s.retryable
         }
         if (s.kind === 'available') {
+            currentOffer = s.offer
+            clearTimeout(priceTimer)
+            root.querySelector('[data-price-note]')!.textContent = ''
             const price = prices[product]
-            root.querySelector('[data-price]')!.textContent = price
+            root.querySelector('[data-price]')!.textContent = currentOffer ? offerLabel(currentOffer) : price
                 ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
                 : 'Priset visas innan du betalar.'
+            if (currentOffer) priceTimer = setTimeout(() => {
+                root.querySelector('[data-price]')!.textContent = 'Priset behöver hämtas på nytt innan du beställer.'
+            }, Math.max(0, currentOffer.expiresAt * 1000 - Date.now()))
         }
     }
 
@@ -185,9 +200,21 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     const form = root.querySelector<HTMLFormElement>('form[data-view=available]')!
     const submit = form.querySelector<HTMLButtonElement>('button[type=submit]')!
     let submitting = false
+    async function refreshPrice() {
+        show(await backend.availability(orgnr, product))
+        const terms = form.elements.namedItem('terms') as HTMLInputElement
+        terms.checked = false
+        root.querySelector('[data-price-note]')!.textContent = 'Kontrollera det aktuella priset och godkänn villkoren igen innan du beställer.'
+    }
     form.addEventListener('submit', async (e) => {
         e.preventDefault()
         if (submitting) return
+        if (adapter === 'http' && product === 'basic' && (!currentOffer || currentOffer.expiresAt * 1000 <= Date.now())) {
+            submitting = true
+            submit.disabled = true
+            try { await refreshPrice() } finally { submitting = false; submit.disabled = false }
+            return
+        }
         const email = form.elements.namedItem('email') as HTMLInputElement
         const terms = form.elements.namedItem('terms') as HTMLInputElement
         const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.value.trim())
@@ -202,7 +229,11 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         const returnPath = `/bestall/?orgnr=${orgnr}&produkt=${product === 'ai' ? 'ai' : 'bas'}${fid ? `&fid=${fid}` : ''}`
         let redirecting = false
         try {
-            const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!, fid, companyName, returnPath })
+            const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!, fid, companyName, returnPath, priceQuote: currentOffer?.quote })
+            if (s.kind === 'failure' && s.code === 'http_409') {
+                await refreshPrice()
+                return
+            }
             show(s)
             if (s.kind === 'failure' || s.kind === 'unavailable') window.dispatchEvent(new CustomEvent('kreditrisker:analytics', { detail: 'checkout_failed' }))
             if (s.kind === 'redirect') {
@@ -217,7 +248,8 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             }
         }
     })
-    root.querySelector('[data-retry]')!.addEventListener('click', () => show({ kind: 'available' }))
+    root.querySelector('[data-retry]')!.addEventListener('click', refreshPrice)
+    root.querySelector('[data-price-reload]')!.addEventListener('click', refreshPrice)
     start()
 </script>
 

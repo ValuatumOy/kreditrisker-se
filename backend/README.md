@@ -14,6 +14,10 @@ separate purchase confirmation and withdrawal handling. Its main settings are:
 
 Deployment: `../docs/AWS-SETUP.md` step 5.
 
+Runtime basic-report offers and future price testing are **disabled by default**.
+See [REPORT-PRICING.md](../docs/REPORT-PRICING.md) for the quote contract,
+backend-only configuration, and the required one-time neutral-HTML rollout.
+
 ## Architecture
 
 The website stays **fully static** (`output: 'static'`, S3 + CloudFront). Stripe

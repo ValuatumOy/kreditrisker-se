@@ -19,7 +19,7 @@
 // Charge policy: manual capture (authorize now, capture only after the report
 // generates successfully).
 
-const { json, jsonBody, method } = require('../lib/http')
+const { json: jsonResponse, jsonBody, method } = require('../lib/http')
 const {
     getProduct,
     grantFor,
@@ -34,6 +34,8 @@ const { stripeClient } = require('../lib/stripe')
 const config = require('../lib/config')
 const { isFixturePurchase } = require('../lib/fixtureTest')
 const { isSwedishCompany } = require('../lib/swedishCompany')
+const offers = require('../lib/report-offers')
+const json = (statusCode, body, headers) => jsonResponse(statusCode, body, { ...offers.NO_STORE, ...headers })
 
 const INTERNAL_TEST_CODES = new Set((process.env.INTERNAL_TEST_CODES || '').split(',').filter(Boolean))
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -158,16 +160,38 @@ exports.handler = async event => {
         if (!product) return json(400, { error: 'Unknown reportType' })
 
         try {
+            const pricing = reportType === offers.REPORT_TYPE ? offers.configuration() : null
+            const quoteRequested = event?.queryStringParameters?.offer === '1'
+            const summaryRequested = reportType === offers.REPORT_TYPE && event?.queryStringParameters?.offer === 'summary'
+            const businessId = event?.queryStringParameters?.businessId
+            const validCompany = config.isolatedFixtureTest
+                ? isFixturePurchase({ reportType, businessId, email: 'success@simulator.amazonses.com' })
+                : isSwedishCompany(businessId)
+            if (quoteRequested && !validCompany)
+                return json(400, { error: 'A valid Swedish organisation number is required' }, offers.NO_STORE)
+            if (pricing && !quoteRequested && !summaryRequested)
+                return json(409, { error: 'Select a company to load the current price' }, offers.NO_STORE)
             const stripe = product.stripeProductId ? await stripeClient() : null
-            const price = await resolvePrice(stripe, product)
+            const offer = pricing && quoteRequested ? await offers.issueOffer(pricing, businessId) : null
+            const verifiedPrices = pricing && summaryRequested
+                ? await Promise.all(pricing.variants.map(variant => offers.resolveOfferPrice(stripe, product, variant)))
+                : null
+            const price = verifiedPrices ? verifiedPrices.reduce((lowest, price) => price.unit_amount < lowest.unit_amount ? price : lowest)
+                : offer ? await offers.resolveOfferPrice(stripe, product, offer.variant) : await resolvePrice(stripe, product)
             return json(200, {
                 reportType,
                 unitAmount: price.unit_amount,
                 currency: price.currency,
-            })
+                taxBehavior: product.taxBehavior,
+                ...(summaryRequested ? { from: Boolean(pricing && pricing.variants.length > 1) } : {}),
+                ...(quoteRequested || summaryRequested ? {
+                    expiresAt: offer?.expiresAt ?? Math.floor(Date.now() / 1000) + offers.TTL_SECONDS,
+                    ...(offer ? { quote: offer.quote, version: pricing.version, experimentId: pricing.experimentId, variantId: offer.variant.id } : {}),
+                } : {}),
+            }, offers.NO_STORE)
         } catch (err) {
             console.error('get-checkout-price:', err.message)
-            return json(500, { error: 'Could not load checkout price' })
+            return json(err.statusCode || 500, { error: 'Could not load checkout price' }, offers.NO_STORE)
         }
     }
 
@@ -185,6 +209,7 @@ exports.handler = async event => {
         acceptedTermsVersion,
         requestId,
         fulfillReportType,
+        priceQuote,
     } = jsonBody(event)
 
     if (config.isolatedFixtureTest && !isFixturePurchase({ reportType, businessId, email }))
@@ -232,6 +257,11 @@ exports.handler = async event => {
     )
 
     try {
+        const pricing = reportType === offers.REPORT_TYPE ? offers.configuration() : null
+        if (!pricing && priceQuote) throw new offers.OfferError('The price has changed. Reload the current price before ordering')
+        const offer = pricing ? await offers.verifyOffer(pricing, businessId, priceQuote) : null
+        if (offer && normalizedPromotionCode)
+            return json(400, { error: 'Promotion codes cannot be combined with this offer' }, offers.NO_STORE)
         const stripe = await stripeClient()
         let promotionCodeId
         if (normalizedPromotionCode) {
@@ -245,7 +275,7 @@ exports.handler = async event => {
                 return json(400, { error: 'Invalid promotion code' })
         }
 
-        const lineItem = await buildLineItem(
+        const lineItem = offer ? { quantity: 1, price: (await offers.resolveOfferPrice(stripe, product, offer.variant)).id } : await buildLineItem(
             stripe,
             product,
             language,
@@ -254,6 +284,7 @@ exports.handler = async event => {
 
         const sessionParams = {
             mode: 'payment',
+            ...(offer ? { currency: 'sek' } : {}),
             locale: language,
             customer_creation: 'always',
             ...(packageCheckout
@@ -267,7 +298,7 @@ exports.handler = async event => {
             line_items: [lineItem],
             ...(promotionCodeId
                 ? { discounts: [{ promotion_code: promotionCodeId }] }
-                : { allow_promotion_codes: true }),
+                : { allow_promotion_codes: !offer }),
             // Automatic Stripe Tax — Checkout collects the customer address itself for
             // jurisdiction. Requires Stripe Tax enabled + a registration in the dashboard.
             automatic_tax: { enabled: true },
@@ -286,12 +317,14 @@ exports.handler = async event => {
             // Authorize only; the poller captures after the report generates (or
             // cancels the hold on failure → no charge ever occurs on failure).
             payment_intent_data: {
+                ...(offer ? { metadata: offers.attribution(pricing, offer) } : {}),
                 capture_method: product.immediateCapture
                     ? 'automatic'
                     : 'manual',
             },
             custom_text: { submit: { message: langDisclosure } },
             metadata: {
+                ...(offer ? offers.attribution(pricing, offer) : {}),
                 reportType,
                 ...(packageCheckout
                     ? {
@@ -316,16 +349,17 @@ exports.handler = async event => {
             cancel_url: cancelUrl,
         }
 
+        if (offer) await offers.verifyOffer(pricing, businessId, priceQuote)
         const session = packageCheckout
             ? await stripe.checkout.sessions.create(sessionParams, {
                   idempotencyKey: packageCheckout.requestId,
               })
             : await stripe.checkout.sessions.create(sessionParams)
 
-        return json(200, { url: session.url })
+        return json(200, { url: session.url }, offers.NO_STORE)
     } catch (err) {
         console.error('create-checkout:', err.message)
-        return json(500, { error: 'Could not create checkout session' })
+        return json(err.statusCode || 500, { error: err instanceof offers.OfferError ? err.message : 'Could not create checkout session' }, offers.NO_STORE)
     }
 }
 

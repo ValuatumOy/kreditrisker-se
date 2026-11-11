@@ -5,6 +5,7 @@
 // Runs in the browser, so it must not import Node modules.
 
 import { formatOrgnr } from '../orgnr.ts'
+import { loadReportOffer } from './offers.ts'
 import type { OrderRequest, ReportBackend, ReportProduct, ReportState } from './types.ts'
 
 export const disabledBackend: ReportBackend = {
@@ -51,12 +52,17 @@ export const REPORT_TYPE: Record<ReportProduct, string> = { basic: 'se_credit_ri
  * The checkout backend (backend/, ported from the Danish directory): POST
  * /api/create-checkout returns a Stripe Checkout URL. Payment is authorised,
  * the report generated, then captured and emailed; a failed report is never
- * charged. Prices come from Stripe; the page shows only VERIFIED_PRICES.
+ * charged. Basic-report prices and signed quotes come from the same backend
+ * that selects the Stripe line item; legacy products keep VERIFIED_PRICES.
  */
 export function httpBackend(base: string, fetchImpl: typeof fetch = fetch, origin = globalThis.location?.origin): ReportBackend {
     return {
-        async availability() {
-            return { kind: 'available' }
+        async availability(orgnr, product) {
+            if (product !== 'basic') return { kind: 'available' }
+            try {
+                const offer = await loadReportOffer(base, orgnr, fetchImpl, origin)
+                return { kind: 'available', offer, price: { amountSek: offer.unitAmount / 100, vatIncluded: true } }
+            } catch { return { kind: 'unavailable', reason: 'backend_unreachable' } }
         },
         async createOrder(req) {
             try {
@@ -71,6 +77,7 @@ export function httpBackend(base: string, fetchImpl: typeof fetch = fetch, origi
                         companyName: req.companyName,
                         email: req.email,
                         acceptedTermsVersion: req.acceptedTermsVersion,
+                        priceQuote: req.priceQuote,
                         lang: 'sv',
                         reportLang: 'sv',
                         cancelPath: req.returnPath,

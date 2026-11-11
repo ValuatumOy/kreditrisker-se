@@ -5,6 +5,7 @@ import { staticReportState } from '../lib/reports/availability.ts'
 import { PRODUCT_NAME, STATE_LABEL, UNAVAILABLE_TEXT } from '../lib/reports/labels.ts'
 import type { ReportProduct } from '../lib/reports/types.ts'
 import Icon from './Icon.astro'
+import ReportPrice from './ReportPrice.astro'
 
 interface Props {
     company: PublishedCompany
@@ -35,7 +36,7 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
                         <>
                             {s.price && (
                                 <p class="rp__price num">
-                                    {s.price.amountSek.toLocaleString('sv-SE')} kr <span class="muted small">inkl. moms för konsument i Sverige</span>
+                                    {p === 'basic' ? <ReportPrice orgnr={company.record.orgnr} /> : <>{s.price.amountSek.toLocaleString('sv-SE')} kr <span class="muted small">inkl. moms för konsument i Sverige</span></>}
                                 </p>
                             )}
                             <a class="btn" href={orderHref(p)}>

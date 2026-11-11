@@ -103,6 +103,11 @@ async function fulfillSingleReport(session, product) {
         lang: normalizeLang(meta.lang),
         reportLang: normalizeReportLang(meta.reportLang),
         acceptedTermsVersion: meta.acceptedTermsVersion || '',
+        ...(meta.priceVersion ? { pricing: {
+            version: meta.priceVersion, experimentId: meta.priceExperiment, variantId: meta.priceVariant,
+            allocationUnit: meta.priceAllocationUnit, unitAmount: meta.quotedUnitAmount,
+            currency: meta.quotedCurrency, taxBehavior: meta.quotedTaxBehavior,
+        } } : {}),
         termsAcceptedAt: meta.termsAcceptedAt || '',
         params,
         companyName: meta.companyName || '',

@@ -1,0 +1,17 @@
+---
+import { FLAGS } from '../config/site.ts'
+interface Props { orgnr?: string }
+const { orgnr } = Astro.props
+---
+<span data-report-price data-orgnr={orgnr} data-price-api={FLAGS.reportAdapter === 'http' && FLAGS.checkout ? FLAGS.reportApiBase : undefined} aria-live="polite">Aktuellt pris visas när du väljer företag och beställer.</span>
+
+<script>
+    import { loadReportOffer, offerLabel } from '../lib/reports/offers.ts'
+    for (const element of document.querySelectorAll<HTMLElement>('[data-report-price][data-price-api]')) {
+        loadReportOffer(element.dataset.priceApi!, element.dataset.orgnr).then((offer) => {
+            element.textContent = offerLabel(offer)
+            // An expired quote is never left visible as an available current price.
+            setTimeout(() => { element.textContent = 'Se aktuellt pris vid beställning.' }, Math.max(0, offer.expiresAt * 1000 - Date.now()))
+        }).catch(() => { element.textContent = 'Se aktuellt pris vid beställning.' })
+    }
+</script>

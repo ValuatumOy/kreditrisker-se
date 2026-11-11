@@ -54,6 +54,14 @@ function webhookEvent(overrides = {}) {
     return request({ type: 'checkout.session.completed', livemode: false, data: { object: session } })
 }
 
+test('runtime pricing in isolated mode remains available only for the synthetic company', async () => {
+    for (const [businessId, expected] of [['002000-1012', 200], ['556036-9208', 400], ['800101-1231', 400]]) {
+        const response = await checkout({ requestContext: { http: { method: 'GET' } }, queryStringParameters: { reportType: fixture.reportType, businessId, offer: '1' } })
+        assert.equal(response.statusCode, expected)
+    }
+    assert.equal(sessions.length, 0)
+})
+
 test('isolated checkout only starts sessions for the synthetic Basic order and simulator email', async () => {
     for (const change of [
         { businessId: '5560369208' },
