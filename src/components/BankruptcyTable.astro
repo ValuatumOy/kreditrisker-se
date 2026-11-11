@@ -3,20 +3,19 @@ import type { IndexRow } from '../lib/publish.ts'
 import { procedureDate } from '../lib/bankruptcy.ts'
 import { date, SOURCE_TEXT } from '../lib/format.ts'
 import { formatOrgnr } from '../lib/orgnr.ts'
-interface Props { rows: IndexRow[]; asOf: string }
-const { rows, asOf } = Astro.props
+interface Props { rows: IndexRow[]; asOf: string; compact?: boolean }
+const { rows, asOf, compact = false } = Astro.props
 ---
 {rows.length ? <div class="table-wrap" tabindex="0" role="region" aria-label="Företag med registrerad konkursstatus">
-    <table class="data bankruptcies">
-        <thead><tr><th scope="col">Företag</th><th scope="col">Bransch</th><th scope="col">Kommun</th><th scope="col">Förfarandets start</th><th scope="col">Statuskälla</th></tr></thead>
+    <table class:list={['data', 'bankruptcies', { 'bankruptcies--compact': compact }]}>
+        <thead><tr><th scope="col">Företag</th>{!compact && <><th scope="col">Bransch</th><th scope="col">Kommun</th></>}<th scope="col">{compact ? 'Konkurs inledd' : 'Förfarandets start'}</th>{!compact && <th scope="col">Statuskälla</th>}</tr></thead>
         <tbody>{rows.map((r) => {
             const since = procedureDate(r, asOf)
             return <tr>
                 <th scope="row"><a href={r.p}>{r.n}</a><small>{formatOrgnr(r.o)}</small></th>
-                <td>{r.s?.label ?? 'Uppgift saknas'}</td>
-                <td>{r.k?.name ?? 'Uppgift saknas'}</td>
+                {!compact && <><td>{r.s?.label ?? 'Uppgift saknas'}</td><td>{r.k?.name ?? 'Uppgift saknas'}</td></>}
                 <td>{since ? <time datetime={since}>{date(since)}</time> : 'Datum saknas eller kan inte användas'}</td>
-                <td>{r.sr ? <>{SOURCE_TEXT[r.sr.source]}<small>Hämtat {date(r.sr.retrievedAt)}</small></> : 'Se företagets källor'}</td>
+                {!compact && <td>{r.sr ? <>{SOURCE_TEXT[r.sr.source]}<small>Hämtat {date(r.sr.retrievedAt)}</small></> : 'Se företagets källor'}</td>}
             </tr>
         })}</tbody>
     </table>
@@ -25,4 +24,7 @@ const { rows, asOf } = Astro.props
     .bankruptcies td { text-align: left; white-space: normal; min-width: 9rem; }
     .bankruptcies th[scope='row'] { min-width: 15rem; }
     .bankruptcies small { display: block; color: var(--ink-3); font-weight: 400; margin-top: 4px; }
+    .bankruptcies--compact th:first-child { width: 65%; min-width: 0; overflow-wrap: anywhere; }
+    .bankruptcies--compact td { min-width: 0; }
+    .bankruptcies--compact th:last-child, .bankruptcies--compact td:last-child { text-align: left; padding-right: 0; }
 </style>
