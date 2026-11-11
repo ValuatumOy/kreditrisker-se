@@ -15,17 +15,16 @@ const jsonl = (rows: unknown[]) => rows.map((r) => JSON.stringify(r) + '\n').joi
 const read = (file: string) => fs.readFileSync(file, 'utf8')
 const rows = ['1\ta\tAlfa AB\t1\t5564480282', '2\ta\tAlfa AB\t1\t5564480282K', '3\tb\tBeta AB\t1\t5565675906', '4\tc\tGamma AB\t1\t5591844112']
 const context: Context = { revision: 'a'.repeat(40), config: candidateConfig({ SE_INDEXING: '1', SE_COMPANY_SITEMAP: '1', SE_SITE_ORIGIN: 'https://www.kreditrisker.se', SECRET_VALUATUM_API_TOKEN: 'secret' }, '2026-11-11') }
-function setup() {
+function setup(customContext = context) {
     const repo = temp(), dir = path.join(temp(), 'plan')
-    writePlan(dir, createPlan(rows.join('\n'), '', context, 2))
-    return { repo, dir }
+    writePlan(dir, createPlan(rows.join('\n'), '', customContext, 2))
+    return { repo, dir, context: customContext }
 }
-function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean; fail?: boolean; wrongIdentity?: boolean; noindex?: boolean; missingSitemap?: boolean; missingHtml?: boolean; directoryCount?: number; mutateExisting?: boolean; changedName?: boolean; includeNonselected?: boolean; omitRobots?: boolean; wrongRedirect?: boolean; omitRequiredSitemap?: boolean; emptyStaticSitemap?: boolean; emptyHubSitemap?: boolean; omitRedirectManifest?: boolean; wrongRedirectManifest?: boolean } = {}): BuildSteps {
+function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean; fail?: boolean; wrongIdentity?: boolean; noindex?: boolean; missingSitemap?: boolean; missingHtml?: boolean; directoryCount?: number; mutateExisting?: boolean; changedName?: boolean; includeNonselected?: boolean; omitRobots?: boolean; wrongRedirect?: boolean; omitRequiredSitemap?: boolean; emptyStaticSitemap?: boolean; emptyHubSitemap?: boolean; omitRedirectManifest?: boolean; wrongRedirectManifest?: boolean; eligible?: boolean; profileRobots?: 'index' | 'noindex' } = {}): BuildSteps {
     return {
         fetch(env) {
             const selected = read(env.BUILD_STATIC_PARAMS_FILE!).trim().split('\n').map((l) => l.split('\t')).filter((c) => !c[4].endsWith('K'))
-            assert.equal(env.SE_INDEXING, '1')
-            const pages = selected.map((c) => ({ record: { orgnr: settings.wrongIdentity ? '5560659475' : c[4], name: c[2] + (settings.changedName ? ' changed' : ''), status: {code: 'active'}, periods: [], provenance: {importedAt: '2026-11-11T00:00:00.000Z'}, synthetic: false, formerNames: [], sni: [{code: '1', label: 'Synthetic sector', version: '2025'}], municipality: {code: '0180', name: 'Stockholm'} }, path: `/foretag/${c[4]}/company-${c[0]}/`, redirectsFrom: [], freshness: 'current', quality: {indexable: true, meetsThreshold: true} }))
+            const pages = selected.map((c) => ({ record: { orgnr: settings.wrongIdentity ? '5560659475' : c[4], name: c[2] + (settings.changedName ? ' changed' : ''), status: {code: 'active'}, periods: [], provenance: {importedAt: '2026-11-11T00:00:00.000Z'}, synthetic: false, formerNames: [], sni: [{code: '1', label: 'Synthetic sector', version: '2025'}], municipality: {code: '0180', name: 'Stockholm'} }, path: `/foretag/${c[4]}/company-${c[0]}/`, redirectsFrom: [], freshness: 'current', quality: {indexable: settings.eligible ?? true, meetsThreshold: settings.eligible ?? true} }))
             const index = new Map(read(env.SE_INDEX_IN!).split('\n').filter(Boolean).map((l) => { const r = JSON.parse(l); return [r.o, r] }))
             for (const p of pages) index.set(p.record.orgnr, toRow(p as any))
             if (settings.mutateExisting && index.size) { const first = index.values().next().value; first.ix = false; first.n = 'corrupted'; first.ns = -999 }
@@ -41,29 +40,32 @@ function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean;
             const index = read(path.join(env.SE_BUILD_DIR!, 'index.jsonl')).trim().split('\n').map((l) => JSON.parse(l))
             assert.equal(index.length, settings.directoryCount ?? 3, 'all renders must see the full frozen index')
             const write = (file: string, content: string) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, content) }
-            const html = (route: string) => `<html><meta name="robots" content="${settings.noindex ? 'noindex' : 'index'},follow"><link rel="canonical" href="https://www.kreditrisker.se${route}"></html>`
+            const flag = (key: string) => env[key] === '1' || env[key]?.toLowerCase() === 'true'
+            const open = flag('SE_INDEXING') && !flag('SE_PREVIEW')
+            const htmlOpen = (flag('SE_INDEXING') || flag('SE_HTML_FINAL')) && !flag('SE_PREVIEW')
+            const html = (route: string, verdict = open ? 'index' : 'noindex') => `<html><meta name="robots" content="${settings.noindex ? 'noindex' : verdict},follow"><link rel="canonical" href="https://www.kreditrisker.se${route}"></html>`
             for (const r of index) write(path.join(env.SE_OUT_DIR!, 'foretag', r.o, 'index.html'), `<link rel="canonical" href="https://www.kreditrisker.se${r.p}"><meta http-equiv="refresh" content="0;url=${settings.wrongRedirect ? '/wrong/' : r.p}">`)
-            for (const p of pages) if (!settings.missingHtml) write(path.join(env.SE_OUT_DIR!, p.path.slice(1), 'index.html'), html(p.path))
+            for (const p of pages) if (!settings.missingHtml) write(path.join(env.SE_OUT_DIR!, p.path.slice(1), 'index.html'), html(p.path, settings.profileRobots ?? (htmlOpen && p.quality.indexable && !p.record.synthetic ? 'index' : 'noindex')))
             for (const prefix of ['branscher', 'kommuner', 'konkurser']) write(path.join(env.SE_OUT_DIR!, prefix, 'index.html'), html(`/${prefix}/`))
             write(path.join(env.SE_OUT_DIR!, 'sitemap-index.xml'), (settings.omitRequiredSitemap ? ['sitemap-companies-1.xml'] : ['sitemap-pages.xml', 'sitemap-hubs.xml', 'sitemap-companies-1.xml']).map((f) => `<loc>https://www.kreditrisker.se/${f}</loc>`).join(''))
             const site = buildSite([], index, 'fixture')
-            for (const [file, urls, empty] of [['sitemap-pages.xml', staticUrls(site, true), settings.emptyStaticSitemap], ['sitemap-hubs.xml', hubUrls(site, env.SE_DATA_AS_OF!, true), settings.emptyHubSitemap]] as const) {
+            for (const [file, urls, empty] of [['sitemap-pages.xml', staticUrls(site, open), settings.emptyStaticSitemap], ['sitemap-hubs.xml', hubUrls(site, env.SE_DATA_AS_OF!, open), settings.emptyHubSitemap]] as const) {
                 for (const {path: route} of urls) write(path.join(env.SE_OUT_DIR!, route.slice(1), 'index.html'), html(route))
                 write(path.join(env.SE_OUT_DIR!, file), empty ? '<urlset/>' : urls.map((u) => `<loc>https://www.kreditrisker.se${u.path}</loc>`).join(''))
             }
             if (!settings.omitRedirectManifest) write(path.join(env.SE_OUT_DIR!, 'redirects.json'), JSON.stringify(site.redirects.map((r) => ({...r, to: settings.wrongRedirectManifest ? '/wrong/' : r.to, status: 301}))))
-            if (!settings.omitRobots) write(path.join(env.SE_OUT_DIR!, 'robots.txt'), 'User-agent: *\nDisallow: /bestall/\nDisallow: /sok/\n\nSitemap: https://www.kreditrisker.se/sitemap-index.xml\n')
+            if (!settings.omitRobots) write(path.join(env.SE_OUT_DIR!, 'robots.txt'), open ? 'User-agent: *\nDisallow: /bestall/\nDisallow: /sok/\n\nSitemap: https://www.kreditrisker.se/sitemap-index.xml\n' : '# Pre-launch or staging: nothing may be indexed.\nUser-agent: *\nDisallow: /\n')
             const selectedOrgnrs = new Set(read(env.SE_COMPANY_SITEMAP_FILE!).trim().split('\n').map((l) => l.split('\t')[4]))
-            const sitemapRows = settings.includeNonselected ? index : index.filter((r) => selectedOrgnrs.has(r.o))
+            const sitemapRows = open ? (settings.includeNonselected ? index : index.filter((r) => selectedOrgnrs.has(r.o) && r.ix)) : []
             write(path.join(env.SE_OUT_DIR!, 'sitemap-companies-1.xml'), (settings.missingSitemap ? sitemapRows.slice(1) : sitemapRows).map((r) => `<loc>https://www.kreditrisker.se${r.p}</loc>`).join(''))
             write(path.join(env.SE_OUT_DIR!, '_astro', 'asset.js'), 'stable asset')
         },
     }
 }
-const next = (setup: {repo: string; dir: string}, phase: 'fetched' | 'rendered', steps = fake()) => runNext(setup.repo, setup.dir, context, phase, steps, {})
+const next = (setup: {repo: string; dir: string; context?: Context}, phase: 'fetched' | 'rendered', steps = fake()) => runNext(setup.repo, setup.dir, setup.context ?? context, phase, steps, {})
 function complete(settings: Parameters<typeof fake>[0] = {}) {
     const s = setup()
-    next(s, 'fetched'); next(s, 'fetched')
+    next(s, 'fetched', fake(settings)); next(s, 'fetched', fake(settings))
     next(s, 'rendered', fake(settings)); next(s, 'rendered', fake(settings))
     return s
 }
@@ -142,7 +144,7 @@ test('rejections, duplicates, unexpected identities, missing index and interrupt
 })
 
 test('staging refuses incomplete sitemap coverage and noindex HTML without creating ready output', () => {
-    for (const settings of [{missingSitemap: true}, {noindex: true}]) {
+    for (const settings of [{missingSitemap: true}]) {
         const s = complete(settings)
         const out = path.join(temp(), 'stage')
         assert.throws(() => stageCandidate(s.dir, out), /Staging failed/)
@@ -296,4 +298,32 @@ test('staging requires exact static/hub sitemap coverage and full directory redi
         assert.throws(() => stageCandidate(s.dir, out), /Staging failed/)
         assert.equal(fs.existsSync(out), false)
     }
+})
+
+
+test('all selected profiles must carry frozen HTML robots verdict even outside the sitemap', () => {
+    const cases = [
+        {env: {SE_INDEXING: '1', SE_COMPANY_SITEMAP: '1'}, eligible: false, wrong: 'index'},
+        {env: {SE_INDEXING: '0', SE_HTML_FINAL: '1'}, eligible: true, wrong: 'noindex'},
+        {env: {SE_INDEXING: '1', SE_COMPANY_SITEMAP: '1', SE_HTML_FINAL: '1', SE_PREVIEW: '1'}, eligible: true, wrong: 'index'},
+        {env: {SE_INDEXING: '0', SE_HTML_FINAL: '0'}, eligible: true, wrong: 'index'},
+    ] as const
+    for (const c of cases) {
+        const customContext = {...context, config: candidateConfig(c.env, '2026-11-11')}
+        const s = setup(customContext)
+        const steps = fake({eligible: c.eligible})
+        next(s, 'fetched', steps); next(s, 'fetched', steps)
+        assert.throws(() => next(s, 'rendered', fake({eligible: c.eligible, profileRobots: c.wrong})), /robots verdict differs/)
+        assert.equal(fs.existsSync(path.join(s.dir, 'rendered', '00000')), false)
+        next(s, 'rendered', steps); next(s, 'rendered', steps)
+        assert.equal(verifyCandidate(s.dir).companies, 3)
+        stageCandidate(s.dir, path.join(temp(), 'overlay'))
+    }
+})
+
+
+test('plans pin a usable default API origin and reject invalid or unsafe API endpoints', () => {
+    assert.equal(candidateConfig({}, '2026-11-11').PUBLIC_VALUATUM_API_BASE_URL, 'https://sweden.valuatum.com')
+    assert.equal(candidateConfig({PUBLIC_VALUATUM_API_BASE_URL: 'https://sweden.valuatum.com/'}, '2026-11-11').PUBLIC_VALUATUM_API_BASE_URL, 'https://sweden.valuatum.com')
+    for (const endpoint of ['not-a-url', 'http://sweden.valuatum.com', 'https://user:secret@sweden.valuatum.com', 'https://sweden.valuatum.com/rest', 'https://sweden.valuatum.com/?token=secret']) assert.throws(() => candidateConfig({PUBLIC_VALUATUM_API_BASE_URL: endpoint}, '2026-11-11'))
 })

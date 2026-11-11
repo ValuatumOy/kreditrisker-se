@@ -37,7 +37,10 @@ export function candidateConfig(env: NodeJS.ProcessEnv, asOf = env.SE_DATA_AS_OF
     const origin = (env.SE_SITE_ORIGIN || 'https://www.kreditrisker.se').replace(/\/$/, '')
     const url = new URL(origin)
     assert(['https:', 'http:'].includes(url.protocol) && url.origin === origin && !url.username && !url.password, 'SE_SITE_ORIGIN must be a valid HTTP(S) origin without a path or credentials')
-    return Object.fromEntries([...CONFIG_KEYS.map((key) => [key, env[key] ?? '']), ['SE_SITE_ORIGIN', origin], ['SE_FETCH_CONCURRENCY', String(fetchConcurrency(env.SE_FETCH_CONCURRENCY))], ['SE_DATA_AS_OF', asOf]])
+    const apiBase = (env.PUBLIC_VALUATUM_API_BASE_URL || 'https://sweden.valuatum.com').replace(/\/$/, '')
+    const api = new URL(apiBase)
+    assert(api.protocol === 'https:' && api.origin === apiBase && !api.username && !api.password, 'PUBLIC_VALUATUM_API_BASE_URL must be an HTTPS origin without a path or credentials')
+    return Object.fromEntries([...CONFIG_KEYS.map((key) => [key, env[key] ?? '']), ['SE_SITE_ORIGIN', origin], ['PUBLIC_VALUATUM_API_BASE_URL', apiBase], ['SE_FETCH_CONCURRENCY', String(fetchConcurrency(env.SE_FETCH_CONCURRENCY))], ['SE_DATA_AS_OF', asOf]])
 }
 
 function rowsOf(text: string): Row[] {
@@ -167,7 +170,9 @@ function treeHash(directory: string): string {
     return hash.digest('hex')
 }
 
-function checkPaths(pagesFile: string, dist: string, expected: Set<string>, origin: string): PagePath[] {
+function checkPaths(pagesFile: string, dist: string, expected: Set<string>, config: Record<string, string>): PagePath[] {
+    const origin = config.SE_SITE_ORIGIN
+    const flag = (key: string) => config[key] === '1' || config[key]?.toLowerCase() === 'true'
     const paths: PagePath[] = []
     const seen = new Set<string>()
     for (const page of jsonLines(pagesFile)) {
@@ -177,6 +182,9 @@ function checkPaths(pagesFile: string, dist: string, expected: Set<string>, orig
         assert(fs.statSync(path.join(dist, page.path.slice(1), 'index.html'), { throwIfNoEntry: false })?.size, `Missing built company page: ${page.path}`)
         assert(fs.statSync(path.join(dist, 'foretag', orgnr, 'index.html'), { throwIfNoEntry: false })?.size, `Missing orgnr redirect: ${orgnr}`)
         const html = read(path.join(dist, page.path.slice(1), 'index.html'))
+        const indexable = (flag('SE_INDEXING') || flag('SE_HTML_FINAL')) && !flag('SE_PREVIEW') && !page.record.synthetic && page.quality.indexable
+        const robots = [...html.matchAll(/<meta\b[^>]*name=["']robots["'][^>]*content=["']([^"']+)["']/gi)]
+        assert(robots.length === 1 && robots[0][1] === (indexable ? 'index,follow' : 'noindex,follow'), `Built page robots verdict differs: ${page.path}`)
         assert(html.includes(`rel="canonical" href="${origin + page.path}"`), `Built page canonical differs: ${page.path}`)
         for (const route of [`/foretag/${orgnr}/`, ...(page.redirectsFrom ?? [])]) {
             const redirect = read(path.join(dist, route.slice(1), 'index.html'))
@@ -258,7 +266,7 @@ function checkpoints(directory: string, plan: Plan, hash: string, phase: Phase, 
             checkIndex(lastIndex, expected)
         } else {
             const pages = path.join(directory, 'fetched', batchName(i), 'output', 'pages.jsonl')
-            checkPaths(pages, path.join(folder, 'output'), batchCompanies(directory, plan, i), plan.config.SE_SITE_ORIGIN)
+            checkPaths(pages, path.join(folder, 'output'), batchCompanies(directory, plan, i), plan.config)
         }
         previous = fileHash(receiptFile)
         hashes.push(previous)
@@ -299,7 +307,7 @@ export function runNext(repo: string, directory: string, context: Context, phase
             fs.copyFileSync(path.join(directory, 'fetched', batchName(i), 'output', 'pages.jsonl'), path.join(data, 'pages.jsonl'))
             fs.copyFileSync(fetched.lastIndex, path.join(data, 'index.jsonl'))
             steps.build({ ...buildEnv, SE_BUILD_DIR: data })
-            checkPaths(path.join(data, 'pages.jsonl'), output, batchCompanies(directory, plan, i), plan.config.SE_SITE_ORIGIN)
+            checkPaths(path.join(data, 'pages.jsonl'), output, batchCompanies(directory, plan, i), plan.config)
             for (const prefix of ['branscher', 'kommuner', 'konkurser']) assert(fs.statSync(path.join(output, prefix, 'index.html'), { throwIfNoEntry: false })?.size, `Missing complete ${prefix} output`)
             assert(fileHash(path.join(data, 'index.jsonl')) === fileHash(fetched.lastIndex), 'Build changed frozen index')
             assert(fileHash(path.join(data, 'pages.jsonl')) === fileHash(path.join(directory, 'fetched', batchName(i), 'output', 'pages.jsonl')), 'Build changed fetched pages')
@@ -346,7 +354,7 @@ export function stageCandidate(directory: string, destination: string): ReturnTy
                     if (fs.existsSync(target)) assert(fileHash(target) === fileHash(path.join(assets, name)), `Asset collision: ${name}`)
                     else fs.copyFileSync(path.join(assets, name), target)
                 }
-                checkPaths(path.join(directory, 'fetched', batchName(i), 'output', 'pages.jsonl'), temp, batchCompanies(directory, plan, i), plan.config.SE_SITE_ORIGIN)
+                checkPaths(path.join(directory, 'fetched', batchName(i), 'output', 'pages.jsonl'), temp, batchCompanies(directory, plan, i), plan.config)
             }
             checkSitemaps(temp, verified.indexFile, plan.config, new Set(rowsOf(read(path.join(directory, 'snapshot.txt'))).filter((r) => !r.group).map((r) => r.orgnr)))
             const result = { ...verified, output: destination, sha256: treeHash(temp) }
