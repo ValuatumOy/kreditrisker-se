@@ -132,6 +132,8 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 
 `COMPANIES=all` is limited to 10,000 rows. Larger builds require a separately verified, bounded process; the limit is a safeguard, not a capacity guarantee.
 
+The production job requires a nonempty existing index. A named-company run stops before deployment if the source list would remove company pages. Industry, municipality and bankruptcy directories are rebuilt in full and synchronized with deletion of obsolete list pages; company pages and assets are never sync-deleted.
+
 Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
 the full directory `PUBLIC_SE_SEARCH_ENDPOINT` is `/api/search`, the search
 Lambda, which returns the same `SearchHit[]`.
