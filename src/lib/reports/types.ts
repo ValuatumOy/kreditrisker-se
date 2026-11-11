@@ -1,5 +1,6 @@
 // Report products and their states. Basic and AI are modelled separately:
 // each has its own availability, order and delivery lifecycle.
+import type { ReportOffer } from './offers.ts'
 
 export type ReportProduct = 'basic' | 'ai'
 
@@ -12,7 +13,7 @@ export type UnavailableReason =
 export type ReportState =
     | { kind: 'unavailable'; reason: UnavailableReason }
     | { kind: 'sample'; sampleHref: string }
-    | { kind: 'available'; price?: { amountSek: number; vatIncluded: boolean } }
+    | { kind: 'available'; price?: { amountSek: number; vatIncluded: boolean }; offer?: ReportOffer }
     | { kind: 'processing'; orderId: string; startedAt: string }
     | { kind: 'success'; orderId: string; downloadHref: string; expiresAt?: string }
     | { kind: 'failure'; orderId?: string; code: string; retryable: boolean }
@@ -32,6 +33,7 @@ export interface OrderRequest {
     companyName?: string
     /** Same-origin path Stripe returns to (with ?checkout=success) or cancels to. */
     returnPath?: string
+    priceQuote?: string
 }
 
 /** Contract for the future Swedish report backend. */

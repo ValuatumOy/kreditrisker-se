@@ -1,0 +1,24 @@
+---
+import { FLAGS } from '../config/site.ts'
+interface Props { orgnr?: string }
+const { orgnr } = Astro.props
+---
+<span data-report-price data-orgnr={orgnr} data-price-api={FLAGS.reportAdapter === 'http' && FLAGS.checkout ? FLAGS.reportApiBase : undefined} aria-live="polite">Aktuellt pris visas när du väljer företag och beställer.</span>
+
+<script>
+    import { loadReportOffer, offerLabel, offerRemainingMs } from '../lib/reports/offers.ts'
+    import { loadWhenNearViewport, observePriceExposure } from '../lib/price-analytics.ts'
+    for (const element of document.querySelectorAll<HTMLElement>('[data-report-price][data-price-api]')) {
+        const exposure = element.dataset.orgnr ? observePriceExposure(element, 'company') : null
+        loadWhenNearViewport(element, () => {
+            loadReportOffer(element.dataset.priceApi!, element.dataset.orgnr).then((offer) => {
+                element.textContent = offerLabel(offer)
+                exposure?.setOffer(offer)
+                setTimeout(() => {
+                    exposure?.setOffer()
+                    element.textContent = 'Se aktuellt pris vid beställning.'
+                }, offerRemainingMs(offer))
+            }).catch(() => { element.textContent = 'Se aktuellt pris vid beställning.' })
+        })
+    }
+</script>

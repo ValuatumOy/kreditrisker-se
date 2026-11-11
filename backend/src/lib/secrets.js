@@ -18,6 +18,7 @@ async function loadSecrets() {
     cached = {
       STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
       STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET || '',
+      REPORT_PRICING_SIGNING_KEY: process.env.REPORT_PRICING_SIGNING_KEY || '',
       VALUATUM_REST_URL: process.env.VALUATUM_REST_URL || '',
       VALUATUM_REST_TOKEN: process.env.VALUATUM_REST_TOKEN || '',
     };
@@ -33,6 +34,7 @@ async function loadSecrets() {
   cached = {
     STRIPE_SECRET_KEY: parsed.STRIPE_SECRET_KEY || '',
     STRIPE_WEBHOOK_SECRET: parsed.STRIPE_WEBHOOK_SECRET || '',
+    REPORT_PRICING_SIGNING_KEY: parsed.REPORT_PRICING_SIGNING_KEY || '',
     VALUATUM_REST_URL: parsed.VALUATUM_REST_URL || '',
     VALUATUM_REST_TOKEN: parsed.VALUATUM_REST_TOKEN || '',
   };
