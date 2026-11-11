@@ -2,7 +2,9 @@
 
 Valuatum's owners decide how these checks apply to each launch. Switches are environment variables read by `src/config/site.ts`; the build refuses a few unsafe combinations on its own.
 
-2026-10-30: the owner requested launch of the basic report while the IMY question remains open. The Finnish risk model is used without a Swedish predictive validation. AI-report sales and search indexing remain disabled. Verify the first real paid order and delivery after launch.
+2026-10-30: the owner requested launch of the basic report while the IMY question remained open. The Finnish risk model was used without a Swedish predictive validation. AI-report sales and search indexing were disabled at that time.
+
+2026-11-11: the owner requested opening search indexing. The site-wide edge restriction was removed and the general pages were rebuilt with indexing enabled. Older company HTML still carries its previous `noindex` until each profile is refreshed; the company sitemap is held empty in the meantime. Check the live Search Console status and `docs/SEO-LAUNCH.md` before making further changes. This records the owner's launch decision; it does not determine the legal questions below.
 
 | # | Gate | Evidence required | Unlocks |
 |---|---|---|---|

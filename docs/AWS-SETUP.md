@@ -1,13 +1,15 @@
 # AWS setup for kreditrisker.se
 
 Everything is code in `aws-infra/` (CDK, account 892885731254, eu-west-1),
-except the domain purchase and the first search image. Do the steps in this order. Nothing here sells reports
-or makes the site indexable; those stay behind the launch gates.
+except the domain purchase and the first search image. Do the steps in this order.
+Production indexing is enabled in `aws-infra/cdk.json`: deploying the site stack
+can affect what search engines see. Check `docs/SEO-LAUNCH.md` and the current
+release state before deploying.
 
 ## 1. Domain
 
-Buy `kreditrisker.se` in Route 53 (Registered domains). Route 53 creates a
-hosted zone; note its id (`Z...`).
+The domain is registered and uses a Route 53 hosted zone. Check the existing
+zone id (`Z...`) and DNS before changing the site-stack configuration.
 
 ## 2. Search
 
