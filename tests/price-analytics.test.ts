@@ -142,6 +142,8 @@ test('DOM wiring waits for bridge readiness, real intersection, foreground visib
 })
 
 test('actual built frame strips PII and rejects bad source, origin and slots without network', { skip: !process.env.PRICE_ANALYTICS_FRAME_HTML }, () => {
+    const expectedOrigin = process.env.PRICE_ANALYTICS_EXPECTED_ORIGIN
+    assert.ok(expectedOrigin, 'Set PRICE_ANALYTICS_EXPECTED_ORIGIN to the build SE_SITE_ORIGIN')
     const html = fs.readFileSync(process.env.PRICE_ANALYTICS_FRAME_HTML!, 'utf8')
     const source = [...html.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(match => match[1]).find(value => value.includes('sanitizePriceAnalytics'))
     assert.ok(source)
@@ -152,9 +154,10 @@ test('actual built frame strips PII and rejects bad source, origin and slots wit
         document: { body: { dataset: { analyticsId: 'G-LOCALTEST' } }, head: { appendChild() {} }, createElement: () => ({}) },
         addEventListener: (name: string, callback: typeof receive) => { assert.equal(name, 'message'); receive = callback },
     })
-    const message = (data: unknown, origin = 'https://www.kreditrisker.se', sender = parent) => receive!({ data, origin, source: sender })
+    const message = (data: unknown, origin = expectedOrigin, sender = parent) => receive!({ data, origin, source: sender })
     message({ type: 'init', page: 'company', referrer: 'google' })
     const count = frameWindow.dataLayer.length
+    assert.ok(count > 0, 'PRICE_ANALYTICS_EXPECTED_ORIGIN must match the built frame origin')
     const payload = { type: 'price_event', ...impression, orgnr: '5560369208', email: 'private@example.test', url: 'https://example.test/private', quote: 'secret', amount: '29 kr' }
     message(payload, 'https://attacker.example.test')
     message(payload, undefined, {})
