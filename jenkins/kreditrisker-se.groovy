@@ -124,6 +124,10 @@ The fields below are already set for a production run; leave them as they are.''
                     aws s3 cp "$STATE_URI" "$SE_INDEX_IN" || echo "No previous index state; starting empty."
                     SE_API_REFRESH=1 npm run fetch
                 '''
+                script {
+                    def rejected = readFile('data/build/rejected.jsonl').readLines().count { it.trim() }
+                    if (rejected) unstable("${rejected} companies were not built; review data/build/rejected.jsonl in the build artifacts")
+                }
             }
         }
 
