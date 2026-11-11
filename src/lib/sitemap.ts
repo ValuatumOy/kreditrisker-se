@@ -1,3 +1,4 @@
+import { readParams } from './valuatum/params.ts'
 // Segmented XML sitemaps. A URL is listed only if its page renders
 // index,follow (same rule as Base.astro via isIndexable).
 
@@ -58,7 +59,8 @@ export function companyUrls(site: Site): SitemapUrl[] {
     // During the first indexing rollout legacy profiles may still say noindex.
     // Hide their URLs until the refreshed profile HTML is verified and published.
     if (process.env.SE_COMPANY_SITEMAP === '0') return []
-    return site.rows.filter((c) => isIndexable(!c.ix, site.synthetic)).map((c) => ({ path: c.p, lastmod: c.per?.filedAt ?? c.im }))
+    const selected = process.env.SE_COMPANY_SITEMAP_FILE ? new Set(readParams(process.env.SE_COMPANY_SITEMAP_FILE).map((p) => p.orgnr)) : null
+    return site.rows.filter((c) => (!selected || selected.has(c.o)) && isIndexable(!c.ix, site.synthetic)).map((c) => ({ path: c.p, lastmod: c.per?.filedAt ?? c.im }))
 }
 
 export function companyChunks(site: Site): SitemapUrl[][] {

@@ -3,6 +3,9 @@
 
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { AS_OF, batch1 } from './helpers.ts'
 import { luhnCheckDigit } from '../src/lib/orgnr.ts'
 
@@ -83,4 +86,24 @@ test('paginated hub and bankruptcy sitemap URLs match per-page indexing threshol
     assert.ok(!paths.includes('/konkurser/foretag/3/'), 'a two-company last page is crawlable but noindex and outside sitemap')
     assert.ok(!paths.some((p) => /^\/(branscher|kommuner)\/.+\/2\/$/.test(p)), 'a two-company hub last page is noindex')
     assert.ok(staticUrls(site).some((u) => u.path === '/konkurser/om-konkurs/'))
+})
+
+
+test('candidate sitemap subset excludes retained eligible companies without changing full hubs or rows', () => {
+    const site = siteFromRelease(realRelease(), AS_OF)
+    const before = companyUrls(site)
+    const selected = site.rows.find((r) => r.p === before[0].path)!
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'se-sitemap-subset-'))
+    const file = path.join(dir, 'selected.txt')
+    fs.writeFileSync(file, `1\tx\tSelected\t1\t${selected.o}\n`)
+    const old = process.env.SE_COMPANY_SITEMAP_FILE
+    try {
+        process.env.SE_COMPANY_SITEMAP_FILE = file
+        assert.deepEqual(companyUrls(site).map((u) => u.path), [selected.p])
+        assert.ok(site.rows.length > 1)
+        assert.ok(hubUrls(site).length > 0)
+    } finally {
+        if (old === undefined) delete process.env.SE_COMPANY_SITEMAP_FILE
+        else process.env.SE_COMPANY_SITEMAP_FILE = old
+    }
 })

@@ -19,7 +19,8 @@ import type { PublishedCompany } from '../src/lib/contract/types.ts'
 import { readJsonl, writeJsonl } from '../src/lib/jsonl.ts'
 import { publishCompany, toRow, type IndexRow } from '../src/lib/publish.ts'
 import { fetchBundle, mapLimit } from '../src/lib/valuatum/api.ts'
-import { assertBatchSize } from '../src/lib/valuatum/batch-limit.ts'
+import { assertBundleIdentity } from '../src/lib/valuatum/identity.ts'
+import { assertBatchSize, fetchConcurrency } from '../src/lib/valuatum/batch-limit.ts'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
 import { readParams } from '../src/lib/valuatum/params.ts'
 
@@ -30,6 +31,7 @@ const slugOf = (p: string) => p.split('/')[3]
 async function main() {
     const batchFile = process.env.BUILD_STATIC_PARAMS_FILE
     if (!batchFile) throw new Error('BUILD_STATIC_PARAMS_FILE is not set')
+    const concurrency = fetchConcurrency(process.env.SE_FETCH_CONCURRENCY)
     const batch = readParams(batchFile)
     assertBatchSize(batch.length)
     const allFile = process.env.BUILD_STATIC_PARAMS_FILE_ALL
@@ -37,7 +39,7 @@ async function main() {
     const keep = all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))
     const indexIn = process.env.SE_INDEX_IN ?? path.join(BUILD_DIR, 'index.jsonl')
     const rows = new Map(readJsonl<IndexRow>(indexIn).map((r) => [r.o, r]))
-    const importedAt = process.env.SE_IMPORTED_AT ?? new Date().toISOString()
+    const importedAt = new Date().toISOString()
     const batchId = `api-${importedAt.slice(0, 10)}`
 
     const rejected: { fid: string; name: string; reason: string }[] = []
@@ -49,13 +51,14 @@ async function main() {
     const pagesTemp = path.join(BUILD_DIR, 'pages.jsonl.tmp')
     const pageFd = fs.openSync(pagesTemp, 'w')
     try {
-        await mapLimit(batch, Number(process.env.SE_FETCH_CONCURRENCY ?? 8), async (param) => {
+        await mapLimit(batch, concurrency, async (param) => {
             if (writeError) return
             let page: PublishedCompany
             let review: string[]
             try {
                 const bundle = await fetchBundle(param.fid)
                 if (!bundle) return void rejected.push({ ...param, reason: 'no financial statements in the model' })
+                assertBundleIdentity(bundle, param)
                 const mapped = mapBundle(bundle, { batchId, importedAt })
                 if (!mapped.ok) return void rejected.push({ ...param, reason: mapped.reason })
                 const valid = validateRecord(mapped.record)

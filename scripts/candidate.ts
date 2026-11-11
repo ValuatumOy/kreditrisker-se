@@ -1,13 +1,13 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { execFileSync } from 'node:child_process'
-import { candidateConfig, createPlan, readPlan, runNext, stageCandidate, verifyCandidate, writePlan } from './lib/candidate.ts'
+import { assertPublicFiles, candidateConfig, createPlan, readPlan, runNext, selectCompanies, stageCandidate, verifyCandidate, writePlan } from './lib/candidate.ts'
 
 const repo = path.resolve(import.meta.dirname, '..')
 const [command, ...args] = process.argv.slice(2)
 const options = new Map<string, string>()
 for (let i = 0; i < args.length; i += 2) {
-    if (!['--snapshot', '--out', '--seed-index', '--batch-size', '--plan'].includes(args[i]) || !args[i + 1]) throw new Error('Use --snapshot file --out directory [--seed-index file] [--batch-size number], or --plan directory')
+    if (!['--snapshot', '--full-snapshot', '--count', '--out', '--seed-index', '--batch-size', '--plan'].includes(args[i]) || !args[i + 1]) throw new Error('Use --snapshot file --out directory [--seed-index file] [--batch-size number], or --plan directory')
     if (options.has(args[i])) throw new Error(`Duplicate option: ${args[i]}`)
     options.set(args[i], args[i + 1])
 }
@@ -19,6 +19,8 @@ const required = (key: string): string => {
 const revision = () => {
     if (fs.readdirSync(repo).some((name) => /^\.env($|\.)/.test(name) && !/\.(example|sample)$/.test(name))) throw new Error('Candidate builds require environment variables, not unpinned local .env files')
     if (execFileSync('git', ['status', '--porcelain'], { cwd: repo, encoding: 'utf8' }).trim()) throw new Error('Use a clean, dedicated git checkout for a candidate build')
+    const tracked = execFileSync('git', ['ls-files', '-z', '--', 'public'], {cwd: repo, encoding: 'utf8'}).split('\0').filter(Boolean)
+    assertPublicFiles(repo, tracked)
     return execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim()
 }
 const outsideRepo = (directory: string) => {
@@ -27,7 +29,13 @@ const outsideRepo = (directory: string) => {
     if (!relative || (!relative.startsWith('..' + path.sep) && !path.isAbsolute(relative))) throw new Error('Candidate output must be outside the repository and its public/build directories')
 }
 
-if (command === 'plan') {
+if (command === 'select') {
+    const out = required('--out')
+    outsideRepo(out)
+    const selected = selectCompanies(fs.readFileSync(required('--full-snapshot'), 'utf8'), options.has('--seed-index') ? fs.readFileSync(required('--seed-index'), 'utf8') : '', Number(options.get('--count')))
+    fs.writeFileSync(out, selected, { flag: 'wx' })
+    console.log(`Frozen selection written to ${out}; no fetching or rendering`)
+} else if (command === 'plan') {
     const out = required('--out')
     outsideRepo(out)
     const prepared = createPlan(
@@ -35,6 +43,7 @@ if (command === 'plan') {
         options.has('--seed-index') ? fs.readFileSync(required('--seed-index'), 'utf8') : '',
         { revision: revision(), config: candidateConfig(process.env) },
         options.has('--batch-size') ? Number(options.get('--batch-size')) : undefined,
+        fs.readFileSync(required('--full-snapshot'), 'utf8'),
     )
     writePlan(out, prepared)
     console.log(`Frozen ${prepared.plan.companies} companies / ${prepared.plan.rows} rows into ${prepared.plan.batches.length} batches. No data fetched or pages generated. Plan: ${out}`)
@@ -56,12 +65,16 @@ if (command === 'plan') {
     outsideRepo(out)
     const relative = path.relative(directory, out)
     if (!relative || (!relative.startsWith('..' + path.sep) && !path.isAbsolute(relative))) throw new Error('Stage output must be outside the plan directory')
+    const {plan} = readPlan(directory)
+    if (revision() !== plan.revision) throw new Error('Git revision differs from the frozen plan')
     console.log(JSON.stringify(stageCandidate(directory, out), null, 2))
 } else if (command === 'verify') {
     const directory = required('--plan')
     outsideRepo(directory)
+    const {plan} = readPlan(directory)
+    if (revision() !== plan.revision) throw new Error('Git revision differs from the frozen plan')
     console.log(JSON.stringify(verifyCandidate(directory), null, 2))
     console.log('All planned company pages and index entries are present in the private batch outputs. This is not a production deployment or a 500,000-company capacity test.')
 } else {
-    throw new Error('Commands: plan --snapshot file --out directory [--seed-index file] [--batch-size 1000]; fetch-next --plan directory; build-next --plan directory; verify --plan directory; stage --plan directory --out new-directory. See docs/CANDIDATE-BUILDS.md.')
+    throw new Error('Commands: select --full-snapshot file --seed-index file --count 16000 --out file; plan --full-snapshot file --snapshot selection-file --out directory [--seed-index file] [--batch-size 1000]; fetch-next --plan directory; build-next --plan directory; verify --plan directory; stage --plan directory --out new-directory. See docs/CANDIDATE-BUILDS.md.')
 }
