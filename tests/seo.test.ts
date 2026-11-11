@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SITE } from '../src/config/site.ts'
 import { publishCompany } from '../src/lib/publish.ts'
-import { companyJsonLd, crumbsJsonLd, providerJsonLd, serializeJsonLd } from '../src/lib/seo.ts'
+import { companyJsonLd, companyTitle, crumbsJsonLd, providerJsonLd, serializeJsonLd } from '../src/lib/seo.ts'
 import { AS_OF, batch1 } from './helpers.ts'
 
 test('company markup identifies the directory page without inventing a website or founding date', () => {
@@ -44,4 +44,14 @@ test('JSON-LD cannot close its script element through company names', () => {
     const serialized = serializeJsonLd(original)
     assert.doesNotMatch(serialized, /<\/script/i)
     assert.deepEqual(JSON.parse(serialized), original)
+})
+
+test('profile title leads with name and number, names an ongoing procedure, and promises no statements it lacks', () => {
+    const record = batch1()[0]
+    const company = publishCompany(record, undefined, AS_OF)
+    const id = `${record.name} (${record.orgnr.slice(0, 6)}-${record.orgnr.slice(6)})`
+    assert.equal(companyTitle(company), `${id} – omsättning, bokslut och nyckeltal`)
+    const bankrupt = publishCompany({ ...record, status: { ...record.status, code: 'bankruptcy' } }, undefined, AS_OF)
+    assert.equal(companyTitle(bankrupt), `${id} – konkurs, omsättning, bokslut och nyckeltal`)
+    assert.equal(companyTitle(publishCompany({ ...record, periods: [] }, undefined, AS_OF)), `${id} – företagsuppgifter`)
 })
