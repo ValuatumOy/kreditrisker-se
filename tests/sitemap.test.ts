@@ -100,9 +100,13 @@ test('candidate sitemap subset excludes retained eligible companies without chan
     try {
         process.env.SE_COMPANY_SITEMAP_FILE = file
         assert.deepEqual(companyUrls(site).map((u) => u.path), [selected.p])
+        process.env.SE_COMPANY_SITEMAP = '0'
+        assert.deepEqual(companyUrls(site), [], 'the production hold takes precedence over a selected sitemap file')
+        delete process.env.SE_COMPANY_SITEMAP
         assert.ok(site.rows.length > 1)
         assert.ok(hubUrls(site).length > 0)
     } finally {
+        delete process.env.SE_COMPANY_SITEMAP
         if (old === undefined) delete process.env.SE_COMPANY_SITEMAP_FILE
         else process.env.SE_COMPANY_SITEMAP_FILE = old
     }
