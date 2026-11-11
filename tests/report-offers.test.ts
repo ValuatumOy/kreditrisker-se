@@ -81,3 +81,34 @@ test('network elapsed time is deducted with a monotonic clock and an exhausted o
         return Response.json(offer())
     }, 'https://www.kreditrisker.se', () => tick), /Expired/)
 })
+
+test('29 SEK offers still load when AbortSignal.timeout is unavailable', async t => {
+    const original = Object.getOwnPropertyDescriptor(AbortSignal, 'timeout')!
+    Object.defineProperty(AbortSignal, 'timeout', { configurable: true, value: undefined })
+    t.after(() => Object.defineProperty(AbortSignal, 'timeout', original))
+    let calls = 0
+    const value = await loadReportOffer('/api/', '5560369208', async (_url, init) => {
+        calls++
+        assert.ok(init?.signal instanceof AbortSignal)
+        assert.equal(init.signal.aborted, false)
+        return Response.json({ ...offer(), unitAmount: 2900, quote: undefined })
+    }, 'https://www.kreditrisker.se')
+    assert.equal(calls, 1)
+    assert.equal(offerLabel(value), '29 kr inkl. moms för konsument i Sverige')
+})
+
+test('the compatible offer timeout aborts a stalled request after exactly ten seconds', async t => {
+    t.mock.timers.enable({ apis: ['setTimeout'] })
+    let signal: AbortSignal | undefined
+    const pending = loadReportOffer('/api/', '5560369208', async (_url, init) => {
+        signal = init!.signal!
+        return new Promise<Response>((_resolve, reject) => {
+            signal!.addEventListener('abort', () => reject(new Error('request aborted')))
+        })
+    }, 'https://www.kreditrisker.se')
+    t.mock.timers.tick(9999)
+    assert.equal(signal?.aborted, false)
+    t.mock.timers.tick(1)
+    assert.equal(signal?.aborted, true)
+    await assert.rejects(pending, /request aborted/)
+})
