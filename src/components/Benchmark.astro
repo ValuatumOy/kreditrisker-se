@@ -1,0 +1,71 @@
+---
+// The company against the median of the directory's companies in its industry. The directory is not the
+// whole industry, so the wording says "i katalogen" and never "i branschen".
+import type { Value } from '../lib/contract/types.ts'
+import { compactSek, count, date, percent } from '../lib/format.ts'
+import type { Benchmark, PeerField } from '../lib/peers.ts'
+import type { Hub } from '../lib/publish.ts'
+import { SITE } from '../config/site.ts'
+import Val from './Val.astro'
+
+interface Props {
+    data: Benchmark
+    hub: Hub
+    name: string
+    no: string
+}
+const { data, hub, name, no } = Astro.props
+const LABEL: Record<PeerField, string> = { ns: 'Nettoomsättning', om: 'Rörelsemarginal', er: 'Soliditet', rg: 'Omsättningstillväxt', emp: 'Anställda' }
+const val = (n: number): Value => ({ status: 'derived', value: n, formula: 'index', inputs: [] })
+const show = (f: PeerField, n: number) => (f === 'ns' ? compactSek(val(n)) : f === 'emp' ? count(val(Math.round(n))) : percent(val(n)))
+const n = (x: number) => x.toLocaleString('sv-SE')
+// The figures have different coverage, so the caption gives the range behind the medians.
+const counts = data.rows.map((r) => r.peers)
+const basis = Math.min(...counts) === Math.max(...counts) ? n(counts[0]) : `${n(Math.min(...counts))}–${n(Math.max(...counts))}`
+---
+
+<figure class="fig">
+    <div class="fig__head"><span class="fig__no">{no}</span><span class="fig__title">{hub.name} <span class="fig__sub">– SNI {hub.code}</span></span></div>
+    <div class="table-wrap" tabindex="0" role="region" aria-label={`${no}, jämförelse med företag i samma bransch`}>
+        <table class="data bm">
+            <thead>
+                <tr>
+                    <th scope="col">Nyckeltal</th>
+                    <th scope="col">Företaget</th>
+                    <th scope="col">Median</th>
+                </tr>
+            </thead>
+            <tbody>
+                {
+                    data.rows.map((r) => (
+                        <tr>
+                            <th scope="row">{LABEL[r.field]}</th>
+                            <td><Val d={show(r.field, r.value)} /></td>
+                            <td><Val d={show(r.field, r.median)} /></td>
+                        </tr>
+                    ))
+                }
+            </tbody>
+        </table>
+    </div>
+    <figcaption class="fig__src">
+        {data.place && <>Efter nettoomsättning är {name} nummer {n(data.place)} av {n(data.ranked)} jämförda företag. </>}
+        <b>Urval:</b> {basis} företag i katalogen med huvudbransch <a href={`/branscher/${hub.slug}/`}>{hub.name.toLowerCase()}</a> och ett aktuellt bokslut på 12 månader.
+        Medianen är det mittersta värdet. Beräknat {date(SITE.asOf)}.
+    </figcaption>
+</figure>
+
+<style>
+    /* Three short columns: no need for the wide first column of the statement tables. */
+    .bm th:first-child {
+        min-width: 0;
+    }
+    .bm th,
+    .bm td {
+        padding-inline: 8px;
+    }
+    .bm th:last-child,
+    .bm td:last-child {
+        padding-right: 0;
+    }
+</style>
