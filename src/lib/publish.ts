@@ -226,11 +226,23 @@ export function buildSite(pages: PublishedCompany[], rows: IndexRow[], releaseId
     }
 }
 
+const hubLookups = new WeakMap<Site, { industries: Map<string, Hub>; municipalities: Map<string, Hub> }>()
+
 /** Companies in the same industry, then same municipality, for internal links. */
 export function relatedCompanies(site: Site, c: PublishedCompany, limit = 6): IndexRow[] {
     const r = c.record
-    const ind = r.sni[0] && site.industries.find((h) => h.code === r.sni[0].code)
-    const kom = r.municipality && site.municipalities.find((h) => h.code === r.municipality!.code)
+    let lookup = hubLookups.get(site)
+    if (!lookup) {
+        const firstByCode = (hubs: Hub[]) => {
+            const result = new Map<string, Hub>()
+            for (const hub of hubs) if (!result.has(hub.code)) result.set(hub.code, hub)
+            return result
+        }
+        lookup = { industries: firstByCode(site.industries), municipalities: firstByCode(site.municipalities) }
+        hubLookups.set(site, lookup)
+    }
+    const ind = r.sni[0] && lookup.industries.get(r.sni[0].code)
+    const kom = r.municipality && lookup.municipalities.get(r.municipality.code)
     const seen = new Set<string>([r.orgnr])
     const out: IndexRow[] = []
     for (const group of [ind?.companies, kom?.companies]) {
