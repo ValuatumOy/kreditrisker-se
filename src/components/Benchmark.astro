@@ -50,7 +50,7 @@ const basis = Math.min(...counts) === Math.max(...counts) ? n(counts[0]) : `${n(
     </div>
     <figcaption class="fig__src">
         {data.place && <>Efter nettoomsättning är {name} nummer {n(data.place)} av {n(data.ranked)} jämförda företag. </>}
-        <b>Urval:</b> {basis} företag i katalogen med huvudbransch <a href={`/branscher/${hub.slug}/`}>{hub.name.toLowerCase()}</a> och ett aktuellt bokslut på 12 månader.
+        <b>Urval:</b> {basis} företag i katalogen med huvudbransch <a href={`/branscher/${hub.slug}/`}>{hub.name.toLowerCase()}</a>, tillräckliga bokslutsuppgifter och ett aktuellt bokslut på 12 månader.
         Medianen är det mittersta värdet. Beräknat {date(SITE.asOf)}.
     </figcaption>
 </figure>

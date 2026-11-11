@@ -18,7 +18,7 @@ export interface Benchmark {
 }
 
 // Same selection as the rankings: a current report covering 12 months.
-const comparable = (r: IndexRow) => r.fr === 'current' && r.per?.months === 12
+const comparable = (r: IndexRow) => r.q && r.fr === 'current' && r.per?.months === 12
 
 const cache = new WeakMap<Hub, { sorted: Record<PeerField, number[]>; place: Map<string, number> }>()
 

@@ -14,6 +14,7 @@ test('analytics frame is embeddable only by the website while normal pages stay 
                 ReferrerPolicy: { ReferrerPolicy: 'no-referrer', Override: true },
                 FrameOptions: Match.absent(),
             },
+            CustomHeadersConfig: { Items: [{ Header: 'X-Robots-Tag', Value: 'noindex, nofollow', Override: true }] },
         },
     })
     template.hasResourceProperties('AWS::CloudFront::ResponseHeadersPolicy', {

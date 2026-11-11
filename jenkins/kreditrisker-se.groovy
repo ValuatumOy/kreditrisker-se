@@ -36,7 +36,7 @@ pipeline {
 
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
-Empty: the nightly run (companies updated since SINCE). "all": every company.
+Empty: the nightly run (companies updated since SINCE). "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')

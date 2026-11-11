@@ -64,4 +64,7 @@ test('profile title leads with name and number, names an ongoing procedure, and 
     const bankrupt = publishCompany({ ...record, status: { ...record.status, code: 'bankruptcy' } }, undefined, AS_OF)
     assert.equal(companyTitle(bankrupt), `${id} – konkurs, omsättning, bokslut och nyckeltal`)
     assert.equal(companyTitle(publishCompany({ ...record, periods: [] }, undefined, AS_OF)), `${id} – företagsuppgifter`)
+    const noSales = structuredClone(record)
+    noSales.periods[0].income.netSales = { status: 'missing', reason: 'not_in_source' }
+    assert.equal(companyTitle(publishCompany(noSales, undefined, AS_OF)), `${id} – bokslut och nyckeltal`)
 })
