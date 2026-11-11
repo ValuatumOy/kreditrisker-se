@@ -49,10 +49,11 @@ The newest period's end is compared with `SE_DATA_AS_OF` (defaults to the build 
 A profile is indexed only if all of these hold:
 - it's not synthetic
 - its status is known
-- SNI and municipality are optional; missing SNI never creates an inferred industry or an industry-hub entry
 - it has at least one period that isn't stale
 - the newest period reports at least **5 of 7** core items: net sales, operating result, net profit, total assets, equity, current liabilities, employees
 - the global switch is on
+
+Industry (SNI) and municipality are optional; a profile missing either field is not listed in that type of hub. Missing SNI never creates an inferred industry. In a sample of 300 live profiles on 2026-11-11, 11 % failed only on a missing SNI, which is why that rule was dropped.
 
 Everything else is `noindex,follow` and left out of the sitemaps. The reasons are listed by `npm run data:status`.
 

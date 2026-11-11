@@ -97,7 +97,8 @@ test('missing SNI alone does not hide a useful profile; core data, status and fr
     assert.deepEqual(c.quality.reasons, [])
     const site = buildSite([c], [toRow(c)], 'test')
     assert.equal(site.industries.length, 0)
-    assert.doesNotMatch(summarize(c).join(' '), /SNI/)
+    assert.equal(site.municipalities.length, 1)
+    assert.doesNotMatch(summarize(c).join(' '), /SNI|verksamhet inom/)
     assert.equal(assessQuality(r, 'stale', opts).indexable, false)
     r.status.code = 'unknown'
     assert.equal(assessQuality(r, 'current', opts).indexable, false)
