@@ -6,6 +6,7 @@ import { staticReportState } from '../lib/reports/availability.ts'
 import { STATE_LABEL } from '../lib/reports/labels.ts'
 import { VERIFIED_PRICES } from '../config/site.ts'
 import Icon from './Icon.astro'
+import ReportPrice from './ReportPrice.astro'
 
 interface Props {
     no?: string
@@ -62,7 +63,7 @@ const rows: [string, Cell, Cell][] = [
                 }
                 <tr class="sum">
                     <th scope="row">Pris</th>
-                    <td>{price('basic')}</td>
+                    <td><ReportPrice /></td>
                     <td>{price('ai')}</td>
                 </tr>
                 <tr class="sum">

@@ -45,6 +45,8 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         const checkoutLambda = Object.entries(resources).find(([id, resource]) => id.startsWith('CreateCheckoutFn') && resource.Type === 'AWS::Lambda::Function')?.[1]
         assert.match(JSON.stringify(checkoutLambda?.Properties.Environment.Variables.APP_SECRETS_ARN), environmentName === 'Test' ? /kreditrisker-se-isolated-checkout/ : /kreditrisker-se-prod/)
         assert.equal(checkoutLambda?.Properties.Environment.Variables.REPORT_ISOLATED_FIXTURE_TEST, environmentName === 'Test' ? '1' : '0')
+        assert.equal(checkoutLambda?.Properties.Environment.Variables.REPORT_PRICING_ENABLED, '0')
+        assert.equal(checkoutLambda?.Properties.Environment.Variables.REPORT_PRICING_CONFIG, '')
         assert.equal(checkoutLambda?.Properties.Environment.Variables.ADMIN_EMAIL, environmentName === 'Test' ? 'success@simulator.amazonses.com' : 'luottoriskiraportti202605@valuatum.com')
         const orderTable = Object.entries(resources).find(([id, resource]) => id.startsWith('OrdersTable') && resource.Type === 'AWS::DynamoDB::Table')?.[1]
         assert.ok(orderTable?.Properties.GlobalSecondaryIndexes.some((index: any) => index.IndexName === 'WithdrawalIndex'

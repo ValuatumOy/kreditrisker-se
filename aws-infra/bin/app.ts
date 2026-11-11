@@ -79,6 +79,8 @@ for (const environmentName of ['Test', 'Prod'] as const) {
         contactEmail: ctx('contactEmail'),
         stripeProducts: JSON.parse(ctx(`stripeProducts${environmentName}`) ?? '{}'),
         checkoutEnabled: ctx(`checkoutEnabled${environmentName}`) === '1',
+        reportPricingEnabled: ctx(`reportPricingEnabled${environmentName}`) === '1',
+        reportPricingConfig: ctx(`reportPricingConfig${environmentName}`),
         ...(environmentName === 'Test' && (testReportEngineUrl || testReportEngineArn)
             ? { testReportEngine: { url: testReportEngineUrl ?? '', arn: testReportEngineArn ?? '' } }
             : {}),

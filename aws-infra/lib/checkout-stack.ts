@@ -46,6 +46,9 @@ export interface CheckoutStackProps extends cdk.StackProps {
     stripeProducts?: Record<string, string>
     /** Enables new sessions; disabling Test also disconnects its report engine. */
     checkoutEnabled?: boolean
+    /** Backend-only offer configuration. Absent/disabled retains approved catalog prices. */
+    reportPricingEnabled?: boolean
+    reportPricingConfig?: string
     /** Dedicated test engine, with its own queues and data. */
     testReportEngine?: ReportEngineTarget
     /** Version of the approved purchase terms accepted before checkout. */
@@ -259,6 +262,8 @@ export class CheckoutStack extends cdk.Stack {
             NODE_OPTIONS: '--enable-source-maps',
             CONTACT_EMAIL: props.contactEmail ?? '',
             REPORT_CHECKOUT_ENABLED: props.checkoutEnabled ? '1' : '0',
+            REPORT_PRICING_ENABLED: props.reportPricingEnabled ? '1' : '0',
+            REPORT_PRICING_CONFIG: props.reportPricingConfig ?? '',
             REPORT_TERMS_VERSION: props.termsVersion ?? '',
             REPORT_ISOLATED_FIXTURE_TEST: props.environmentName === 'Test' && props.isolatedFixtureTest ? '1' : '0',
         }
