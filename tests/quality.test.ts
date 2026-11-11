@@ -74,3 +74,15 @@ test('summary states facts only and flags stale data', () => {
     assert.doesNotMatch(sparse, /Soliditeten/)
     assert.doesNotMatch(sparse, /rörelseresultatet/)
 })
+
+test('missing industry preserves indexing but creates no industry hub', () => {
+    const r = asReal(byName(batch1(), 'Exempel Mjukvara'))
+    r.sni = []
+    const c = publishCompany(r, undefined, AS_OF)
+    assert.equal(c.quality.indexable, true)
+    assert.deepEqual(c.quality.reasons, [])
+    const site = buildSite([c], [toRow(c)], 'test')
+    assert.equal(site.industries.length, 0)
+    assert.equal(site.municipalities.length, 1)
+    assert.doesNotMatch(summarize(c).join(' '), /SNI|verksamhet inom/)
+})

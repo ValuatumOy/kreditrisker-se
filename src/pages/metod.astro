@@ -91,14 +91,14 @@ const toc = [
             <ol>
                 <li>uppgifterna är verkliga, inte testdata,</li>
                 <li>registreringsstatusen är känd,</li>
-                <li>huvudbransch (SNI) finns; kommun är valfri,</li>
                 <li>det finns minst ett bokslut och det senaste är inte inaktuellt,</li>
                 <li>
                     det senaste bokslutet redovisar minst {MIN_CORE_ITEMS} av dessa {CORE_ITEMS.length} poster med ett annat värde än 0: {CORE_ITEMS.map(([, k]) => CORE_LABEL[k]).join(', ')}.
                 </li>
             </ol>
             <p>
-                Enskilda näringsidkare får ingen profil, eftersom deras organisationsnummer är ett personnummer. Profiler som inte klarar tröskeln visas för besökare men märks
+                Bransch och kommun krävs inte: en profil utan dem indexeras men finns inte med på någon bransch- eller kommunsida. Enskilda näringsidkare får ingen profil,
+                eftersom deras organisationsnummer är ett personnummer. Profiler som inte klarar tröskeln visas för besökare men märks
                 <code>noindex</code> och tas inte med i webbplatskartan.
             </p>
 
