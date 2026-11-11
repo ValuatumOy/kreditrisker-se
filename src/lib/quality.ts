@@ -10,6 +10,8 @@
 //   3. at least one fiscal period exists and the newest is not stale
 //   4. the newest period reports at least MIN_CORE_ITEMS of the CORE_ITEMS as
 //      non-zero values (the backend stores no zeros, so a 0 is an absent item)
+// Industry (SNI) and municipality are optional: a profile without them has its
+// statements and is found by name, it just is not listed on a hub page.
 // Everything else gets <meta name="robots" content="noindex,follow"> and is
 // left out of the sitemaps. The global INDEXING flag overrides to noindex.
 
