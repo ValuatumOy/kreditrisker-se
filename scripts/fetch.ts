@@ -9,7 +9,7 @@
 //
 // TSV columns, as written by build/get_static_params: fid, slug, name, sni, orgnr.
 // Writes data/build/pages.jsonl, index.jsonl (also the next build's state),
-// rejected.jsonl and removed.txt, then `SE_DATA_SOURCE=build astro build` renders them.
+// rejected.jsonl, warnings.jsonl and removed.txt, then `SE_DATA_SOURCE=build astro build` renders them.
 
 import fs from 'node:fs'
 import path from 'node:path'
@@ -38,29 +38,52 @@ async function main() {
     const importedAt = new Date().toISOString()
     const batchId = `api-${importedAt.slice(0, 10)}`
 
-    const pages: PublishedCompany[] = []
     const rejected: { fid: string; name: string; reason: string }[] = []
+    const warnings: { fid: string; orgnr: string; name: string; periods: string[]; warnings: string[] }[] = []
     let done = 0
-    await mapLimit(batch, Number(process.env.SE_FETCH_CONCURRENCY ?? 8), async (param) => {
-        try {
-            const bundle = await fetchBundle(param.fid)
-            if (!bundle) return void rejected.push({ ...param, reason: 'no financial statements in the model' })
-            const mapped = mapBundle(bundle, { batchId, importedAt })
-            if (!mapped.ok) return void rejected.push({ ...param, reason: mapped.reason })
-            const valid = validateRecord(mapped.record)
-            if (!valid.ok) return void rejected.push({ ...param, reason: valid.errors.join('; ') })
-            const prev = rows.get(mapped.record.orgnr)
-            const history = prev ? [...prev.rf.map(slugOf), slugOf(prev.p)] : undefined
-            const page = publishCompany(mapped.record, history, SITE.asOf)
-            if (!page.quality.publishable) return void rejected.push({ ...param, reason: 'not publishable (sole trader)' })
-            pages.push(page)
+    let pageCount = 0
+    let writeError: unknown
+    fs.mkdirSync(BUILD_DIR, { recursive: true })
+    const pagesTemp = path.join(BUILD_DIR, 'pages.jsonl.tmp')
+    const pageFd = fs.openSync(pagesTemp, 'w')
+    try {
+        await mapLimit(batch, Number(process.env.SE_FETCH_CONCURRENCY ?? 8), async (param) => {
+            if (writeError) return
+            let page: PublishedCompany
+            let review: string[]
+            try {
+                const bundle = await fetchBundle(param.fid)
+                if (!bundle) return void rejected.push({ ...param, reason: 'no financial statements in the model' })
+                const mapped = mapBundle(bundle, { batchId, importedAt })
+                if (!mapped.ok) return void rejected.push({ ...param, reason: mapped.reason })
+                const valid = validateRecord(mapped.record)
+                if (!valid.ok) return void rejected.push({ ...param, reason: valid.errors.join('; ') })
+                const prev = rows.get(mapped.record.orgnr)
+                const history = prev ? [...prev.rf.map(slugOf), slugOf(prev.p)] : undefined
+                page = publishCompany(mapped.record, history, SITE.asOf)
+                if (!page.quality.publishable) return void rejected.push({ ...param, reason: 'not publishable (sole trader)' })
+                review = valid.warnings
+            } catch (e) {
+                rejected.push({ ...param, reason: e instanceof Error ? e.message : String(e) })
+                return
+            } finally {
+                if (++done % 100 === 0) console.log(`fetched ${done}/${batch.length}`)
+            }
+            try {
+                fs.writeFileSync(pageFd, JSON.stringify(page) + '\n')
+            } catch (e) {
+                writeError = e instanceof Error ? e : new Error(String(e))
+                return
+            }
+            pageCount++
             rows.set(page.record.orgnr, toRow(page))
-        } catch (e) {
-            rejected.push({ ...param, reason: e instanceof Error ? e.message : String(e) })
-        } finally {
-            if (++done % 100 === 0) console.log(`fetched ${done}/${batch.length}`)
-        }
-    })
+            if (review.length) warnings.push({ fid: param.fid, orgnr: page.record.orgnr, name: page.record.name, periods: page.record.periods.map((p) => p.end), warnings: review })
+        })
+        if (writeError) throw writeError
+    } finally {
+        fs.closeSync(pageFd)
+    }
+    fs.renameSync(pagesTemp, path.join(BUILD_DIR, 'pages.jsonl'))
 
     // Last save time for every company in the directory, not just the batch (the
     // "Senast uppdaterade" page sorts the whole index by it).
@@ -79,16 +102,15 @@ async function main() {
                 removed.push(`foretag/${o}/`)
                 rows.delete(o)
             }
-    fs.mkdirSync(BUILD_DIR, { recursive: true })
-    writeJsonl(path.join(BUILD_DIR, 'pages.jsonl'), pages)
     writeJsonl(path.join(BUILD_DIR, 'index.jsonl'), rows.values())
     writeJsonl(path.join(BUILD_DIR, 'rejected.jsonl'), rejected)
+    writeJsonl(path.join(BUILD_DIR, 'warnings.jsonl'), warnings)
     // S3 prefixes of companies that left the directory, for the deploy step to delete.
     fs.writeFileSync(path.join(BUILD_DIR, 'removed.txt'), removed.map((r) => r + '\n').join(''))
     const indexable = [...rows.values()].filter((r) => r.ix).length
-    console.log(`batch ${batch.length}: ${pages.length} pages, ${rejected.length} rejected (data/build/rejected.jsonl)`)
+    console.log(`batch ${batch.length}: ${pageCount} pages, ${rejected.length} rejected (data/build/rejected.jsonl), ${warnings.length} with warnings (data/build/warnings.jsonl)`)
     console.log(`index: ${rows.size} companies, ${indexable} pass the index threshold`)
-    if (batch.length && !pages.length) process.exitCode = 1
+    if (batch.length && !pageCount) process.exitCode = 1
 }
 
 await main()

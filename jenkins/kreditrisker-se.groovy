@@ -178,7 +178,7 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
-            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/removed.txt', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt', allowEmptyArchive: true, fingerprint: true
         }
     }
 }
