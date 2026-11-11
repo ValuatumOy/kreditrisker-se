@@ -48,6 +48,14 @@ export const FLAGS = {
      * docs/LAUNCH-GATES.md are signed off and the data is real.
      */
     indexing: flag('SE_INDEXING'),
+    /**
+     * Mass builds before launch. The HTML carries each page's own index verdict
+     * while robots.txt stays closed and the sitemaps stay empty, so opening the
+     * site later (SE_INDEXING=1) is a small build and not a rebuild of every
+     * company page. Until then the edge must send X-Robots-Tag: noindex
+     * (aws-infra context `indexing`, docs/SEO-LAUNCH.md).
+     */
+    htmlFinal: flag('SE_HTML_FINAL'),
     /** Generate pages for enskilda näringsidkare (personnummer). Legal gate. */
     publishSoleTraders: flag('SE_PUBLISH_SOLE_TRADERS'),
     /** Show validated Swedish credit-model output on profiles. Legal gate. */
@@ -87,6 +95,8 @@ export const VERIFIED_PRICES: Partial<Record<'basic' | 'ai', { amountSek: number
 
 /** Site is allowed to be indexed at all. */
 export const siteIndexable = FLAGS.indexing && !FLAGS.preview
+/** Pages may say index,follow in their HTML (the site itself can still be closed). */
+export const htmlIndexable = (FLAGS.indexing || FLAGS.htmlFinal) && !FLAGS.preview
 
 if (FLAGS.checkout && (FLAGS.reportAdapter !== 'http' || !FLAGS.reportApiBase))
     throw new Error('SE_CHECKOUT requires PUBLIC_SE_REPORT_ADAPTER=http and PUBLIC_SE_REPORT_API')
@@ -94,7 +104,7 @@ if (FLAGS.checkout && !env('SE_TERMS_VERSION'))
     throw new Error('SE_CHECKOUT requires SE_TERMS_VERSION for the approved purchase terms')
 if (FLAGS.previewFixtureCheckout && !FLAGS.preview)
     throw new Error('SE_PREVIEW_FIXTURE requires SE_PREVIEW')
-if (FLAGS.reportAdapter === 'mock' && siteIndexable)
+if (FLAGS.reportAdapter === 'mock' && htmlIndexable)
     throw new Error('The mock report adapter may only be used in non-indexed preview builds')
 for (const p of ['basic', 'ai'] as const)
     if (FLAGS.checkout && FLAGS.reports[p] === 'live' && !VERIFIED_PRICES[p])

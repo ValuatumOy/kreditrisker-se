@@ -38,6 +38,15 @@ class AuditSeoTest(unittest.TestCase):
         self.write('index.html', self.page('index,follow'))
         self.assertTrue(any('indexable page' in error for error in audit_seo.audit(self.root, ORIGIN, 'blocked')[0]))
 
+    def test_gated_build_allows_final_page_verdicts_behind_a_closed_site(self):
+        self.write('index.html', self.page('index,follow'))
+        self.assertEqual(audit_seo.audit(self.root, ORIGIN, 'gated')[0], [])
+        self.write('robots.txt', f'User-agent: *\nDisallow: /sok/\nSitemap: {ORIGIN}/sitemap-index.xml\n')
+        self.assertTrue(any('must disallow /' in error for error in audit_seo.audit(self.root, ORIGIN, 'gated')[0]))
+        self.write('robots.txt', 'User-agent: *\nDisallow: /\n')
+        self.write('sitemap-pages.xml', f'<urlset xmlns="{NS}"><url><loc>{ORIGIN}/</loc></url></urlset>')
+        self.assertTrue(any('empty sitemaps' in error for error in audit_seo.audit(self.root, ORIGIN, 'gated')[0]))
+
     def test_indexable_build_checks_sitemap_against_actual_html(self):
         self.write('robots.txt', f'User-agent: *\nDisallow: /sok/\nUser-agent: GPTBot\nDisallow: /\nSitemap: {ORIGIN}/sitemap-index.xml\n')
         self.write('index.html', self.page('index,follow'))
