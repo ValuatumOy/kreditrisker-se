@@ -21,11 +21,17 @@ test('omitted fields are rejected, explicit missing is accepted', () => {
     assert.ok(validateRecord(r).errors.some((e) => e.includes('balance.equity')))
 })
 
-test('negative amounts are allowed for results and equity but not for assets', () => {
+test('unusual signs are preserved and warned without rejecting the company', () => {
     const r = byName(batch1(), 'Exempel Restaurang')
     assert.equal(validateRecord(r).ok, true) // negative equity, negative operating profit
     r.periods[0].balance.totalAssets = { status: 'reported', value: -5, source: r.status.source }
-    assert.ok(validateRecord(r).errors.some((e) => e.includes('totalAssets cannot be negative')))
+    const result = validateRecord(r)
+    assert.equal(result.ok, true)
+    assert.deepEqual(result.errors, [])
+    assert.ok(result.warnings.some((e) => e.includes('totalAssets') && e.includes('-5')))
+    assert.equal(r.periods[0].balance.totalAssets.value, -5)
+    r.periods[0].balance.cash = { status: 'reported', value: Number.NaN, source: r.status.source }
+    assert.equal(validateRecord(r).ok, false, 'non-finite amounts must still be rejected')
 })
 
 test('synthetic flag, source and orgnr group must agree', () => {

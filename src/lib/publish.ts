@@ -233,11 +233,14 @@ export function relatedCompanies(site: Site, c: PublishedCompany, limit = 6): In
     const kom = r.municipality && site.municipalities.find((h) => h.code === r.municipality!.code)
     const seen = new Set<string>([r.orgnr])
     const out: IndexRow[] = []
-    for (const x of [...(ind?.companies ?? []), ...(kom?.companies ?? [])]) {
-        if (out.length >= limit) break
-        if (!seen.has(x.o)) {
-            out.push(x)
-            seen.add(x.o)
+    for (const group of [ind?.companies, kom?.companies]) {
+        if (!group) continue
+        for (const x of group) {
+            if (out.length >= limit) return out
+            if (!seen.has(x.o)) {
+                out.push(x)
+                seen.add(x.o)
+            }
         }
     }
     return out

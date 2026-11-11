@@ -25,7 +25,7 @@ const INCOMPARABLE = new Set([
     'no_prior_period',
 ])
 const RATIO_FIELDS = ['revenueGrowth', 'operatingMargin', 'profitMargin', 'equityRatio', 'quickRatio', 'returnOnEquity'] as const
-// Items that cannot be negative in a correctly parsed statement.
+// Unusual signs need review, but can occur in the original annual accounts.
 const NON_NEGATIVE = new Set(['totalAssets', 'inventories', 'cash', 'currentLiabilities', 'longTermLiabilities', 'untaxedReserves'])
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
@@ -33,6 +33,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export interface ValidationResult {
     ok: boolean
     errors: string[]
+    warnings: string[]
 }
 
 function isObj(v: unknown): v is Record<string, unknown> {
@@ -50,12 +51,12 @@ function checkSource(s: unknown, path: string, errors: string[], synthetic: bool
     if (synthetic !== (s.source === 'synthetic')) errors.push(`${path}.source: synthetic flag and source disagree`)
 }
 
-function checkValue(v: unknown, path: string, errors: string[], synthetic: boolean, field: string) {
+function checkValue(v: unknown, path: string, errors: string[], warnings: string[], synthetic: boolean, field: string) {
     if (!isObj(v)) return void errors.push(`${path}: value missing (use status "missing", never omit or 0)`)
     switch (v.status) {
         case 'reported':
             if (typeof v.value !== 'number' || !Number.isFinite(v.value)) errors.push(`${path}.value: not a finite number`)
-            else if (NON_NEGATIVE.has(field) && v.value < 0) errors.push(`${path}.value: ${field} cannot be negative`)
+            else if (NON_NEGATIVE.has(field) && v.value < 0) warnings.push(`${path}.value: unusual negative ${field}: ${v.value}`)
             checkSource(v.source, `${path}.source`, errors, synthetic)
             break
         case 'derived':
@@ -76,7 +77,7 @@ function checkValue(v: unknown, path: string, errors: string[], synthetic: boole
     }
 }
 
-function checkPeriod(p: unknown, path: string, errors: string[], synthetic: boolean) {
+function checkPeriod(p: unknown, path: string, errors: string[], warnings: string[], synthetic: boolean) {
     if (!isObj(p)) return void errors.push(`${path}: not an object`)
     if (!isDate(p.start) || !isDate(p.end)) errors.push(`${path}: start/end must be ISO dates`)
     else if (p.start >= p.end) errors.push(`${path}: start must be before end`)
@@ -88,15 +89,16 @@ function checkPeriod(p: unknown, path: string, errors: string[], synthetic: bool
     const income = isObj(p.income) ? p.income : {}
     const balance = isObj(p.balance) ? p.balance : {}
     const ratios = isObj(p.ratios) ? p.ratios : {}
-    for (const f of INCOME_FIELDS) checkValue(income[f], `${path}.income.${f}`, errors, synthetic, f)
-    for (const f of BALANCE_FIELDS) checkValue(balance[f], `${path}.balance.${f}`, errors, synthetic, f)
-    for (const f of RATIO_FIELDS) checkValue(ratios[f], `${path}.ratios.${f}`, errors, synthetic, f)
-    checkValue(p.employees, `${path}.employees`, errors, synthetic, 'employees')
+    for (const f of INCOME_FIELDS) checkValue(income[f], `${path}.income.${f}`, errors, warnings, synthetic, f)
+    for (const f of BALANCE_FIELDS) checkValue(balance[f], `${path}.balance.${f}`, errors, warnings, synthetic, f)
+    for (const f of RATIO_FIELDS) checkValue(ratios[f], `${path}.ratios.${f}`, errors, warnings, synthetic, f)
+    checkValue(p.employees, `${path}.employees`, errors, warnings, synthetic, 'employees')
 }
 
 export function validateRecord(input: unknown): ValidationResult {
     const errors: string[] = []
-    if (!isObj(input)) return { ok: false, errors: ['record: not an object'] }
+    const warnings: string[] = []
+    if (!isObj(input)) return { ok: false, errors: ['record: not an object'], warnings }
     const r = input
     const synthetic = r.synthetic === true
 
@@ -134,7 +136,7 @@ export function validateRecord(input: unknown): ValidationResult {
 
     if (!Array.isArray(r.periods)) errors.push('periods: array required (may be empty)')
     else {
-        r.periods.forEach((p, i) => checkPeriod(p, `periods[${i}]`, errors, synthetic))
+        r.periods.forEach((p, i) => checkPeriod(p, `periods[${i}]`, errors, warnings, synthetic))
         const ends = r.periods.map((p) => (isObj(p) ? String(p.end) : ''))
         for (let i = 1; i < ends.length; i++) if (ends[i] >= ends[i - 1]) errors.push('periods: must be sorted newest first without duplicates')
     }
@@ -157,7 +159,7 @@ export function validateRecord(input: unknown): ValidationResult {
     if (!isObj(r.provenance) || typeof r.provenance.batchId !== 'string' || !isDate(String(r.provenance.importedAt).slice(0, 10)))
         errors.push('provenance: batchId and importedAt required')
 
-    return { ok: errors.length === 0, errors }
+    return { ok: errors.length === 0, errors, warnings }
 }
 
 export function assertRecord(input: unknown): CompanyRecord {

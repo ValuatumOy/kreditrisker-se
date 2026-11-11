@@ -58,13 +58,26 @@ export function selectBatch(allLines: string[], changedLines: string[], mode: Ba
     const fid = (l: string) => l.split('\t')[0]
     const picked = new Set(mode === 'changed' ? changedLines.filter((l) => l.trim()).map(fid) : [])
     const missing: string[] = []
+    const byOrgnr = new Map<string, string[]>()
+    const byFid = new Set<string>()
+    for (const row of rows) {
+        const columns = row.split('\t')
+        const id = columns[0]
+        byFid.add(id)
+        const orgnr = columns[4]?.replace(/\D/g, '')
+        if (orgnr) {
+            const ids = byOrgnr.get(orgnr) ?? []
+            ids.push(id)
+            byOrgnr.set(orgnr, ids)
+        }
+    }
     for (const token of companies.split(/[\s,;]+/).filter(Boolean)) {
         const o = parseOrgnr(token.replace(/K$/i, ''))
         const hits = o.ok
-            ? rows.filter((l) => l.split('\t')[4]?.replace(/\D/g, '') === o.orgnr)
-            : rows.filter((l) => l.split('\t')[0] === token)
+            ? (byOrgnr.get(o.orgnr) ?? [])
+            : (byFid.has(token) ? [token] : [])
         if (!hits.length) missing.push(token)
-        hits.forEach((l) => picked.add(fid(l)))
+        hits.forEach((id) => picked.add(id))
     }
     if (missing.length) throw new Error(`not in the directory (staticparams.txt): ${missing.join(', ')}`)
     return rows.filter((l) => picked.has(fid(l)))
