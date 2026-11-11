@@ -10,9 +10,9 @@ const file = (text: string) => ({ sha256: sha256(text), bytes: Buffer.byteLength
 const index = '{"o":"5564480282","p":"/foretag/5564480282/new/"}\n'
 const capture = (site: Inventory, state = index): Capture => ({
     version: 1, capturedAt: '2026-11-11T12:00:00.000Z', complete: true,
-    site: { bucket: 'synthetic-site', versioning: 'Enabled', objects: Object.fromEntries(Object.entries(site).map(([key, value]) => [key, { ...value, versionId: 'synthetic-version', head: { ContentType: 'text/html' } }])) },
-    state: { uri: 's3://synthetic-state/index.jsonl', versioning: 'Enabled', versionId: 'synthetic-state-version', sha256: sha256(state), head: {} },
-    policy: { uri: 's3://synthetic-state/sitemap-policy.json', versionId: null, sha256: null },
+    site: { bucket: 'synthetic-site', versioning: 'Enabled', objects: Object.fromEntries(Object.entries(site).map(([key, value]) => [key, { ...value, versionId: 'synthetic-version', head: { VersionId: 'synthetic-version', ContentLength: value.bytes, ContentType: 'text/html' } }])) },
+    state: { uri: 's3://synthetic-state/index.jsonl', versioning: 'Enabled', versionId: 'synthetic-state-version', sha256: sha256(state), head: { VersionId: 'synthetic-state-version', ContentLength: Buffer.byteLength(state), ContentType: 'application/x-ndjson' } },
+    policy: { uri: 's3://synthetic-state/sitemap-policy.json', versionId: null, sha256: null, head: null },
     search: { function: 'synthetic-search', imageUri: 'example.invalid/search@sha256:' + 'a'.repeat(64), revisionId: 'synthetic-revision', indexSha256: sha256(state) },
     distributionId: 'SYNTHETIC',
 })
@@ -63,14 +63,55 @@ test('offline seed/index/search drift fails closed and cannot silently rebase a 
     assert.equal(makeReleasePlan({ ...i, liveIndex: index.replace('\n', '\r\n'), capture: capture(i.before, index.replace('\n', '\r\n')) }).baseline.seedSha256, sha256(index), 'only line/JSON serialization is normalized for seed identity; exact live bytes remain pinned')
 })
 
+test('changed static search JSON is global generated output with its original bytes covered by rollback', () => {
+    const i = input()
+    const oldHits = JSON.stringify([{ o: '5564480282', n: 'Alfa AB', p: '/foretag/5564480282/old/' }])
+    const newHits = JSON.stringify([
+        { o: '5564480282', n: 'Alfa AB uppdaterat', p: '/foretag/5564480282/new/' },
+        { o: '5565675906', n: 'Beta AB', p: '/foretag/5565675906/legacy/' },
+    ])
+    const before = { ...i.before, 'sok/index.json': file(oldHits) }
+    const overlay = { ...i.overlay, 'sok/index.json': file(newHits) }
+    const plan = makeReleasePlan({ ...i, before, overlay, capture: capture(before) })
+    assert.deepEqual(plan.writes['sok/index.json'], { before: file(oldHits), after: file(newHits), phase: 'global-pages' })
+    assert(plan.rollback.restore.includes('sok/index.json'))
+    assert(!plan.rollback.removeNew.includes('sok/index.json'))
+    assert(!plan.preserved.assetKeys.includes('sok/index.json'))
+    const assetBefore = { ...before, 'sok/custom.json': file(oldHits), '_astro/search.json': file(oldHits) }
+    for (const key of ['sok/custom.json', '_astro/search.json']) {
+        assert.throws(() => makeReleasePlan({ ...i, before: assetBefore, overlay: { ...overlay, [key]: file(newHits) }, capture: capture(assetBefore) }), /Existing asset would be overwritten/)
+    }
+})
+
+test('every retained index company must have its canonical, orgnr redirect and old-slug redirects in the composite', () => {
+    const i = input()
+    const retained = { o: '5565675906', p: '/foretag/5565675906/legacy/', rf: ['/foretag/5565675906/prior-name/'] }
+    const before = { ...i.before, 'foretag/5565675906/prior-name/index.html': file('old-slug redirect') }
+    const finalIndex = index + JSON.stringify(retained) + '\n'
+    const retainedInput = { ...i, before, finalIndex, seed: finalIndex, liveIndex: finalIndex, capture: capture(before, finalIndex) }
+    const planned = makeReleasePlan(retainedInput)
+    assert.deepEqual(planned.preserved.indexedCompanies, [{ orgnr: retained.o, canonical: 'foretag/5565675906/legacy/index.html', redirects: ['foretag/5565675906/index.html', 'foretag/5565675906/prior-name/index.html'] }])
+    for (const key of ['foretag/5565675906/legacy/index.html', 'foretag/5565675906/index.html', 'foretag/5565675906/prior-name/index.html']) {
+        const missing: Inventory = { ...before }; delete missing[key]
+        assert.throws(() => makeReleasePlan({ ...retainedInput, before: missing, capture: capture(missing, finalIndex) }), /Missing retained company HTML or redirect/)
+    }
+})
+
 test('complete versioned backup claims must match all local keys and bytes', () => {
     const i = input()
     for (const modify of [
         (c: Capture) => { delete c.site.objects['_astro/old.js'] },
         (c: Capture) => { c.site.objects['_astro/old.js'].sha256 = 'f'.repeat(64) },
         (c: Capture) => { c.site.objects['_astro/old.js'].versionId = 'null' },
+        (c: Capture) => { c.site.objects['_astro/old.js'].head = {} },
+        (c: Capture) => { c.site.objects['_astro/old.js'].head.VersionId = 'wrong-version' },
+        (c: Capture) => { c.site.objects['_astro/old.js'].head.ContentLength = 999999 },
         (c: Capture) => { c.site.versioning = 'Suspended' as any },
         (c: Capture) => { c.state.versionId = 'null' },
+        (c: Capture) => { c.state.head = [] as any },
+        (c: Capture) => { c.state.head.ContentLength = 999999 },
+        (c: Capture) => { c.policy.head = {} },
+        (c: Capture) => { c.policy.versionId = 'policy-version'; c.policy.sha256 = 'a'.repeat(64); c.policy.head = {} },
         (c: Capture) => { c.search.imageUri = 'example.invalid/search:latest' },
         (c: Capture) => { c.complete = false as any },
     ]) {
@@ -79,6 +120,21 @@ test('complete versioned backup claims must match all local keys and bytes', () 
     }
     assert.throws(() => makeReleasePlan({ ...i, overlay: { ...i.overlay, '_astro/old.js': file('collision') } }), /Existing asset would be overwritten/)
     assert.throws(() => makeReleasePlan({ ...i, overlay: { ...i.overlay, 'images/shared.svg': file('collision') } }), /Existing asset would be overwritten/)
+})
+
+test('state and policy require distinct safe S3 keys in the same bucket outside the served site bucket', () => {
+    const i = input()
+    for (const [stateUri, policyUri] of [
+        ['s3://synthetic-site/index.html', 's3://synthetic-site/robots.txt'],
+        ['s3://synthetic-state/index.jsonl', 's3://synthetic-site/robots.txt'],
+        ['s3://synthetic-state/index.jsonl', 's3://other-state/policy.json'],
+        ['s3://synthetic-state/index.jsonl', 's3://synthetic-state/index.jsonl'],
+        ['s3://synthetic-state/../index.jsonl', 's3://synthetic-state/policy.json'],
+        ['s3://synthetic-state/index.jsonl?version=1', 's3://synthetic-state/policy.json'],
+    ]) {
+        const c = structuredClone(i.capture); c.state.uri = stateUri; c.policy.uri = policyUri
+        assert.throws(() => validateCapture(c, i.before, index), /S3 state or policy URI|separate state bucket/)
+    }
 })
 
 test('local inventory refuses junctions and ambiguous filesystem keys', () => {

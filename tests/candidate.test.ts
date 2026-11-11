@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto'
 import { fetchConcurrency } from '../src/lib/valuatum/batch-limit.ts'
 import { staticUrls, hubUrls } from '../src/lib/sitemap.ts'
 import { buildSite, toRow } from '../src/lib/publish.ts'
+import { toSearchHit } from '../src/lib/search.ts'
 import { assertPublicFiles, checkSitemaps, createPlan, writePlan, readPlan, candidateConfig, runNext, selectCompanies, verifyCandidate, stageCandidate, type BuildSteps, type Context } from '../scripts/lib/candidate.ts'
 
 const temp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'se-candidate-'))
@@ -43,6 +44,7 @@ function fake(settings: { reject?: boolean; duplicate?: boolean; drop?: boolean;
             const index = read(path.join(env.SE_BUILD_DIR!, 'index.jsonl')).trim().split('\n').map((l) => JSON.parse(l))
             assert.equal(index.length, settings.directoryCount ?? 3, 'all renders must see the full frozen index')
             const write = (file: string, content: string) => { fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, content) }
+            write(path.join(env.SE_OUT_DIR!, 'sok', 'index.json'), JSON.stringify(index.map(toSearchHit)))
             const flag = (key: string) => env[key] === '1' || env[key]?.toLowerCase() === 'true'
             const open = flag('SE_INDEXING') && !flag('SE_PREVIEW')
             const htmlOpen = (flag('SE_INDEXING') || flag('SE_HTML_FINAL')) && !flag('SE_PREVIEW')
@@ -331,8 +333,13 @@ test('plans pin a usable default API origin and reject invalid or unsafe API end
     for (const endpoint of ['not-a-url', 'http://sweden.valuatum.com', 'https://user:secret@sweden.valuatum.com', 'https://sweden.valuatum.com/rest', 'https://sweden.valuatum.com/?token=secret']) assert.throws(() => candidateConfig({PUBLIC_VALUATUM_API_BASE_URL: endpoint}, '2026-11-11'))
 })
 
-test('offline promotion package verifies the candidate, preserves 857 nonselected profiles, and detects package corruption', () => {
-    const s = complete(), stage = path.join(temp(), 'stage')
+test('offline promotion package preserves retained indexed profiles and all old site keys, and detects package corruption', () => {
+    const retained = [nonselected, { ...nonselected, o: '5591844112', n: 'Gamma AB', p: '/foretag/5591844112/gamma-ab/', rf: ['/foretag/5591844112/prior-name/'] }]
+    const s = { repo: temp(), dir: path.join(temp(), 'plan') }, stage = path.join(temp(), 'stage')
+    writePlan(s.dir, createPlan(rows.slice(0, 3).join('\n'), jsonl(retained), context, 2, fullSnapshot))
+    const steps = fake({ directoryCount: 4 })
+    next(s, 'fetched', steps); next(s, 'fetched', steps)
+    next(s, 'rendered', steps); next(s, 'rendered', steps)
     stageCandidate(s.dir, stage)
     const captureDir = temp(), site = path.join(captureDir, 'site')
     fs.mkdirSync(site)
@@ -340,15 +347,23 @@ test('offline promotion package verifies the candidate, preserves 857 nonselecte
         const file = path.join(site, key); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, text)
     }
     for (let i = 0; i < 857; i++) write(`foretag/${9000000000 + i}/legacy/index.html`, `synthetic nonselected profile ${i} with noindex`)
+    for (const row of retained) {
+        write(row.p.slice(1) + 'index.html', `<link rel="canonical" href="https://www.kreditrisker.se${row.p}"><meta name="robots" content="noindex,follow">`)
+        for (const route of [`/foretag/${row.o}/`, ...row.rf]) write(route.slice(1) + 'index.html', `<link rel="canonical" href="https://www.kreditrisker.se${row.p}"><meta http-equiv="refresh" content="0;url=${row.p}">`)
+    }
     write('_astro/legacy.js', 'synthetic retained old asset')
+    const oldSearch = JSON.stringify(retained.map((r) => toSearchHit(r as any)))
+    write('sok/index.json', oldSearch)
     write('sitemap-companies-99.xml', '<old-synthetic-sitemap/>')
     const before = inventory(site), liveIndex = read(path.join(s.dir, 'seed-index.jsonl'))
     fs.writeFileSync(path.join(captureDir, 'index.jsonl'), liveIndex)
+    const previousPolicy = '{"version":1,"mode":"hold"}\n'
+    fs.writeFileSync(path.join(captureDir, 'sitemap-policy.json'), previousPolicy)
     const capture: Capture = {
         version: 1, capturedAt: '2026-11-11T12:00:00Z', complete: true,
-        site: { bucket: 'synthetic-site', versioning: 'Enabled', objects: Object.fromEntries(Object.entries(before).map(([key, value]) => [key, { ...value, versionId: 'synthetic-original', head: {} }])) },
-        state: { uri: 's3://synthetic-state/index.jsonl', versioning: 'Enabled', versionId: 'synthetic-index', sha256: hash(liveIndex), head: {} },
-        policy: { uri: 's3://synthetic-state/sitemap-policy.json', versionId: null, sha256: null },
+        site: { bucket: 'synthetic-site', versioning: 'Enabled', objects: Object.fromEntries(Object.entries(before).map(([key, value]) => [key, { ...value, versionId: 'synthetic-original', head: { VersionId: 'synthetic-original', ContentLength: value.bytes, ContentType: 'text/html' } }])) },
+        state: { uri: 's3://synthetic-state/index.jsonl', versioning: 'Enabled', versionId: 'synthetic-index', sha256: hash(liveIndex), head: { VersionId: 'synthetic-index', ContentLength: Buffer.byteLength(liveIndex), ContentType: 'application/x-ndjson' } },
+        policy: { uri: 's3://synthetic-state/sitemap-policy.json', versionId: 'synthetic-policy', sha256: hash(previousPolicy), head: { VersionId: 'synthetic-policy', ContentLength: Buffer.byteLength(previousPolicy), ContentType: 'application/json' } },
         search: { function: 'synthetic-search', imageUri: 'example.invalid/search@sha256:' + 'a'.repeat(64), revisionId: 'synthetic-revision', indexSha256: hash(liveIndex) },
         distributionId: 'SYNTHETIC',
     }
@@ -356,15 +371,35 @@ test('offline promotion package verifies the candidate, preserves 857 nonselecte
     const out = path.join(temp(), 'release')
     const result = prepareRelease(s.dir, stage, captureDir, out)
     assert.equal(result.promotionAllowed, false)
-    assert.equal(verifyRelease(out).preservedCompanyKeys, 857)
+    assert.equal(verifyRelease(out).preservedCompanyKeys, 863)
     assert.deepEqual(inventory(path.join(out, 'backup', 'site')), before)
+    assert.equal(read(path.join(out, 'backup', 'sitemap-policy.json')), previousPolicy)
     const release = JSON.parse(read(path.join(out, 'release.json')))
-    assert.equal(release.preserved.companyKeys.length, 857)
+    assert.equal(release.preserved.companyKeys.length, 863)
+    assert.equal(release.preserved.indexedCompanies.length, 2)
+    assert.deepEqual(new Set(release.preserved.indexedCompanies.map((c: any) => c.orgnr)), new Set(retained.map((r) => r.o)))
+    assert.equal(release.writes['sok/index.json'].phase, 'global-pages')
+    assert(release.rollback.restore.includes('sok/index.json'))
+    assert.equal(read(path.join(out, 'backup', 'site', 'sok', 'index.json')), oldSearch)
+    assert.equal(read(path.join(out, 'overlay', 'sok', 'index.json')), read(path.join(stage, 'sok', 'index.json')))
+    assert.equal(JSON.parse(read(path.join(out, 'overlay', 'sok', 'index.json'))).length, 4)
     assert.equal(inventory(path.join(out, 'overlay'))['foretag/9000000000/legacy/index.html'], undefined)
     const simulated = { ...before, ...Object.fromEntries(Object.entries(release.writes).map(([key, value]: [string, any]) => [key, value.after])) }
+    const combined = path.join(temp(), 'combined')
+    fs.cpSync(site, combined, { recursive: true }); fs.cpSync(path.join(out, 'overlay'), combined, { recursive: true })
+    assert.equal(release.result.siteInventorySha256, hash(JSON.stringify(inventory(combined), null, 2) + '\n'), 'result digest must equal a physically combined and independently sorted site inventory')
     for (const key of release.rollback.removeNew) delete simulated[key]
     for (const key of release.rollback.restore) simulated[key] = before[key]
     assert.deepEqual(simulated, before, 'rollback plan restores exact original inventory including newly created keys')
+    const policyPath = path.join(out, 'next-sitemap-policy.json'), policyText = read(policyPath)
+    fs.appendFileSync(policyPath, ' ')
+    assert.throws(() => verifyRelease(out), /Prepared index or sitemap policy changed/)
+    fs.writeFileSync(policyPath, policyText)
+    for (const extra of ['unexpected.txt', path.join('backup', 'unexpected.txt')]) {
+        fs.writeFileSync(path.join(out, extra), 'unexpected')
+        assert.throws(() => verifyRelease(out), /Unexpected file/)
+        fs.unlinkSync(path.join(out, extra))
+    }
     fs.appendFileSync(path.join(out, 'overlay', 'sitemap-companies-99.xml'), 'tampered')
     assert.throws(() => verifyRelease(out), /overlay differs/)
     assert.deepEqual(inventory(site), before, 'preparation never mutates the snapshot')

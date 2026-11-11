@@ -4,14 +4,18 @@ The 16,000-company pilot is **not authorized to run**. Do not fetch, render, pub
 
 **There is no production promotion controller. `promotionAllowed` is always `false`.** A generated package is review material, not approval to upload it. Do not pass it to the legacy Jenkins deployment, and never use `sync --delete` with its incremental overlay.
 
+**The current site infrastructure cannot yet supply this tool's capture contract.** `aws-infra/lib/site-stack.ts` enables versioning only on the state bucket; the served site bucket is currently unversioned. This tool requires non-null immutable versions for every site object and does not support the present null-version site objects. Enabling versioning alone leaves existing null-version objects unchanged. A separately authorized infrastructure/backup migration and its restore tests are required before this preparation command can consume a real production capture. An alternative future implementation could support verified immutable backups in a separate versioned state/backup bucket, but this code does **not** implement or accept that alternative.
+
 ## What preparation verifies
 
 After generation has been separately approved and the candidate completed, the tool can prepare a reviewable release against a separately captured complete production snapshot. It:
 
 - Revalidates every candidate checkpoint and restages it with the existing HTML, canonical, robots, redirects and exact selected-only sitemap guards. The supplied stage must equal that verified restage byte for byte.
 - Requires the captured index to match the frozen candidate seed. JSONL serialization and line endings are normalized for this comparison; the exact original captured index bytes are also pinned for drift detection and rollback. A completed candidate cannot be rebased onto newer live state.
-- Requires a complete versioned site inventory, matching local bytes for every key, full raw object metadata, the versioned index, the current sitemap-policy object or its confirmed absence, resolved search image digest and Lambda revision, and CloudFront distribution identity.
+- Requires a complete versioned site inventory with matching local bytes for every key. Recorded HeadObject metadata must match each immutable VersionId and ContentLength and contain ContentType; the same checks apply to the index and any existing policy. Completeness of additional headers, tags, ACL and retention/encryption settings still depends on the external capture process and is not established by local validation. State and policy must be distinct keys in one separate state bucket, outside the served site bucket. Captured destinations still need reconciliation against approved stack outputs before publication.
 - Preserves every nonselected `foretag/` key, including redirects. Candidate renders include directory-wide orgnr redirects: those nonselected files are explicitly excluded from the prepared overlay. All existing asset keys are retained; overwriting an existing asset with different bytes is refused.
+- Treats the generated `sok/index.json` search feed as mutable global output, with its previous bytes included in backup and rollback. Only this exact JSON route is exempt from the asset collision guard.
+- Requires every nonselected final-index company to retain its canonical page, orgnr redirect and every recorded old-slug redirect in the composite site. A matching index row cannot substitute for missing HTML.
 - Retires old numbered company sitemap parts absent from the candidate by replacing them with an empty valid sitemap. They remain discoverable independently of `sitemap-index.xml`, so merely removing them from the index is insufficient.
 - Copies and rehashes the entire site capture, index, metadata and existing policy into a local backup. Records forward phases, every overwritten and new key, the old index version and search digest, and the exact selected-only policy proposed for normal builds.
 
@@ -46,7 +50,7 @@ capture/
         "sha256": "<sha256 of exact bytes>",
         "bytes": 123,
         "versionId": "<immutable S3 VersionId>",
-        "head": { "ContentType": "text/html", "CacheControl": "<captured value>" }
+        "head": { "VersionId": "<same immutable S3 VersionId>", "ContentLength": 123, "ContentType": "text/html", "CacheControl": "<captured value>" }
       }
     }
   },
@@ -55,12 +59,13 @@ capture/
     "versioning": "Enabled",
     "versionId": "<immutable S3 VersionId>",
     "sha256": "<sha256 of exact index.jsonl bytes>",
-    "head": { "ContentType": "application/x-ndjson" }
+    "head": { "VersionId": "<same immutable S3 VersionId>", "ContentLength": 456, "ContentType": "application/x-ndjson" }
   },
   "policy": {
     "uri": "s3://example-state/sitemap-policy.json",
     "versionId": null,
-    "sha256": null
+    "sha256": null,
+    "head": null
   },
   "search": {
     "function": "example-search",
@@ -72,7 +77,7 @@ capture/
 }
 ```
 
-Use the complete raw HeadObject response rather than just the sample fields. If a sitemap policy exists, supply its exact bytes plus version and SHA-256. Null policy version/hash asserts that no policy object currently exists and must be rechecked under the release lock. `search.indexSha256` may be set only after independently verifying the captured image's database against the exact captured index. Current search images have no automatic index binding; use null until this is proven. Local files must have unambiguous ASCII website keys; symlinks, junctions, nonregular entries and case collisions are rejected. The tool intentionally refuses unversioned site/index snapshots; enabling versioning later does not version pre-existing null-version objects, so those must receive separately verified immutable backups first.
+Use the complete raw HeadObject response rather than just the sample fields. If a sitemap policy exists, supply its exact bytes, version, SHA-256 and HeadObject metadata with matching VersionId/ContentLength and a ContentType. Null policy version/hash/head asserts that no policy object currently exists and must be rechecked under the release lock. `search.indexSha256` may be set only after independently verifying the captured image's database against the exact captured index. Current search images have no automatic index binding; use null until this is proven. Local files must have unambiguous ASCII website keys; symlinks, junctions, nonregular entries and case collisions are rejected. The tool refuses unversioned site/index snapshots and separately backed-up null-version source objects; see the unresolved infrastructure gate above. It does not acquire backups or validate the restore path against AWS.
 
 ## Prepare and verify locally
 
@@ -83,7 +88,7 @@ node scripts/release-plan.ts prepare --plan /private/pilot-plan --stage /private
 node scripts/release-plan.ts verify --release /private/pilot-release-review
 ```
 
-The package contains `release.json` and its checksum, the full local `backup/`, the verified `restaged/` tree, a filtered `overlay/`, `next-index.jsonl` and `next-sitemap-policy.json`. Review the preserved key counts against the captured real company inventory (about 857 currently expected), excluded nonselected redirects, changed/new keys, retired sitemap parts and every blocker. Do not interpret a company-key count as a company count: a company may have multiple pages and redirects. Preparation needs disk for the complete backup, restage and overlay. On failure the private temporary directory is retained for diagnosis and no ready destination is created. Package checksums detect accidental changes; they do not prevent deliberate manifest rewriting.
+The package contains `release.json` and its checksum, the full local `backup/`, the verified `restaged/` tree, a filtered `overlay/`, `next-index.jsonl` and `next-sitemap-policy.json`. Verification checks exact policy bytes, the entire backup inventory and known package paths; extra regular files are refused. Site inventory hashes always use sorted keys, including the composite result. Review the retained indexed-company list and preserved key counts against the captured real company inventory (about 857 currently expected), excluded nonselected redirects, changed/new keys, retired sitemap parts and every blocker. Do not interpret a company-key count as a company count: a company may have multiple pages and redirects. Preparation needs disk for the complete backup, restage and overlay. On failure the private temporary directory is retained for diagnosis and no ready destination is created. Package checksums detect accidental changes; they do not prevent deliberate manifest rewriting.
 
 ## Required production implementation before approval
 
