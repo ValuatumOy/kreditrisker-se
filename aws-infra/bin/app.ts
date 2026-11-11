@@ -19,6 +19,8 @@
 //   isolatedFixtureTest   1 to restrict the test API to one synthetic company and SES simulator
 //   checkoutEnabledProd   1 to allow new live checkout sessions after launch checks
 //   termsVersionTest/Prod version identifier for the approved purchase terms
+//   indexing              1 once search indexing is approved; until then Prod sends X-Robots-Tag: noindex.
+//                         Set it in cdk.json, not with -c, so a later deploy cannot close the site again.
 //
 // Without hostedZoneId the sites run on their *.cloudfront.net domains.
 
@@ -64,6 +66,7 @@ new SiteStack(app, 'KreditriskerSiteStackProd', {
     searchRepository: searchRepo.repository,
     checkoutApiDomain: ctx('checkoutApiProd'),
     buildRoleName,
+    indexing: ctx('indexing') === '1',
 })
 
 const testReportEngineUrl = ctx('testReportEngineUrl')

@@ -177,8 +177,10 @@ def audit(root, origin, mode):
     if not has_wildcard:
         errors.append('robots.txt: missing User-agent: *')
     blocked = ('disallow', '/') in wildcard_rules and ('allow', '/') not in wildcard_rules
-    if mode == 'blocked' and not blocked:
-        errors.append('robots.txt: blocked build must disallow /')
+    # gated: pages carry their final verdict (SE_HTML_FINAL), the site is still closed.
+    closed = mode in ('blocked', 'gated')
+    if closed and not blocked:
+        errors.append(f'robots.txt: {mode} build must disallow /')
     if mode == 'indexable' and blocked:
         errors.append('robots.txt: indexable build must not disallow /')
     if mode == 'indexable' and origin + '/sitemap-index.xml' not in sitemaps:
@@ -220,8 +222,8 @@ def audit(root, origin, mode):
                     errors.append(f'sitemap URL is redirected, noncanonical, or noindex: {url}')
     except (OSError, ET.ParseError, ValueError) as exc:
         errors.append(f'sitemap: {exc}')
-    if mode == 'blocked' and urls:
-        errors.append('blocked build must have empty sitemaps')
+    if closed and urls:
+        errors.append(f'{mode} build must have empty sitemaps')
     if mode == 'indexable' and origin + '/' not in urls:
         errors.append('indexable build must list the homepage in a sitemap')
 
@@ -232,7 +234,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--dir', default='dist', help='complete build directory (default: dist)')
     parser.add_argument('--origin', default='https://www.kreditrisker.se', help='canonical site origin')
-    parser.add_argument('--mode', required=True, choices=('blocked', 'indexable'))
+    parser.add_argument('--mode', required=True, choices=('blocked', 'gated', 'indexable'))
     args = parser.parse_args()
     errors, pages, urls = audit(args.dir, args.origin, args.mode)
     print(f'Checked {pages} HTML pages and {urls} sitemap URLs in {args.mode} mode.')

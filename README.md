@@ -70,6 +70,7 @@ Routes (Swedish):
 |---|---|---|
 | `SE_SITE_NAME` / `SE_SITE_ORIGIN` / `SE_CONTACT_EMAIL` | Kreditrisker / https://www.kreditrisker.se / – | brand, canonical origin, contact |
 | `SE_INDEXING` | off | global index switch (synthetic data stays noindex regardless) |
+| `SE_HTML_FINAL` | off | pages carry their own index verdict while robots.txt and sitemaps stay closed ([docs/SEO-LAUNCH.md](docs/SEO-LAUNCH.md#mass-build-before-the-indexing-decision)) |
 | `SE_REPORT_BASIC`, `SE_REPORT_AI` | `unavailable` | `unavailable` \| `sample` \| `live`, per product |
 | `SE_CHECKOUT` | off | real ordering; needs the http adapter, API base and verified prices |
 | `PUBLIC_SE_REPORT_ADAPTER`, `PUBLIC_SE_REPORT_API` | `disabled` | report backend ([docs/REPORTS.md](docs/REPORTS.md)) |

@@ -1,6 +1,7 @@
-import { SITE, siteIndexable } from '../config/site.ts'
-import type { PublishedCompany } from './contract/types.ts'
+import { SITE, htmlIndexable, siteIndexable } from '../config/site.ts'
+import type { CompanyStatusCode, PublishedCompany } from './contract/types.ts'
 import { LEGAL_FORM_TEXT } from './format.ts'
+import { formatOrgnr } from './orgnr.ts'
 
 export type Crumb = { href?: string; label: string }
 
@@ -14,6 +15,19 @@ export const crumbsJsonLd = (list: Crumb[]) => ({
         ...(c.href ? { item: SITE.origin + c.href } : {}),
     })),
 })
+
+// An ongoing procedure goes into the title. A hypothesis from the Finnish site's Search Console
+// (Aug-Nov 2026), where "name + konkurssi" is a frequent modifier and "name + liikevaihto" gets many
+// impressions but few clicks with a title that does not say it. The title is only as current as the
+// page: the nightly batch must rebuild a company when its status changes.
+const PROCEDURE: Partial<Record<CompanyStatusCode, string>> = { bankruptcy: 'konkurs', liquidation: 'likvidation', reconstruction: 'rekonstruktion' }
+
+/** Search title of a company profile: name and organisation number first, then what the page holds. */
+export function companyTitle(c: PublishedCompany): string {
+    const r = c.record
+    const procedure = PROCEDURE[r.status.code]
+    return `${r.name} (${formatOrgnr(r.orgnr)}) – ${procedure ? `${procedure}, ` : ''}${r.periods[0] ? 'omsättning, bokslut och nyckeltal' : 'företagsuppgifter'}`
+}
 
 /** Organization markup with registry facts only (no ratings, no reviews). */
 export const companyJsonLd = (c: PublishedCompany) => ({
@@ -43,5 +57,8 @@ export const providerJsonLd = () => ({
 /** Escape HTML-significant input while retaining valid JSON-LD. */
 export const serializeJsonLd = (data: object) => JSON.stringify(data).replace(/</g, '\\u003c')
 
-/** The single rule for index/noindex: global flag, real data, and the page's own verdict. */
+/** Whether the site is open: robots.txt, sitemaps. Global flag, real data, and the page's own verdict. */
 export const isIndexable = (pageNoindex: boolean, syntheticData: boolean) => siteIndexable && !syntheticData && !pageNoindex
+
+/** The robots meta in the HTML. Same rule, except that SE_HTML_FINAL lets a page state its verdict before the site opens. */
+export const pageIndexable = (pageNoindex: boolean, syntheticData: boolean) => htmlIndexable && !syntheticData && !pageNoindex
