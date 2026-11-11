@@ -38,7 +38,7 @@ const maxMonth = Math.max(1, ...summary.months.map((m) => m.count))
         {[{ title: 'Branscher', kind: 'branscher', groups: industries }, { title: 'Kommuner', kind: 'kommuner', groups: municipalities }].map(({ title, kind, groups }) => <section>
             <h2>{title}</h2>
             <p>Företag med konkursstatus och deras andel av samtliga profiler i samma {title === 'Branscher' ? 'bransch' : 'kommun'} i vårt underlag. Alla registrerade startdatum ingår. Andelen är ingen uppskattning av konkursrisken.</p>
-            {groups.length ? <><BankruptcyGroups groups={groups.slice(0, 10)} /><p>De {Math.min(10, groups.length)} grupperna med flest företag med konkursstatus. <a href={`/konkurser/${kind}/`}>Visa alla {title.toLowerCase()} i urvalet</a>.</p></> : <p>Inga grupper med konkursstatus finns i underlaget.</p>}
+            {groups.length ? <><BankruptcyGroups groups={groups.slice(0, 10)} /><p>{groups.length > 10 && 'De 10 grupperna med flest företag med konkursstatus. '}<a href={`/konkurser/${kind}/`}>Visa alla {title.toLowerCase()} i urvalet</a>.</p></> : <p>Inga grupper med konkursstatus finns i underlaget.</p>}
         </section>)}
         <section aria-labelledby="storlek">
             <h2 id="storlek">Företagens storlek</h2>
