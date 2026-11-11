@@ -55,6 +55,9 @@ export function hubUrls(site: Site): SitemapUrl[] {
 }
 
 export function companyUrls(site: Site): SitemapUrl[] {
+    // During the first indexing rollout legacy profiles may still say noindex.
+    // Hide their URLs until the refreshed profile HTML is verified and published.
+    if (process.env.SE_COMPANY_SITEMAP === '0') return []
     return site.rows.filter((c) => isIndexable(!c.ix, site.synthetic)).map((c) => ({ path: c.p, lastmod: c.per?.filedAt ?? c.im }))
 }
 

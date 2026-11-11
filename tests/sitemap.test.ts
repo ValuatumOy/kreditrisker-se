@@ -41,6 +41,19 @@ test('real dataset: only threshold-passing canonical profiles are listed', () =>
     assert.ok(companyUrls(site).every((u) => /^\d{4}-\d{2}-\d{2}$/.test(u.lastmod!)))
 })
 
+test('company sitemaps can be held back while old profiles still contain noindex', () => {
+    const site = siteFromRelease(realRelease(), AS_OF)
+    process.env.SE_COMPANY_SITEMAP = '0'
+    try {
+        assert.equal(companyUrls(site).length, 0)
+        assert.doesNotMatch(sitemapIndex(site), /sitemap-companies-/)
+        assert.ok(staticUrls(site).length > 0)
+    } finally {
+        delete process.env.SE_COMPANY_SITEMAP
+    }
+    assert.ok(companyUrls(site).length > 0)
+})
+
 test('real dataset: hubs need three indexable profiles; index lists segments', () => {
     const site = siteFromRelease(realRelease(), AS_OF)
     const hubs = hubUrls(site).map((u) => u.path)
