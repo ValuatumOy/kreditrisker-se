@@ -23,7 +23,7 @@ import { assertBatchSize } from '../src/lib/valuatum/batch-limit.ts'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
 import { readParams } from '../src/lib/valuatum/params.ts'
 
-const BUILD_DIR = path.join(process.cwd(), 'data', 'build')
+const BUILD_DIR = process.env.SE_BUILD_DIR ?? path.join(process.cwd(), 'data', 'build')
 
 const slugOf = (p: string) => p.split('/')[3]
 
@@ -37,7 +37,7 @@ async function main() {
     const keep = all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))
     const indexIn = process.env.SE_INDEX_IN ?? path.join(BUILD_DIR, 'index.jsonl')
     const rows = new Map(readJsonl<IndexRow>(indexIn).map((r) => [r.o, r]))
-    const importedAt = new Date().toISOString()
+    const importedAt = process.env.SE_IMPORTED_AT ?? new Date().toISOString()
     const batchId = `api-${importedAt.slice(0, 10)}`
 
     const rejected: { fid: string; name: string; reason: string }[] = []
@@ -60,6 +60,7 @@ async function main() {
                 if (!mapped.ok) return void rejected.push({ ...param, reason: mapped.reason })
                 const valid = validateRecord(mapped.record)
                 if (!valid.ok) return void rejected.push({ ...param, reason: valid.errors.join('; ') })
+                if (param.orgnr && mapped.record.orgnr !== param.orgnr) throw new Error(`API orgnr mismatch for fid ${param.fid}: expected ${param.orgnr}, received ${mapped.record.orgnr}`)
                 const prev = rows.get(mapped.record.orgnr)
                 const history = prev ? [...prev.rf.map(slugOf), slugOf(prev.p)] : undefined
                 page = publishCompany(mapped.record, history, SITE.asOf)

@@ -13,7 +13,7 @@ import { buildSite, siteFromRelease, type IndexRow, type Site } from './publish.
 import type { PublishedCompany } from './contract/types.ts'
 import { readJsonl } from './jsonl.ts'
 
-export const BUILD_DIR = path.join(process.cwd(), 'data', 'build')
+export const BUILD_DIR = process.env.SE_BUILD_DIR ?? path.join(process.cwd(), 'data', 'build')
 
 export function fixtureRelease(): Release {
     const raw = readBatchFile(path.join(process.cwd(), 'data', 'fixtures', 'synthetic-batch-001.jsonl'))
