@@ -10,9 +10,14 @@ export interface ReportOffer {
     experimentId?: string
     variantId?: string
     from?: boolean
+    remainingMs: number
+    validUntil: number
+    analyticsExperiment?: string
+    analyticsVariant?: string
 }
 
-export async function loadReportOffer(base: string, orgnr: string | undefined, fetchImpl: typeof fetch = fetch, origin = globalThis.location?.origin): Promise<ReportOffer> {
+export async function loadReportOffer(base: string, orgnr: string | undefined, fetchImpl: typeof fetch = fetch, origin = globalThis.location?.origin, now = () => performance.now()): Promise<ReportOffer> {
+    const startedAt = now()
     const url = new URL('create-checkout', new URL(base, origin))
     url.search = new URLSearchParams({ reportType: 'se_credit_risk', offer: orgnr ? '1' : 'summary', ...(orgnr ? { businessId: formatOrgnr(orgnr) } : {}) }).toString()
     const response = await fetchImpl(url, { cache: 'no-store', credentials: 'same-origin', signal: AbortSignal.timeout(10000) })
@@ -20,12 +25,16 @@ export async function loadReportOffer(base: string, orgnr: string | undefined, f
     const value = await response.json()
     if (value.reportType !== 'se_credit_risk' || !Number.isSafeInteger(value.unitAmount) || value.unitAmount <= 0 ||
         value.currency !== 'sek' || value.taxBehavior !== 'inclusive' || !Number.isInteger(value.expiresAt) ||
-        value.expiresAt <= Date.now() / 1000 || value.expiresAt > Date.now() / 1000 + 310 ||
+        !Number.isFinite(value.remainingMs) || value.remainingMs <= 0 || value.remainingMs > 300000 ||
         (!orgnr && typeof value.from !== 'boolean') || (orgnr && value.from !== undefined) ||
         (value.quote !== undefined && (typeof value.quote !== 'string' || value.quote.length > 2048)))
         throw new Error('Invalid price offer')
-    return value
+    const validUntil = startedAt + value.remainingMs
+    if (validUntil <= now()) throw new Error('Expired price offer')
+    return { ...value, validUntil }
 }
+
+export const offerRemainingMs = (offer: ReportOffer, now = performance.now()) => Math.max(0, offer.validUntil - now)
 
 export function offerLabel(offer: ReportOffer): string {
     return `${offer.from ? 'Från ' : ''}${(offer.unitAmount / 100).toLocaleString('sv-SE')} kr inkl. moms för konsument i Sverige`

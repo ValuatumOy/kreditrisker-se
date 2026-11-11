@@ -107,6 +107,7 @@ async function fulfillSingleReport(session, product) {
             version: meta.priceVersion, experimentId: meta.priceExperiment, variantId: meta.priceVariant,
             allocationUnit: meta.priceAllocationUnit, unitAmount: meta.quotedUnitAmount,
             currency: meta.quotedCurrency, taxBehavior: meta.quotedTaxBehavior,
+            analyticsExperiment: meta.priceAnalyticsExperiment, analyticsVariant: meta.priceAnalyticsVariant,
         } } : {}),
         termsAcceptedAt: meta.termsAcceptedAt || '',
         params,

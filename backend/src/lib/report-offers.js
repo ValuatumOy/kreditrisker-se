@@ -19,16 +19,20 @@ function configuration() {
         const value = JSON.parse(process.env.REPORT_PRICING_CONFIG || '')
         if (value.storefrontVersion !== 'runtime-offers-v1' || !isLabel(value.version) ||
             !isLabel(value.experimentId) || value.allocationUnit !== 'company' ||
+            !['e1', 'e2', 'e3', 'e4', 'e5', 'e6', 'e7', 'e8'].includes(value.analyticsExperiment) ||
             !Array.isArray(value.variants) || !value.variants.length || value.variants.length > 4)
             throw new Error()
         const ids = new Set()
+        const analyticsVariants = new Set()
         for (const variant of value.variants) {
             if (!isLabel(variant.id) || ids.has(variant.id) ||
+                !['v1', 'v2', 'v3', 'v4'].includes(variant.analyticsVariant) || analyticsVariants.has(variant.analyticsVariant) ||
                 !Number.isInteger(variant.weight) || variant.weight <= 0 || variant.weight > 10000 ||
                 !Number.isSafeInteger(variant.unitAmount) || variant.unitAmount <= 0 ||
                 variant.unitAmount > 99999999 || typeof variant.stripePriceId !== 'string' || !/^price_[A-Za-z0-9_]{1,200}$/.test(variant.stripePriceId))
                 throw new Error()
             ids.add(variant.id)
+            analyticsVariants.add(variant.analyticsVariant)
         }
         return { ...value, fingerprint: createHash('sha256').update(JSON.stringify(value)).digest('hex') }
     } catch { throw new OfferError('Pricing configuration is unavailable', 503) }
@@ -96,6 +100,7 @@ function attribution(config, offer) {
         priceVersion: config.version, priceExperiment: config.experimentId, priceVariant: offer.variant.id,
         priceAllocationUnit: config.allocationUnit, quotedUnitAmount: String(offer.variant.unitAmount),
         quotedCurrency: 'sek', quotedTaxBehavior: 'inclusive',
+        priceAnalyticsExperiment: config.analyticsExperiment, priceAnalyticsVariant: offer.variant.analyticsVariant,
     }
 }
 

@@ -16,11 +16,11 @@ let signingKey = SECRET
 require('../src/lib/secrets').loadSecrets = async () => ({ REPORT_PRICING_SIGNING_KEY: signingKey, STRIPE_WEBHOOK_SECRET: 'whsec_local_only' })
 const offers = require('../src/lib/report-offers')
 const configValue = () => ({
-    storefrontVersion: 'runtime-offers-v1', version: 'test-v1', experimentId: 'local-fixture', allocationUnit: 'company',
+    storefrontVersion: 'runtime-offers-v1', version: 'test-v1', experimentId: 'local-fixture', allocationUnit: 'company', analyticsExperiment: 'e1',
     // Synthetic mock amounts/IDs only; no proposed live prices.
     variants: [
-        { id: 'control', weight: 1, unitAmount: 1100, stripePriceId: 'price_mock_control' },
-        { id: 'variant', weight: 1, unitAmount: 1700, stripePriceId: 'price_mock_variant' },
+        { id: 'control', weight: 1, unitAmount: 1100, stripePriceId: 'price_mock_control', analyticsVariant: 'v1' },
+        { id: 'variant', weight: 1, unitAmount: 1700, stripePriceId: 'price_mock_variant', analyticsVariant: 'v2' },
     ],
 })
 let sessions, priceOverride, productActive, priceCalls
@@ -57,6 +57,8 @@ test('disabled default ignores malformed experiment config and retains 29 SEK le
     const value = JSON.parse(response.body)
     assert.equal(value.unitAmount, 2900)
     assert.equal(value.quote, undefined)
+    assert.equal(value.remainingMs, 300000)
+    assert.equal(value.analyticsExperiment, undefined)
     const summary = JSON.parse((await get(undefined, { offer: 'summary' })).body)
     assert.equal(summary.unitAmount, 2900)
     assert.equal(summary.from, false)
@@ -95,6 +97,8 @@ test('GET offer equals the exact checkout line item and authoritative attributio
     assert.match(response.headers['cache-control'], /private, no-store/)
     const value = JSON.parse(response.body)
     assert.ok(value.quote)
+    assert.ok(value.remainingMs > 0 && value.remainingMs <= 300000)
+    assert.equal(value.analyticsExperiment, 'e1')
     assert.equal(value.currency, 'sek')
     assert.equal(value.taxBehavior, 'inclusive')
     const variant = configValue().variants.find(variant => variant.id === value.variantId)
@@ -105,6 +109,7 @@ test('GET offer equals the exact checkout line item and authoritative attributio
     assert.equal(params.metadata.quotedUnitAmount, String(value.unitAmount))
     assert.equal(params.metadata.priceExperiment, value.experimentId)
     assert.equal(params.metadata.priceVariant, value.variantId)
+    assert.equal(params.metadata.priceAnalyticsVariant, value.analyticsVariant)
     assert.deepEqual(params.payment_intent_data.metadata, offers.attribution(offers.configuration(), { variant }))
     assert.equal(params.payment_intent_data.capture_method, 'manual')
     assert.equal(params.currency, 'sek')
@@ -155,6 +160,19 @@ test('misconfiguration and missing secret fail closed', async () => {
     process.env.REPORT_PRICING_CONFIG = JSON.stringify(configValue())
     signingKey = ''
     assert.equal((await get()).statusCode, 503)
+    assert.equal(sessions.length, 0)
+})
+
+test('analytics slots are small fixed labels and variant slots cannot collide', async () => {
+    for (const change of [
+        { analyticsExperiment: 'company-name' }, { analyticsExperiment: 'e9' },
+        { variants: configValue().variants.map(value => ({ ...value, analyticsVariant: 'v1' })) },
+        { variants: configValue().variants.map(value => ({ ...value, analyticsVariant: 'private@example.test' })) },
+    ]) {
+        process.env.REPORT_PRICING_CONFIG = JSON.stringify({ ...configValue(), ...change })
+        assert.equal((await get()).statusCode, 503)
+        assert.equal((await post()).statusCode, 503)
+    }
     assert.equal(sessions.length, 0)
 })
 

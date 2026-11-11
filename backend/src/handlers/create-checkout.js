@@ -186,7 +186,9 @@ exports.handler = async event => {
                 ...(summaryRequested ? { from: Boolean(pricing && pricing.variants.length > 1) } : {}),
                 ...(quoteRequested || summaryRequested ? {
                     expiresAt: offer?.expiresAt ?? Math.floor(Date.now() / 1000) + offers.TTL_SECONDS,
-                    ...(offer ? { quote: offer.quote, version: pricing.version, experimentId: pricing.experimentId, variantId: offer.variant.id } : {}),
+                    remainingMs: offer ? Math.max(0, offer.expiresAt * 1000 - Date.now()) : offers.TTL_SECONDS * 1000,
+                    ...(offer ? { quote: offer.quote, version: pricing.version, experimentId: pricing.experimentId, variantId: offer.variant.id,
+                        analyticsExperiment: pricing.analyticsExperiment, analyticsVariant: offer.variant.analyticsVariant } : {}),
                 } : {}),
             }, offers.NO_STORE)
         } catch (err) {

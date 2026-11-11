@@ -21,6 +21,7 @@ const frameOrigin = import.meta.env.PUBLIC_GA_FRAME_ORIGIN || ''
 
 <script>
     import { ANALYTICS_EVENTS, analyticsPage, analyticsReferrer, type AnalyticsEvent } from '../lib/analytics.ts'
+    import { sanitizePriceAnalytics, type PriceAnalyticsEvent } from '../lib/price-analytics.ts'
 
     const banner = document.querySelector<HTMLElement>('#consent')
     if (banner) {
@@ -29,16 +30,18 @@ const frameOrigin = import.meta.env.PUBLIC_GA_FRAME_ORIGIN || ''
         const returnKey = 'kreditrisker_analytics_return'
         let frame: HTMLIFrameElement | null = null
         let ready = false
-        let waiting: AnalyticsEvent[] = []
+        let waiting: (AnalyticsEvent | PriceAnalyticsEvent)[] = []
         const get = (storage: Storage, key: string) => { try { return storage.getItem(key) } catch { return null } }
         const set = (storage: Storage, key: string, value: string) => { try { storage.setItem(key, value) } catch {} }
         const remove = (storage: Storage, key: string) => { try { storage.removeItem(key) } catch {} }
         const consent = () => get(localStorage, consentKey) === 'granted'
 
-        function send(name: AnalyticsEvent) {
-            if (!consent() || !ANALYTICS_EVENTS.includes(name)) return
-            if (frame && ready) frame.contentWindow?.postMessage({ type: 'event', name }, '*')
-            else waiting.push(name)
+        function send(value: AnalyticsEvent | PriceAnalyticsEvent) {
+            if (!consent()) return
+            const price = typeof value === 'object' ? sanitizePriceAnalytics(value) : null
+            if (!price && (typeof value !== 'string' || !ANALYTICS_EVENTS.includes(value))) return
+            if (frame && ready) frame.contentWindow?.postMessage(price ? { type: 'price_event', ...price } : { type: 'event', name: value }, '*')
+            else waiting.push(price ?? value)
         }
 
         function load() {
@@ -81,6 +84,7 @@ const frameOrigin = import.meta.env.PUBLIC_GA_FRAME_ORIGIN || ''
             set(localStorage, consentKey, 'granted')
             banner.hidden = true
             load()
+            window.dispatchEvent(new Event('kreditrisker:consent'))
         })
         function stop() {
             for (const name of ['_ga', `_ga_${banner.dataset.analyticsId?.slice(2) ?? ''}`]) {
@@ -94,12 +98,18 @@ const frameOrigin = import.meta.env.PUBLIC_GA_FRAME_ORIGIN || ''
             ready = false
             waiting = []
             banner.hidden = true
+            window.dispatchEvent(new Event('kreditrisker:consent'))
         }
         banner.querySelector('[data-reject]')?.addEventListener('click', () => {
             set(localStorage, consentKey, 'denied')
             stop()
         })
-        addEventListener('storage', (event) => { if (event.key === consentKey && event.newValue !== 'granted') stop() })
+        addEventListener('storage', (event) => {
+            if (event.key !== consentKey) return
+            if (event.newValue === 'granted') load()
+            else stop()
+            window.dispatchEvent(new Event('kreditrisker:consent'))
+        })
         document.querySelectorAll<HTMLElement>('[data-consent-open]').forEach((button) => { button.hidden = false; button.addEventListener('click', open) })
         const queueSearch = () => { if (consent()) set(sessionStorage, searchKey, '1') }
         document.addEventListener('submit', (event) => { if ((event.target as Element)?.matches('[data-search]')) queueSearch() })
@@ -110,8 +120,14 @@ const frameOrigin = import.meta.env.PUBLIC_GA_FRAME_ORIGIN || ''
         window.addEventListener('kreditrisker:analytics', (event) => {
             const name = (event as CustomEvent).detail
             if (name === 'checkout_submitted') remove(sessionStorage, returnKey)
-            if (ANALYTICS_EVENTS.includes(name)) send(name)
+            if (typeof name === 'string' && ANALYTICS_EVENTS.includes(name as AnalyticsEvent)) send(name as AnalyticsEvent)
+            else {
+                const price = sanitizePriceAnalytics(name)
+                if (price) send(price)
+            }
         })
+        document.documentElement.dataset.priceAnalyticsReady = 'true'
+        window.dispatchEvent(new Event('kreditrisker:consent'))
     }
 </script>
 
