@@ -41,9 +41,10 @@ const hashFile = (file: string): File => {
     return { sha256: h.digest('hex'), bytes }
 }
 const validKey = (key: string) => /^[a-zA-Z0-9_./-]+$/.test(key) && key.split('/').every((s) => s && s !== '.' && s !== '..')
+const validBucket = (bucket: unknown): bucket is string => typeof bucket === 'string' && /^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(bucket) && !/\.\.|\.-|-\.|^\d+\.\d+\.\d+\.\d+$/.test(bucket)
 function stateLocation(uri: unknown) {
     const parts = typeof uri === 'string' ? /^s3:\/\/([a-z0-9][a-z0-9.-]{1,61}[a-z0-9])\/(.+)$/.exec(uri) : null
-    assert(parts && !/\.\.|\.-|-\.|^\d+\.\d+\.\d+\.\d+$/.test(parts[1]) && validKey(parts[2]), 'Invalid S3 state or policy URI')
+    assert(parts && validBucket(parts[1]) && validKey(parts[2]), 'Invalid S3 state or policy URI')
     return { bucket: parts[1], key: parts[2] }
 }
 
@@ -67,7 +68,7 @@ export function inventory(directory: string): Inventory {
 
 export function validateCapture(capture: Capture, site: Inventory, index: string): void {
     assert(capture.version === 1 && capture.complete === true && /^\d{4}-\d{2}-\d{2}T/.test(capture.capturedAt) && Number.isFinite(Date.parse(capture.capturedAt)), 'Incomplete or invalid offline capture')
-    assert(capture.site?.versioning === 'Enabled' && /^[a-z0-9.-]+$/.test(capture.site.bucket), 'Capture requires a versioned site bucket')
+    assert(capture.site?.versioning === 'Enabled' && validBucket(capture.site.bucket), 'Capture requires a versioned site bucket')
     const state = stateLocation(capture.state?.uri), policy = stateLocation(capture.policy?.uri)
     assert(state.bucket === policy.bucket && state.bucket !== capture.site.bucket && state.key !== policy.key, 'State and policy must use distinct keys in one separate state bucket')
     assert(typeof capture.site.objects === 'object' && capture.site.objects !== null, 'Capture lacks object versions')
@@ -87,9 +88,9 @@ export function validateCapture(capture: Capture, site: Inventory, index: string
         assert(Number.isInteger(capture.policy.head?.ContentLength) && Number(capture.policy.head?.ContentLength) > 0, 'Missing sitemap policy restore metadata')
         checkHead(capture.policy.head, capture.policy.versionId, Number(capture.policy.head?.ContentLength), 'sitemap policy')
     }
-    assert(capture.search && /^[A-Za-z0-9-_]+$/.test(capture.search.function) && /^\S+@sha256:[a-f0-9]{64}$/.test(capture.search.imageUri) && typeof capture.search.revisionId === 'string' && capture.search.revisionId.length > 0, 'Capture requires the resolved search image digest and Lambda revision')
+    assert(capture.search && typeof capture.search.function === 'string' && /^[A-Za-z0-9-_]+$/.test(capture.search.function) && /^\S+@sha256:[a-f0-9]{64}$/.test(capture.search.imageUri) && typeof capture.search.revisionId === 'string' && capture.search.revisionId.length > 0, 'Capture requires the resolved search image digest and Lambda revision')
     assert(capture.search.indexSha256 === null || capture.search.indexSha256 === capture.state.sha256, 'Search/index drift in offline capture')
-    assert(/^[A-Z0-9]+$/.test(capture.distributionId), 'Missing CloudFront distribution identity')
+    assert(typeof capture.distributionId === 'string' && /^[A-Z0-9]+$/.test(capture.distributionId), 'Missing CloudFront distribution identity')
 }
 
 /** A reviewable offline change set. This is deliberately not an executable release controller. */

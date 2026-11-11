@@ -107,12 +107,16 @@ test('complete versioned backup claims must match all local keys and bytes', () 
         (c: Capture) => { c.site.objects['_astro/old.js'].head.VersionId = 'wrong-version' },
         (c: Capture) => { c.site.objects['_astro/old.js'].head.ContentLength = 999999 },
         (c: Capture) => { c.site.versioning = 'Suspended' as any },
+        (c: Capture) => { delete (c.site as any).bucket },
+        (c: Capture) => { c.site.bucket = 'invalid..bucket' },
         (c: Capture) => { c.state.versionId = 'null' },
         (c: Capture) => { c.state.head = [] as any },
         (c: Capture) => { c.state.head.ContentLength = 999999 },
         (c: Capture) => { c.policy.head = {} },
         (c: Capture) => { c.policy.versionId = 'policy-version'; c.policy.sha256 = 'a'.repeat(64); c.policy.head = {} },
         (c: Capture) => { c.search.imageUri = 'example.invalid/search:latest' },
+        (c: Capture) => { delete (c.search as any).function },
+        (c: Capture) => { delete (c as any).distributionId },
         (c: Capture) => { c.complete = false as any },
     ]) {
         const c = structuredClone(i.capture); modify(c)
