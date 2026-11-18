@@ -25,6 +25,7 @@ distinctCompanyRows(pages.map((p) => ({ o: p.record.orgnr, p: p.path })))
 const byId = new Map(rows.map((r) => [r.o, r]))
 const synthetic = rows.some((r) => r.syn)
 const batch = readParams(process.env.BUILD_STATIC_PARAMS_FILE!)
+const revisions = new Map(batch.flatMap((p) => p.orgnr ? [[p.orgnr, p.updatedAt ?? null] as const] : []))
 const touched = new Set(batch.flatMap((p) => p.orgnr ? [p.orgnr] : []))
 for (const page of pages) {
     const row = byId.get(page.record.orgnr)
@@ -32,6 +33,8 @@ for (const page of pages) {
         throw new Error(`Company page differs from index: ${page.path}`)
     const indexable = pageIndexable(!row.ix, synthetic)
     verifyCompanyHtml(fs.readFileSync(path.join(dist, page.path, 'index.html'), 'utf8'), SITE.origin + page.path, indexable)
+    if (!revisions.has(row.o)) throw new Error(`Rendered company is outside selected batch: ${row.o}`)
+    row.rv = revisions.get(row.o)!
     delete row.sm
     if (indexable) row.sm = true
     touched.add(row.o)
@@ -42,13 +45,19 @@ const oldById = new Map(previous.map((r) => [r.o, r]))
 for (const row of rows) {
     if (rendered.has(row.o)) continue
     const old = oldById.get(row.o)
-    if (touched.has(row.o)) delete row.sm
+    if (touched.has(row.o)) {
+        delete row.sm
+        delete row.rv
+    }
     if (row.sm && (!old?.sm || old.p !== row.p || old.ix !== row.ix || old.syn !== row.syn))
         throw new Error(`Unverified sitemap eligibility: ${row.p}`)
 }
 const checkpoint = previous.map((row) => {
     const copy = { ...row }
-    if (touched.has(row.o) || !byId.has(row.o)) delete copy.sm
+    if (touched.has(row.o) || !byId.has(row.o)) {
+        delete copy.sm
+        delete copy.rv
+    }
     return copy
 })
 function writeSitemaps(directory: string, index: IndexRow[]) {

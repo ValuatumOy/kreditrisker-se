@@ -284,7 +284,7 @@ test('static params: orgnr parsed, group-account K codes skipped', () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'se-params-'))
     const f = path.join(dir, 'p.txt')
     fs.writeFileSync(f, '900001\ttestbolaget\tTestbolaget Norrland AB\t47599\t556987-6542\n900002\ttestbolaget\tTestbolaget Norrland AB\t47599\t5569876542K\n')
-    assert.deepEqual(readParams(f), [{ fid: '900001', name: 'Testbolaget Norrland AB', orgnr: '5569876542' }])
+    assert.deepEqual(readParams(f), [{ fid: '900001', name: 'Testbolaget Norrland AB', orgnr: '5569876542', sni: '47599' }])
     fs.writeFileSync(f, '900001\ttestbolaget\tTestbolaget Norrland AB\t47599\t556987-6542\t1791500000000\n')
     assert.equal(readParams(f)[0].updatedAt, new Date(1791500000000).toISOString(), 'sixth column: model save time')
 })
@@ -323,6 +323,9 @@ test('fetch stage: batch pages, merged index, removed companies dropped, renames
     assert.equal(rows[0].ns, 6_518_822_000, 'newest year in kronor')
     assert.equal(read('rejected.jsonl')[0].fid, '900404', 'uncached company without API access is rejected, not fatal')
     assert.equal(fs.readFileSync(path.join(dir, 'data', 'build', 'removed.txt'), 'utf8'), 'foretag/5560000019/\n', 'deploy deletes pages of removed companies')
+    execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'fetch.ts')], { cwd: dir, env: { ...env, SE_AUTO_BATCH: '1' }, stdio: 'pipe' })
+    assert.deepEqual(read('index.jsonl').map((r) => r.o), ['5569876542', '5560000019'], 'automatic scoped runs preserve rows outside the current directory list')
+    assert.equal(fs.readFileSync(path.join(dir, 'data', 'build', 'removed.txt'), 'utf8'), '', 'automatic runs never request global deletions')
 })
 
 test('fetch clears selected eligibility including rejects, preserves untouched flags, and rejects duplicate state', () => {

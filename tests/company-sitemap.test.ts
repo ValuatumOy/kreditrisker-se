@@ -8,6 +8,7 @@ import { distinctCompanyRows, verifyCompanyHtml } from '../src/lib/company-sitem
 import { mapBundle } from '../src/lib/valuatum/map.ts'
 import { publishCompany, toRow, type IndexRow } from '../src/lib/publish.ts'
 import { readJsonl, writeJsonl } from '../src/lib/jsonl.ts'
+import { automaticBatch } from '../src/lib/valuatum/params.ts'
 
 const ROOT = path.join(import.meta.dirname, '..')
 const ORIGIN = 'https://www.kreditrisker.se'
@@ -79,6 +80,9 @@ test('incremental verification promotes refreshed HTML, preserves untouched elig
         assert.equal(result.status, 0, result.stdout + result.stderr)
         const rows = readJsonl<IndexRow>(path.join(c.build, 'index.jsonl'))
         assert.deepEqual(rows.filter((r) => r.sm).map((r) => r.o), [c.row.o, c.untouched.o])
+        assert.equal(rows.find((r) => r.o === c.row.o)!.rv, null, 'unknown source revision is recorded after successful HTML verification')
+        assert.equal(rows.find((r) => r.o === c.thin.record.orgnr)!.rv, null, 'verified noindex HTML is rendered too')
+        assert.equal(rows.find((r) => r.o === c.failed.o)!.rv, undefined, 'a rejected fetch never advances rendered revision')
         const final = fs.readFileSync(path.join(c.dir, 'dist', 'sitemap-companies-1.xml'), 'utf8')
         assert.ok(final.includes(ORIGIN + c.row.p))
         assert.ok(final.includes(ORIGIN + c.untouched.p))
@@ -97,6 +101,36 @@ test('incremental verification promotes refreshed HTML, preserves untouched elig
         fs.writeFileSync(path.join(c.dir, 'batch.txt'), '')
         assert.equal(c.run().status, 0)
         assert.equal(fs.readFileSync(path.join(c.dir, 'dist', 'sitemap-companies-1.xml'), 'utf8'), final)
+    } finally { fs.rmSync(c.dir, { recursive: true, force: true }) }
+})
+
+test('rendered revision records the selected source save time only after HTML verification', () => {
+    const c = candidate()
+    try {
+        const batch = path.join(c.dir, 'batch.txt')
+        fs.writeFileSync(batch, fs.readFileSync(batch, 'utf8').replace(`${c.row.o}\n`, `${c.row.o}\t1794960000000\n`))
+        assert.equal(c.run().status, 0)
+        const row = readJsonl<IndexRow>(path.join(c.build, 'index.jsonl')).find((r) => r.o === c.row.o)!
+        assert.equal(row.rv, new Date(1794960000000).toISOString())
+        assert.equal(readJsonl<IndexRow>(path.join(c.build, 'index-checkpoint.jsonl')).find((r) => r.o === c.row.o)!.rv, undefined, 'pre-upload checkpoint does not claim the new render')
+    } finally { fs.rmSync(c.dir, { recursive: true, force: true }) }
+})
+
+test('an interrupted unchanged-source rebuild and a rejected refresh clear revision so automatic repair selects them', () => {
+    const c = candidate()
+    try {
+        for (const file of [path.join(c.dir, 'prev.jsonl'), path.join(c.build, 'index.jsonl')]) {
+            const rows = readJsonl<IndexRow>(file)
+            for (const row of rows) row.rv = null
+            writeJsonl(file, rows)
+        }
+        assert.equal(c.run().status, 0)
+        const checkpoint = readJsonl<IndexRow>(path.join(c.build, 'index-checkpoint.jsonl'))
+        const next = readJsonl<IndexRow>(path.join(c.build, 'index.jsonl'))
+        const params = [c.row, c.failed].map((r) => ({ fid: r.o, orgnr: r.o, name: r.n }))
+        assert.deepEqual(automaticBatch(params, checkpoint, 10, 0).map((p) => p.orgnr), [c.row.o, c.failed.o])
+        assert.deepEqual(automaticBatch(params, next, 10, 0).map((p) => p.orgnr), [c.failed.o])
+        assert.equal(checkpoint.find((r) => r.o === c.untouched.o)!.rv, null, 'untouched revisions survive')
     } finally { fs.rmSync(c.dir, { recursive: true, force: true }) }
 })
 

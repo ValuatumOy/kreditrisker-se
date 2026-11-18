@@ -6,7 +6,8 @@
 // run, so "Build with Parameters" -> type the org numbers -> Build is enough:
 //   build or rebuild companies  COMPANIES=556448-0282, 5565675906
 //   build new profiles          COMPANIES=new:1000
-//   nightly (scheduled)         COMPANIES empty: companies updated since SINCE
+//   scheduled every 30 minutes  bounded automatic legacy/changed + unpublished selection
+//   manual changed build       COMPANIES empty: companies updated since SINCE
 //   everything                  COMPANIES=all
 //
 // Differences from the Danish job:
@@ -34,11 +35,13 @@ pipeline {
     agent { label 'sweden-build' }
 
     options { disableConcurrentBuilds() } // the index state in STATE_URI is read and written by every run
+    triggers { cron('H/30 * * * *') }
 
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
-Empty: the nightly run (companies updated since SINCE). "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
+Empty: companies updated since SINCE. "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
 "new:1000": up to 1,000 companies with models available and no profile in the published index.
+"auto": the same bounded existing/new selection as the half-hour schedule.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
@@ -77,6 +80,9 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 checkout scm
                 script {
+                    env.SE_TIMER_BATCH = currentBuild.getBuildCauses('hudson.triggers.TimerTrigger$TimerTriggerCause').size() > 0 ? '1' : '0'
+                    env.SE_AUTO_BATCH = (env.SE_TIMER_BATCH == '1' || params.COMPANIES.trim().equalsIgnoreCase('auto')) ? '1' : '0'
+                    env.SE_SKIP_BATCH = '0'
                     def out = { key -> sh(returnStdout: true, script: "aws cloudformation describe-stacks --stack-name \"\$SITE_STACK\" --query \"Stacks[0].Outputs[?OutputKey=='${key}'].OutputValue\" --output text").trim() }
                     env.BUILD_BUCKET = out('SiteBucketName')
                     env.CLOUDFRONT_DISTRIBUTION_ID = out('DistributionId')
@@ -113,7 +119,7 @@ The fields below are already set for a production run; leave them as they are.''
                     fi
                     rm -f "$BUILD_STATIC_PARAMS_FILE" "$BUILD_STATIC_PARAMS_FILE_ALL"
                     since_args=()
-                    if [ -z "$(echo "$COMPANIES" | tr -d '[:space:]')" ]; then
+                    if [ "$SE_AUTO_BATCH" != '1' ] && [ -z "$(echo "$COMPANIES" | tr -d '[:space:]')" ]; then
                         since_args=(--include-updated-since $(($(date -d "$SINCE" +%s) * 1000)))
                     fi
                     arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
@@ -125,10 +131,17 @@ The fields below are already set for a production run; leave them as they are.''
                     node scripts/select-batch.ts
                     echo "batch: $(wc -l < "$BUILD_STATIC_PARAMS_FILE") rows, directory: $(wc -l < "$BUILD_STATIC_PARAMS_FILE_ALL")"
                 '''
+                script {
+                    if (env.SE_AUTO_BATCH == '1' && !readFile(env.BUILD_STATIC_PARAMS_FILE).trim()) {
+                        env.SE_SKIP_BATCH = '1'
+                        echo 'No automatic company work; skipping fetch, build, deploy and search.'
+                    }
+                }
             }
         }
 
         stage('Fetch') {
+            when { expression { env.SE_SKIP_BATCH != '1' } }
             steps {
                 sh '''#!/bin/bash
                     set -e
@@ -142,6 +155,7 @@ The fields below are already set for a production run; leave them as they are.''
         }
 
         stage('Build') {
+            when { expression { env.SE_SKIP_BATCH != '1' } }
             steps {
                 // ~64 KB of page data per company: a 16k batch is ~1 GB of pages.jsonl, too much for Node's default heap.
                 sh '''#!/bin/bash
@@ -156,11 +170,11 @@ The fields below are already set for a production run; leave them as they are.''
         }
 
         stage('Deploy') {
-            when { expression { params.DEPLOY } }
+            when { expression { params.DEPLOY && env.SE_SKIP_BATCH != '1' } }
             steps {
                 sh '''#!/bin/bash
                     set -e
-                    if [ -n "$(echo "$COMPANIES" | tr -d '[:space:]')" ] && [ "$COMPANIES" != "all" ] && [ -s data/build/removed.txt ]; then
+                    if { [ "$SE_AUTO_BATCH" = '1' ] || { [ -n "$(echo "$COMPANIES" | tr -d '[:space:]')" ] && [ "$COMPANIES" != "all" ]; }; } && [ -s data/build/removed.txt ]; then
                         echo "A named-company build would remove other company pages; review data/build/removed.txt first." >&2
                         exit 1
                     fi
@@ -202,7 +216,7 @@ The fields below are already set for a production run; leave them as they are.''
         stage('Update search') {
             // The image goes to the search repository as :latest; the Lambda is pointed at its digest, so rolling
             // back is update-function-code with an older digest (the repository keeps the last 5 images).
-            when { expression { params.DEPLOY && params.UPDATE_SEARCH && env.SEARCH_FUNCTION && env.SEARCH_REPOSITORY } }
+            when { expression { params.DEPLOY && params.UPDATE_SEARCH && env.SE_SKIP_BATCH != '1' && env.SEARCH_FUNCTION && env.SEARCH_REPOSITORY } }
             steps {
                 sh '''#!/bin/bash
                     set -e
@@ -228,7 +242,12 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
-            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt, data/build/index-checkpoint.jsonl, data/build/sitemap-withdrawal/*.xml', allowEmptyArchive: true, fingerprint: true
+            script {
+                def artifacts = env.SE_TIMER_BATCH == '1'
+                    ? (env.SE_SKIP_BATCH == '1' ? env.BUILD_STATIC_PARAMS_FILE : "${env.BUILD_STATIC_PARAMS_FILE}, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt")
+                    : '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt, data/build/index-checkpoint.jsonl, data/build/sitemap-withdrawal/*.xml'
+                archiveArtifacts artifacts: artifacts, allowEmptyArchive: true, fingerprint: true
+            }
         }
     }
 }
