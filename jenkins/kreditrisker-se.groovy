@@ -5,6 +5,7 @@
 // One field to fill: COMPANIES. Every other parameter defaults to a production
 // run, so "Build with Parameters" -> type the org numbers -> Build is enough:
 //   build or rebuild companies  COMPANIES=556448-0282, 5565675906
+//   build new profiles          COMPANIES=new:1000
 //   nightly (scheduled)         COMPANIES empty: companies updated since SINCE
 //   everything                  COMPANIES=all
 //
@@ -37,6 +38,7 @@ pipeline {
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
 Empty: the nightly run (companies updated since SINCE). "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
+"new:1000": up to 1,000 companies with models available and no profile in the published index.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
@@ -102,6 +104,13 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 sh '''#!/bin/bash
                     set -e
+                    # Keep batch selection and fetch tied to the same production index.
+                    rm -f "$SE_INDEX_IN"
+                    aws s3 cp "$STATE_URI" "$SE_INDEX_IN"
+                    if [ ! -s "$SE_INDEX_IN" ]; then
+                        echo "Existing index state is empty; refusing to build." >&2
+                        exit 1
+                    fi
                     rm -f "$BUILD_STATIC_PARAMS_FILE" "$BUILD_STATIC_PARAMS_FILE_ALL"
                     since_args=()
                     if [ -z "$(echo "$COMPANIES" | tr -d '[:space:]')" ]; then
@@ -123,13 +132,6 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 sh '''#!/bin/bash
                     set -e
-                    # Never use a stale workspace file or publish an empty directory after a download error.
-                    rm -f "$SE_INDEX_IN"
-                    aws s3 cp "$STATE_URI" "$SE_INDEX_IN"
-                    if [ ! -s "$SE_INDEX_IN" ]; then
-                        echo "Existing index state is empty; refusing to build." >&2
-                        exit 1
-                    fi
                     SE_API_REFRESH=1 npm run fetch
                 '''
                 script {

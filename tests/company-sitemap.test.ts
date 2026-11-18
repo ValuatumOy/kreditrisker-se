@@ -118,6 +118,23 @@ test('a failed or filtered company render cannot grant or persist eligibility', 
     }
 })
 
+test('the first gradual batch promotes only refreshed profiles from wholly legacy state', () => {
+    const c = candidate()
+    try {
+        for (const file of [path.join(c.dir, 'prev.jsonl'), path.join(c.build, 'index.jsonl')]) {
+            const rows = readJsonl<IndexRow>(file)
+            for (const row of rows) delete row.sm
+            writeJsonl(file, rows)
+        }
+        assert.equal(c.run().status, 0)
+        const rows = readJsonl<IndexRow>(path.join(c.build, 'index.jsonl'))
+        assert.deepEqual(rows.filter((r) => r.sm).map((r) => r.o), [c.row.o])
+        const withdrawal = path.join(c.build, 'sitemap-withdrawal')
+        assert.deepEqual(fs.readdirSync(withdrawal), ['sitemap-index.xml'])
+        assert.doesNotMatch(fs.readFileSync(path.join(withdrawal, 'sitemap-index.xml'), 'utf8'), /sitemap-companies-/)
+    } finally { fs.rmSync(c.dir, { recursive: true, force: true }) }
+})
+
 test('retry after an interrupted deployment cannot restore withdrawn eligibility', () => {
     const c = candidate()
     try {
@@ -151,7 +168,7 @@ test('Jenkins deploy withdraws first, checkpoints before targets, and publishes 
         const c = candidate()
         try {
             assert.equal(c.run().status, 0)
-            fs.writeFileSync(path.join(c.build, 'removed.txt'), '')
+            fs.writeFileSync(path.join(c.build, 'removed.txt'), `foretag/${c.removed.o}/\n`)
             const journal = path.join(c.dir, 'aws.log')
             const state = path.join(c.dir, 'deployed-state.jsonl')
             const result = spawnSync(bash, ['--noprofile', '--norc', '-c', mock + script], {
@@ -171,6 +188,7 @@ test('Jenkins deploy withdraws first, checkpoints before targets, and publishes 
             } else {
                 assert.ok(locate('cloudfront wait invalidation-completed') < locate('s3 cp --recursive dist'))
                 assert.ok(locate('s3 sync dist/branscher/') < locate('s3 sync dist/ s3://test-bucket/ --delete --exclude * --include sitemap-companies-*.xml'))
+                assert.ok(locate(`s3 rm --recursive s3://test-bucket/foretag/${c.removed.o}/`) < locate('s3 cp dist/sitemap-index.xml'))
                 assert.ok(locate('s3 sync dist/ s3://test-bucket/ --delete --exclude * --include sitemap-companies-*.xml') < locate('s3 cp dist/sitemap-index.xml'))
                 const indexUpload = locate('s3 cp dist/sitemap-index.xml')
                 const stateUpload = locate('s3 cp data/build/index.jsonl')
