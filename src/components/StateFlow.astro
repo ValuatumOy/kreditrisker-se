@@ -12,7 +12,7 @@ const { no } = Astro.props
 const now = { basic: staticReportState('basic', null).kind, ai: staticReportState('ai', null).kind }
 const TEXT: Record<(typeof STATE_KINDS)[number], string> = {
     unavailable: 'Rapporten finns inte för svenska företag ännu, eller inte för just det här företaget.',
-    sample: 'En exempelrapport på syntetiska data visar upplägget. Inget kan beställas.',
+    sample: 'En exempelrapport i PDF-format visar upplägget. Rapporten kan ännu inte beställas.',
     available: 'Rapporten kan beställas. Pris och leveranssätt visas innan du betalar.',
     processing: 'Beloppet är reserverat och rapporten tas fram.',
     success: 'Rapporten skickas som PDF till din e-post.',
