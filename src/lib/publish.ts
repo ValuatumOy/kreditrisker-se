@@ -42,6 +42,8 @@ export interface IndexRow {
     ix: boolean
     q: boolean
     syn: boolean
+    /** Canonical HTML verified index,follow; persisted after deployment, absent for legacy rows. */
+    sm?: true
     /** newest period */
     per?: { start: string; end: string; months: number; filedAt?: string }
     /** newest-period figures: net sales (and prior year), employees */

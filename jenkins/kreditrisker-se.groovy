@@ -5,6 +5,7 @@
 // One field to fill: COMPANIES. Every other parameter defaults to a production
 // run, so "Build with Parameters" -> type the org numbers -> Build is enough:
 //   build or rebuild companies  COMPANIES=556448-0282, 5565675906
+//   build new profiles          COMPANIES=new:1000
 //   nightly (scheduled)         COMPANIES empty: companies updated since SINCE
 //   everything                  COMPANIES=all
 //
@@ -37,6 +38,7 @@ pipeline {
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
 Empty: the nightly run (companies updated since SINCE). "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
+"new:1000": up to 1,000 companies with models available and no profile in the published index.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
@@ -57,9 +59,8 @@ The fields below are already set for a production run; leave them as they are.''
         PUBLIC_VALUATUM_API_BASE_URL = 'https://sweden.valuatum.com'
         SECRET_VALUATUM_API_TOKEN = credentials('kreditrisker-se-api-token')
         SE_INDEXING = '1'
-        // Existing profiles still contain the old noindex meta. Turn the company sitemap on only
-        // after the full candidate has been built and verified against the HTML to be published.
-        SE_COMPANY_SITEMAP = '0'
+        // Legacy rows are excluded; normal batches earn eligibility from verified HTML.
+        SE_COMPANY_SITEMAP = 'verified'
         PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> search Lambda (aws-infra)
         PUBLIC_GA_TRACKING_ID = 'G-10WF1WRH4W'
         PUBLIC_GA_FRAME_ORIGIN = 'https://kreditrisker.se'
@@ -103,6 +104,13 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 sh '''#!/bin/bash
                     set -e
+                    # Keep batch selection and fetch tied to the same production index.
+                    rm -f "$SE_INDEX_IN"
+                    aws s3 cp "$STATE_URI" "$SE_INDEX_IN"
+                    if [ ! -s "$SE_INDEX_IN" ]; then
+                        echo "Existing index state is empty; refusing to build." >&2
+                        exit 1
+                    fi
                     rm -f "$BUILD_STATIC_PARAMS_FILE" "$BUILD_STATIC_PARAMS_FILE_ALL"
                     since_args=()
                     if [ -z "$(echo "$COMPANIES" | tr -d '[:space:]')" ]; then
@@ -124,13 +132,6 @@ The fields below are already set for a production run; leave them as they are.''
             steps {
                 sh '''#!/bin/bash
                     set -e
-                    # Never use a stale workspace file or publish an empty directory after a download error.
-                    rm -f "$SE_INDEX_IN"
-                    aws s3 cp "$STATE_URI" "$SE_INDEX_IN"
-                    if [ ! -s "$SE_INDEX_IN" ]; then
-                        echo "Existing index state is empty; refusing to build." >&2
-                        exit 1
-                    fi
                     SE_API_REFRESH=1 npm run fetch
                 '''
                 script {
@@ -149,6 +150,7 @@ The fields below are already set for a production run; leave them as they are.''
                     for prefix in branscher kommuner konkurser; do
                         [ -s "dist/$prefix/index.html" ] || { echo "Missing complete $prefix output" >&2; exit 1; }
                     done
+                    NODE_OPTIONS=--max-old-space-size=8192 node scripts/company-sitemaps.ts
                 '''
             }
         }
@@ -162,7 +164,22 @@ The fields below are already set for a production run; leave them as they are.''
                         echo "A named-company build would remove other company pages; review data/build/removed.txt first." >&2
                         exit 1
                     fi
-                    aws s3 cp --recursive dist "s3://$BUILD_BUCKET" --only-show-errors
+                    publish_company_sitemaps() {
+                        # Remove obsolete shards too: a crawler may still know their URLs.
+                        aws s3 sync "$1/" "s3://$BUILD_BUCKET/" --delete --exclude '*' --include 'sitemap-companies-*.xml' --only-show-errors
+                        aws s3 cp "$1/sitemap-index.xml" "s3://$BUILD_BUCKET/sitemap-index.xml" --only-show-errors
+                    }
+                    invalidate_and_wait() {
+                        local id
+                        id=$(aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "$1" --query 'Invalidation.Id' --output text)
+                        aws cloudfront wait invalidation-completed --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --id "$id"
+                    }
+                    # Withdraw affected URLs before replacing HTML or deleting companies.
+                    publish_company_sitemaps data/build/sitemap-withdrawal
+                    invalidate_and_wait '/sitemap-*'
+                    # A failed deployment must leave a safe state for the next incremental run.
+                    aws s3 cp data/build/index-checkpoint.jsonl "$STATE_URI" --only-show-errors
+                    aws s3 cp --recursive dist "s3://$BUILD_BUCKET" --exclude 'sitemap-*.xml' --only-show-errors
                     # These directories are rebuilt in full on every run. Remove obsolete
                     # list pages, but never sync-delete incremental company pages or assets.
                     for prefix in branscher kommuner konkurser; do
@@ -171,8 +188,13 @@ The fields below are already set for a production run; leave them as they are.''
                     while read -r prefix; do
                         [ -n "$prefix" ] && aws s3 rm --recursive "s3://$BUILD_BUCKET/$prefix" --only-show-errors
                     done < data/build/removed.txt
+                    # Clear old cached noindex HTML before advertising refreshed targets.
+                    invalidate_and_wait '/*'
+                    aws s3 cp dist/sitemap-pages.xml "s3://$BUILD_BUCKET/sitemap-pages.xml" --only-show-errors
+                    aws s3 cp dist/sitemap-hubs.xml "s3://$BUILD_BUCKET/sitemap-hubs.xml" --only-show-errors
+                    publish_company_sitemaps dist
                     aws s3 cp data/build/index.jsonl "$STATE_URI" --only-show-errors
-                    aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
+                    invalidate_and_wait '/sitemap-*'
                 '''
             }
         }
@@ -206,7 +228,7 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
-            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt, data/build/index-checkpoint.jsonl, data/build/sitemap-withdrawal/*.xml', allowEmptyArchive: true, fingerprint: true
         }
     }
 }

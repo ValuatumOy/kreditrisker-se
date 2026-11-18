@@ -325,6 +325,27 @@ test('fetch stage: batch pages, merged index, removed companies dropped, renames
     assert.equal(fs.readFileSync(path.join(dir, 'data', 'build', 'removed.txt'), 'utf8'), 'foretag/5560000019/\n', 'deploy deletes pages of removed companies')
 })
 
+test('fetch clears selected eligibility including rejects, preserves untouched flags, and rejects duplicate state', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'se-fetch-sitemap-'))
+    try {
+        const cache = path.join(dir, 'cache')
+        fs.mkdirSync(cache)
+        fs.writeFileSync(path.join(cache, '900001.json'), JSON.stringify(bundle()))
+        fs.writeFileSync(path.join(dir, 'batch.txt'), '900001\tx\tTest AB\t1\t5569876542\n900404\tx\tFailed AB\t1\t5591844112\n')
+        const row = (o: string, sm = true) => ({ o, n: o, p: `/foretag/${o}/test/`, rf: [], st: 'active', fr: 'current', ix: true, q: true, syn: false, im: '2026-01-01', ...(sm ? { sm: true } : {}) })
+        const previous = [row('5569876542'), row('5591844112'), row('5564480282'), row('5565675906', false)]
+        const prev = path.join(dir, 'prev.jsonl')
+        const env = { ...process.env, BUILD_STATIC_PARAMS_FILE: path.join(dir, 'batch.txt'), BUILD_STATIC_PARAMS_FILE_ALL: '', SE_INDEX_IN: prev, SE_API_CACHE_DIR: cache, PUBLIC_VALUATUM_API_BASE_URL: '', SECRET_VALUATUM_API_TOKEN: '' }
+        const run = () => execFileSync(process.execPath, [path.join(ROOT, 'scripts', 'fetch.ts')], { cwd: dir, env, stdio: 'pipe' })
+        fs.writeFileSync(prev, previous.map((r) => JSON.stringify(r) + '\n').join(''))
+        run()
+        const rows = fs.readFileSync(path.join(dir, 'data/build/index.jsonl'), 'utf8').trim().split('\n').map((l) => JSON.parse(l))
+        assert.deepEqual(rows.filter((r) => r.sm).map((r) => r.o), ['5564480282'])
+        fs.appendFileSync(prev, JSON.stringify(previous[0]) + '\n')
+        assert.throws(run, /Duplicate company index row/)
+    } finally { fs.rmSync(dir, { recursive: true, force: true }) }
+})
+
 test('batch selection: modes, orgnr with or without hyphen, fids, group rows, unknown companies', () => {
     const all = [
         '1\ta\tAlfa AB\t62100\t5564480282',

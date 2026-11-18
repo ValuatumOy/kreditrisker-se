@@ -123,9 +123,12 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
    then `scripts/select-batch.ts` picks the batch from `COMPANIES` (no file upload; empty = changed, `all` = every company)
 2. Fetch (restores the index state from `STATE_URI`, a private S3 key; uses `SE_API_REFRESH=1` so the selected batch always reads fresh REST data instead of a previous workspace cache)
-3. Build (`SE_DATA_SOURCE=build`)
-4. Deploy: `aws s3 cp` on top of the bucket, delete `removed.txt` prefixes,
-   save the new index state, invalidate CloudFront
+3. Build (`SE_DATA_SOURCE=build`), then verify touched company HTML and prepare
+   gradual company sitemaps (`SE_COMPANY_SITEMAP=verified`)
+4. Deploy: withdraw affected company sitemap URLs and save a conservative
+   index checkpoint before changing targets; upload HTML and delete `removed.txt`
+   prefixes; publish final sitemap segments and index only after targets and
+   CloudFront invalidation complete, then save the final index state.
 5. Update search: `scripts/search-db.ts` builds the search database from the
    whole index, the job builds `search/Dockerfile` (the agent needs Docker), pushes
    the image and points the Lambda at it (docs/AWS-SETUP.md)
@@ -133,6 +136,10 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 `COMPANIES=all` is limited to 10,000 rows. Larger builds require a separately verified, bounded process; the limit is a safeguard, not a capacity guarantee.
 
 The production job requires a nonempty existing index. A named-company run stops before deployment if the source list would remove company pages. Industry, municipality and bankruptcy directories are rebuilt in full and synchronized with deletion of obsolete list pages; company pages and assets are never sync-deleted.
+
+Before enabling the verified sitemap pipeline, deploy the site stack's narrow
+`cloudfront:GetInvalidation` grant to the build role. It lets Jenkins wait for
+cache invalidations on this site's distribution; no other resources change.
 
 Search: the static `/sok/index.json` is emitted only up to 50,000 companies. For
 the full directory `PUBLIC_SE_SEARCH_ENDPOINT` is `/api/search`, the search

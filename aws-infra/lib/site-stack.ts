@@ -208,6 +208,7 @@ export class SiteStack extends cdk.Stack {
             siteBucket.grantDelete(buildRole)
             stateBucket.grantReadWrite(buildRole)
             distribution.grantCreateInvalidation(buildRole)
+            distribution.grant(buildRole, 'cloudfront:GetInvalidation')
             buildRole.addToPrincipalPolicy(new iam.PolicyStatement({ actions: ['cloudformation:DescribeStacks'], resources: [this.stackId] }))
             if (searchFunction) {
                 buildRole.addToPrincipalPolicy(

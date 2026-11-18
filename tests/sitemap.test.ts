@@ -54,6 +54,24 @@ test('company sitemaps can be held back while old profiles still contain noindex
     assert.ok(companyUrls(site).length > 0)
 })
 
+test('verified company sitemap mode excludes legacy rows and keeps the global gates', () => {
+    const site = siteFromRelease(realRelease(), AS_OF)
+    process.env.SE_COMPANY_SITEMAP = 'verified'
+    try {
+        assert.equal(companyUrls(site).length, 0, 'legacy rows are ineligible by default')
+        const row = site.rows.find((c) => c.ix)!
+        row.sm = true
+        assert.deepEqual(companyUrls(site).map((u) => u.path), [row.p])
+        row.ix = false
+        assert.equal(companyUrls(site).length, 0, 'a noindex row never qualifies')
+        row.ix = true
+        site.synthetic = true
+        assert.equal(companyUrls(site).length, 0, 'synthetic data never qualifies')
+    } finally {
+        delete process.env.SE_COMPANY_SITEMAP
+    }
+})
+
 test('real dataset: hubs need three indexable profiles; index lists segments', () => {
     const site = siteFromRelease(realRelease(), AS_OF)
     const hubs = hubUrls(site).map((u) => u.path)
