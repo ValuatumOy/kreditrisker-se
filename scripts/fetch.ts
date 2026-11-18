@@ -22,6 +22,7 @@ import { fetchBundle, mapLimit } from '../src/lib/valuatum/api.ts'
 import { assertBatchSize } from '../src/lib/valuatum/batch-limit.ts'
 import { mapBundle } from '../src/lib/valuatum/map.ts'
 import { readParams } from '../src/lib/valuatum/params.ts'
+import { distinctCompanyRows } from '../src/lib/company-sitemap.ts'
 
 const BUILD_DIR = path.join(process.cwd(), 'data', 'build')
 
@@ -36,7 +37,11 @@ async function main() {
     const all = allFile ? readParams(allFile) : null
     const keep = all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))
     const indexIn = process.env.SE_INDEX_IN ?? path.join(BUILD_DIR, 'index.jsonl')
-    const rows = new Map(readJsonl<IndexRow>(indexIn).map((r) => [r.o, r]))
+    const previous = readJsonl<IndexRow>(indexIn)
+    distinctCompanyRows(previous)
+    const rows = new Map(previous.map((r) => [r.o, r]))
+    // A rejected refresh must not keep its previous sitemap eligibility.
+    for (const param of batch) if (param.orgnr && rows.has(param.orgnr)) delete rows.get(param.orgnr)!.sm
     const importedAt = new Date().toISOString()
     const batchId = `api-${importedAt.slice(0, 10)}`
 
@@ -58,6 +63,7 @@ async function main() {
                 if (!bundle) return void rejected.push({ ...param, reason: 'no financial statements in the model' })
                 const mapped = mapBundle(bundle, { batchId, importedAt })
                 if (!mapped.ok) return void rejected.push({ ...param, reason: mapped.reason })
+                if (param.orgnr && mapped.record.orgnr !== param.orgnr) throw new Error('API organisation number differs from the selected company')
                 const valid = validateRecord(mapped.record)
                 if (!valid.ok) return void rejected.push({ ...param, reason: valid.errors.join('; ') })
                 const prev = rows.get(mapped.record.orgnr)

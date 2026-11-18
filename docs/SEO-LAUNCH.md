@@ -8,15 +8,23 @@ context removes the site-wide `X-Robots-Tag`; the analytics frame remains
 `noindex`. Pages with an individual quality or privacy exclusion remain noindex.
 
 Existing company HTML was built with the old noindex setting and does not change
-when these switches are flipped. Until the pilot refreshes it, the production
-job sets `SE_COMPANY_SITEMAP=0`: this keeps those profiles out of the sitemap,
-while the common pages and eligible hubs can be indexed. Refreshed profiles can
-be found through links even before the company sitemap is enabled.
+when these switches are flipped. The production job uses
+`SE_COMPANY_SITEMAP=verified`: old rows without `sm: true` stay outside the
+company sitemap. Each normal batch clears eligibility for selected companies,
+including failed fetches. After building, `scripts/company-sitemaps.ts` checks
+distinct company rows and each rendered profile's actual canonical and robots
+meta, then grants eligibility only to verified `index,follow` HTML. Untouched
+eligible rows stay eligible across runs; noindex pages and removals are excluded.
 
-Before removing `SE_COMPANY_SITEMAP=0`, verify that every company URL in the
-candidate sitemap has an existing, canonical, indexable HTML page in the release
-being published. Do not assume that a row in `index.jsonl` proves that HTML was
-refreshed. A failed or partial pilot must leave the company sitemap off.
+Deployment first withdraws affected URLs (including obsolete sitemap shards),
+waits for the sitemap cache invalidation, and saves a conservative checkpoint
+of the previous index with those eligibility flags cleared. It then uploads
+targets and deletes removals, waits for the HTML cache invalidation, publishes
+the final sitemap segments before the sitemap index, and saves the final state.
+A failure can temporarily reduce sitemap coverage; the next run cannot restore
+eligibility for HTML that was not verified and uploaded. `SE_COMPANY_SITEMAP=0`
+still disables company sitemaps completely. Unset/default mode retains the full
+release behavior for local and complete-release builds.
 Changing the settings alone does not cause Google to crawl or index a page.
 
 This checklist complements `LAUNCH-GATES.md`; it does not approve indexing, a

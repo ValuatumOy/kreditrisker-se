@@ -57,9 +57,8 @@ The fields below are already set for a production run; leave them as they are.''
         PUBLIC_VALUATUM_API_BASE_URL = 'https://sweden.valuatum.com'
         SECRET_VALUATUM_API_TOKEN = credentials('kreditrisker-se-api-token')
         SE_INDEXING = '1'
-        // Existing profiles still contain the old noindex meta. Turn the company sitemap on only
-        // after the full candidate has been built and verified against the HTML to be published.
-        SE_COMPANY_SITEMAP = '0'
+        // Legacy rows are excluded; normal batches earn eligibility from verified HTML.
+        SE_COMPANY_SITEMAP = 'verified'
         PUBLIC_SE_SEARCH_ENDPOINT = '/api/search' // CloudFront -> search Lambda (aws-infra)
         PUBLIC_GA_TRACKING_ID = 'G-10WF1WRH4W'
         PUBLIC_GA_FRAME_ORIGIN = 'https://kreditrisker.se'
@@ -149,6 +148,7 @@ The fields below are already set for a production run; leave them as they are.''
                     for prefix in branscher kommuner konkurser; do
                         [ -s "dist/$prefix/index.html" ] || { echo "Missing complete $prefix output" >&2; exit 1; }
                     done
+                    NODE_OPTIONS=--max-old-space-size=8192 node scripts/company-sitemaps.ts
                 '''
             }
         }
@@ -162,7 +162,22 @@ The fields below are already set for a production run; leave them as they are.''
                         echo "A named-company build would remove other company pages; review data/build/removed.txt first." >&2
                         exit 1
                     fi
-                    aws s3 cp --recursive dist "s3://$BUILD_BUCKET" --only-show-errors
+                    publish_company_sitemaps() {
+                        # Remove obsolete shards too: a crawler may still know their URLs.
+                        aws s3 sync "$1/" "s3://$BUILD_BUCKET/" --delete --exclude '*' --include 'sitemap-companies-*.xml' --only-show-errors
+                        aws s3 cp "$1/sitemap-index.xml" "s3://$BUILD_BUCKET/sitemap-index.xml" --only-show-errors
+                    }
+                    invalidate_and_wait() {
+                        local id
+                        id=$(aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "$1" --query 'Invalidation.Id' --output text)
+                        aws cloudfront wait invalidation-completed --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --id "$id"
+                    }
+                    # Withdraw affected URLs before replacing HTML or deleting companies.
+                    publish_company_sitemaps data/build/sitemap-withdrawal
+                    invalidate_and_wait '/sitemap-*'
+                    # A failed deployment must leave a safe state for the next incremental run.
+                    aws s3 cp data/build/index-checkpoint.jsonl "$STATE_URI" --only-show-errors
+                    aws s3 cp --recursive dist "s3://$BUILD_BUCKET" --exclude 'sitemap-*.xml' --only-show-errors
                     # These directories are rebuilt in full on every run. Remove obsolete
                     # list pages, but never sync-delete incremental company pages or assets.
                     for prefix in branscher kommuner konkurser; do
@@ -171,8 +186,13 @@ The fields below are already set for a production run; leave them as they are.''
                     while read -r prefix; do
                         [ -n "$prefix" ] && aws s3 rm --recursive "s3://$BUILD_BUCKET/$prefix" --only-show-errors
                     done < data/build/removed.txt
+                    # Clear old cached noindex HTML before advertising refreshed targets.
+                    invalidate_and_wait '/*'
+                    aws s3 cp dist/sitemap-pages.xml "s3://$BUILD_BUCKET/sitemap-pages.xml" --only-show-errors
+                    aws s3 cp dist/sitemap-hubs.xml "s3://$BUILD_BUCKET/sitemap-hubs.xml" --only-show-errors
+                    publish_company_sitemaps dist
                     aws s3 cp data/build/index.jsonl "$STATE_URI" --only-show-errors
-                    aws cloudfront create-invalidation --distribution-id "$CLOUDFRONT_DISTRIBUTION_ID" --paths "/*"
+                    invalidate_and_wait '/sitemap-*'
                 '''
             }
         }
@@ -206,7 +226,7 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
-            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt', allowEmptyArchive: true, fingerprint: true
+            archiveArtifacts artifacts: '*params*.txt, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt, data/build/index-checkpoint.jsonl, data/build/sitemap-withdrawal/*.xml', allowEmptyArchive: true, fingerprint: true
         }
     }
 }
