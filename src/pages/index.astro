@@ -3,6 +3,7 @@ import { Picture } from 'astro:assets'
 import Base from '../layouts/Base.astro'
 import SearchBox from '../components/SearchBox.astro'
 import HeroCard from '../components/HeroCard.astro'
+import HomepageCompanies from '../components/HomepageCompanies.astro'
 import Circuit from '../components/Circuit.astro'
 import Val from '../components/Val.astro'
 import Icon from '../components/Icon.astro'
@@ -105,6 +106,8 @@ const statement =
         </div>
     </section>
 
+    <HomepageCompanies rows={site.rows} asOf={SITE.asOf} />
+
     <!-- ============================================================ STATEMENT (dark slab) -->
     <section class="slab dark">
         <Circuit tone="dark" class="slab__circuit" />
@@ -175,7 +178,7 @@ const statement =
                         <div class="dr__scan"></div>
                     </div>
                     <h3>Kreditrapport och AI-rapport</h3>
-                    <p>På företagets sida ser du vilka rapporter som kan beställas. <a href="/rapporter/">Läs om rapporterna</a>.</p>
+                    <p>På företagets sida ser du vilka rapporter som kan beställas. <a href="/rapporter/">Läs om rapporterna</a> eller <a href="/rapporter/exempel/">se exempelrapporter</a>.</p>
                 </article>
             </div>
         </div>

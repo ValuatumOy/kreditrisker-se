@@ -1,0 +1,80 @@
+---
+import { date } from '../lib/format.ts'
+import { homepageCompanies } from '../lib/homepage-companies.ts'
+import type { IndexRow } from '../lib/publish.ts'
+
+interface Props {
+    rows: IndexRow[]
+    asOf: string
+}
+const { rows, asOf } = Astro.props
+const { bankruptcies, financials } = homepageCompanies(rows, asOf)
+---
+
+{(bankruptcies.length > 0 || financials.length > 0) && (
+    <section class="company-picks">
+        <div class="shell company-picks__grid">
+            {bankruptcies.length > 0 && (
+                <section aria-labelledby="home-konkurser">
+                    <h2 id="home-konkurser">Senaste konkurserna i underlaget</h2>
+                    <ul class="company-picks__list">
+                        {bankruptcies.map(({ row, date: since }) => (
+                            <li>
+                                <a href={row.p}>{row.n}</a>
+                                <span class="small muted">Konkurs sedan <time datetime={since}>{date(since)}</time></span>
+                            </li>
+                        ))}
+                    </ul>
+                    <a href="/konkurser/">Fler företag med konkursstatus</a>
+                </section>
+            )}
+            {financials.length > 0 && (
+                <section aria-labelledby="home-bokslut">
+                    <h2 id="home-bokslut">Företag med aktuella bokslut</h2>
+                    <ul class="company-picks__list">
+                        {financials.map(({ row, period, industry }) => (
+                            <li>
+                                <a href={row.p}>{row.n}</a>
+                                <span class="small muted">{industry.label} · Bokslut <time datetime={period.end}>{date(period.end)}</time></span>
+                            </li>
+                        ))}
+                    </ul>
+                    <a href="/branscher/">Bläddra bland branscher</a>
+                </section>
+            )}
+        </div>
+    </section>
+)}
+
+<style>
+    .company-picks {
+        padding-block: clamp(36px, 6vw, 80px);
+    }
+
+    .company-picks__grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr));
+        gap: clamp(30px, 6vw, 72px);
+    }
+
+    h2 {
+        font-size: var(--step-2);
+        margin-block-end: 16px;
+    }
+
+    .company-picks__list {
+        list-style: none;
+        margin: 0 0 16px;
+        padding: 0;
+        border-block-start: 1px solid var(--rule);
+    }
+
+    li {
+        display: grid;
+        justify-items: start;
+        gap: 3px;
+        padding-block: 8px;
+        border-block-end: 1px solid var(--rule);
+        overflow-wrap: anywhere;
+    }
+</style>
