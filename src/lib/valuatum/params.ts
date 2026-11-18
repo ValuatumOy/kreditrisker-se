@@ -3,13 +3,81 @@
 
 import fs from 'node:fs'
 import { parseOrgnr } from '../orgnr.ts'
+import type { IndexRow } from '../publish.ts'
 
 export interface Param {
     fid: string
     name: string
     orgnr?: string
+    /** Raw industry code from the directory TSV; unknown/unallocated codes remain selectable. */
+    sni?: string
     /** When the model was last saved in Valuatum (ISO), absent in files without the column. */
     updatedAt?: string
+}
+
+export const AUTOMATIC_BATCH_SIZE = 3_000
+
+/** Reserve 80% for five-digit nonzero SNI codes, spread across two-digit divisions. */
+export function selectIndustryMix(params: Param[], limit: number, slot = Math.floor(Date.now() / 1_800_000)): Param[] {
+    const known = params.filter((p) => /^\d{5}$/.test(p.sni ?? '') && !/^0+$/.test(p.sni!))
+    const knownIds = new Set(known.map((p) => p.fid))
+    const unknown = params.filter((p) => !knownIds.has(p.fid)).sort((a, b) => a.orgnr!.localeCompare(b.orgnr!))
+    const quota = (phase: number) => {
+        const reserved = Math.floor((phase + 1) * limit / 5) - Math.floor(phase * limit / 5)
+        let k = Math.min(known.length, limit - reserved)
+        const u = Math.min(unknown.length, limit - k)
+        k = Math.min(known.length, limit - u)
+        return [k, u]
+    }
+    const quotas = Array.from({ length: 5 }, (_, phase) => quota(phase))
+    const phase = slot % 5
+    const before = (kind: number) => Math.floor(slot / 5) * quotas.reduce((sum, q) => sum + q[kind], 0)
+        + quotas.slice(0, phase).reduce((sum, q) => sum + q[kind], 0)
+    const [knownCount, unknownCount] = quotas[phase]
+    const sectors = new Map<string, Param[]>()
+    for (const param of known) {
+        const sector = param.sni!.slice(0, 2)
+        const group = sectors.get(sector) ?? []
+        group.push(param)
+        sectors.set(sector, group)
+    }
+    const groups = [...sectors].sort(([a], [b]) => a.localeCompare(b)).map(([, group]) => group.sort((a, b) => a.orgnr!.localeCompare(b.orgnr!)))
+    const selected: Param[] = []
+    const used = groups.map(() => 0)
+    const start = before(0)
+    for (let request = start; selected.length < knownCount; request++) {
+        const sector = request % groups.length
+        const group = groups[sector]
+        if (used[sector] >= group.length) continue
+        selected.push(group[Math.floor(request / groups.length) % group.length])
+        used[sector]++
+    }
+    const unknownStart = before(1)
+    for (let i = 0; i < unknownCount; i++) selected.push(unknown[(unknownStart + i) % unknown.length])
+    return selected
+}
+
+/** Half existing legacy/changed profiles, half unpublished; use spare capacity for either backlog. */
+export function automaticBatch(params: Param[], rows: Pick<IndexRow, 'o' | 'rv'>[], limit = AUTOMATIC_BATCH_SIZE, slot = Math.floor(Date.now() / 1_800_000)): Param[] {
+    if (!Number.isSafeInteger(limit) || limit < 1) throw new Error('Automatic batch size must be positive')
+    const previous = new Map(rows.map((r) => [r.o, r]))
+    const seen = new Set<string>()
+    const existing: Param[] = []
+    const unpublished: Param[] = []
+    for (const param of params) {
+        if (!param.orgnr || seen.has(param.orgnr)) continue
+        seen.add(param.orgnr)
+        const row = previous.get(param.orgnr)
+        if (!row) unpublished.push(param)
+        else if (row.rv === undefined || row.rv !== (param.updatedAt ?? null)) existing.push(param)
+    }
+    const singleMixed = limit === 1 && existing.length > 0 && unpublished.length > 0
+    let existingCount = Math.min(existing.length, singleMixed ? 1 - slot % 2 : Math.ceil(limit / 2))
+    const newCount = Math.min(unpublished.length, limit - existingCount)
+    existingCount = Math.min(existing.length, limit - newCount)
+    // Each one-company cohort gets its own consecutive turns, including unknown-code turns.
+    const turn = singleMixed ? Math.floor(slot / 2) : slot
+    return [...selectIndustryMix(existing, existingCount, turn), ...selectIndustryMix(unpublished, newCount, turn)]
 }
 
 export function readParams(file: string): Param[] {
@@ -24,6 +92,7 @@ export function readParams(file: string): Param[] {
             const o = c[4] && parseOrgnr(c[4])
             const ms = Number(c[5])
             const p: Param = { fid: c[0], name: c[2] ?? '', orgnr: o && o.ok ? (o.orgnr as string) : undefined }
+            if (c[3]?.trim()) p.sni = c[3].trim()
             if (ms > 0) p.updatedAt = new Date(ms).toISOString()
             return p
         })

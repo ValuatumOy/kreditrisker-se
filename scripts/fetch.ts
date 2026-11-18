@@ -35,13 +35,17 @@ async function main() {
     assertBatchSize(batch.length)
     const allFile = process.env.BUILD_STATIC_PARAMS_FILE_ALL
     const all = allFile ? readParams(allFile) : null
-    const keep = all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))
+    const automatic = process.env.SE_AUTO_BATCH === '1' || process.env.COMPANIES?.trim().toLowerCase() === 'auto'
+    const keep = automatic ? null : all && new Set(all.flatMap((p) => (p.orgnr ? [p.orgnr] : [])))
     const indexIn = process.env.SE_INDEX_IN ?? path.join(BUILD_DIR, 'index.jsonl')
     const previous = readJsonl<IndexRow>(indexIn)
     distinctCompanyRows(previous)
     const rows = new Map(previous.map((r) => [r.o, r]))
     // A rejected refresh must not keep its previous sitemap eligibility.
-    for (const param of batch) if (param.orgnr && rows.has(param.orgnr)) delete rows.get(param.orgnr)!.sm
+    for (const param of batch) if (param.orgnr && rows.has(param.orgnr)) {
+        delete rows.get(param.orgnr)!.sm
+        delete rows.get(param.orgnr)!.rv
+    }
     const importedAt = new Date().toISOString()
     const batchId = `api-${importedAt.slice(0, 10)}`
 
