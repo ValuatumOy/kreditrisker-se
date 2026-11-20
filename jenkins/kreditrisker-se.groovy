@@ -143,9 +143,14 @@ The fields below are already set for a production run; leave them as they are.''
         stage('Fetch') {
             when { expression { env.SE_SKIP_BATCH != '1' } }
             steps {
+                // SE_API_REFRESH=1 never reads data/api-cache, but fetch writes one file per company there and the
+                // workspace survives between runs (the agent is stopped, not terminated): ~7 GB for the whole
+                // directory on a 20 GB disk. Clear it before and after so it holds at most one batch.
                 sh '''#!/bin/bash
                     set -e
+                    rm -rf data/api-cache
                     SE_API_REFRESH=1 npm run fetch
+                    rm -rf data/api-cache
                 '''
                 script {
                     def rejected = readFile('data/build/rejected.jsonl').readLines().count { it.trim() }
@@ -227,6 +232,10 @@ The fields below are already set for a production run; leave them as they are.''
                     docker push -q "$SEARCH_REPOSITORY:latest"
                     image=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$SEARCH_REPOSITORY:latest" | grep "^$SEARCH_REPOSITORY@")
                     docker image rm "$SEARCH_REPOSITORY:latest" > /dev/null
+                    # Each image carries the whole search database; without pruning, its build cache and dangling
+                    # layers accumulate on the agent's disk run after run.
+                    docker builder prune -af > /dev/null || true
+                    docker image prune -f > /dev/null || true
                     aws lambda update-function-code --function-name "$SEARCH_FUNCTION" --image-uri "$image" > /dev/null
                     aws lambda wait function-updated-v2 --function-name "$SEARCH_FUNCTION"
                     # The first call reads the new database into memory, so no visitor waits for it. On a new image
