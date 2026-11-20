@@ -15,7 +15,9 @@ export interface Param {
     updatedAt?: string
 }
 
-export const AUTOMATIC_BATCH_SIZE = 3_000
+// Temporarily 10,000 (the batch limit) while the ~372,000-company backlog of the Swedish mass import is built
+// (20.11.2026); return to 3_000 once the half-hourly runs select fewer than 10,000 companies.
+export const AUTOMATIC_BATCH_SIZE = 10_000
 
 /** Reserve 80% for five-digit nonzero SNI codes, spread across two-digit divisions. */
 export function selectIndustryMix(params: Param[], limit: number, slot = Math.floor(Date.now() / 1_800_000)): Param[] {

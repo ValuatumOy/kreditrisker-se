@@ -137,7 +137,7 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 `COMPANIES=all` is limited to 10,000 rows. Larger builds require a separately verified, bounded process; the limit is a safeguard, not a capacity guarantee.
 
 The same serialized job runs every 30 minutes (`H/30 * * * *`). Timer runs select
-up to `AUTOMATIC_BATCH_SIZE` (initially 3,000 in `src/lib/valuatum/params.ts`),
+up to `AUTOMATIC_BATCH_SIZE` (3,000 in `src/lib/valuatum/params.ts`; temporarily 10,000 while the mass-import backlog is built),
 splitting capacity between existing legacy/changed profiles and unpublished
 companies, then filling spare capacity from either backlog. They compare source
 save times with `IndexRow.rv`, the revision actually rendered and HTML-verified;
