@@ -122,7 +122,7 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 
 1. Get static params (Go tool `build/bin/get_static_params_arm64`, `--accounts "Bolagsverket data import"`),
    then `scripts/select-batch.ts` picks the batch from `COMPANIES` (no file upload; empty = changed, `all` = every company)
-2. Fetch (restores the index state from `STATE_URI`, a private S3 key; uses `SE_API_REFRESH=1` so the selected batch always reads fresh REST data instead of a previous workspace cache)
+2. Fetch (restores the index state from `STATE_URI`, a private S3 key; uses `SE_API_REFRESH=1` so the selected batch always reads fresh REST data instead of a previous workspace cache; `data/api-cache/` is cleared before and after, because the agent keeps its 20 GB workspace between runs and the cache would grow by one file per company)
 3. Build (`SE_DATA_SOURCE=build`), then verify touched company HTML and prepare
    gradual company sitemaps (`SE_COMPANY_SITEMAP=verified`)
 4. Deploy: withdraw affected company sitemap URLs and save a conservative
@@ -131,7 +131,8 @@ Setup, once (nothing in the Jenkinsfile needs editing):
    CloudFront invalidation complete, then save the final index state.
 5. Update search: `scripts/search-db.ts` builds the search database from the
    whole index, the job builds `search/Dockerfile` (the agent needs Docker), pushes
-   the image and points the Lambda at it (docs/AWS-SETUP.md)
+   the image and points the Lambda at it (docs/AWS-SETUP.md), then prunes the
+   Docker build cache and dangling images so they do not fill the agent's disk
 
 `COMPANIES=all` is limited to 10,000 rows. Larger builds require a separately verified, bounded process; the limit is a safeguard, not a capacity guarantee.
 
