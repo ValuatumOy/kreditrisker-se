@@ -1,7 +1,7 @@
 ---
 // Report CTAs on a company profile. Basic and AI each render their own state.
 import type { PublishedCompany } from '../lib/contract/types.ts'
-import { staticReportState } from '../lib/reports/availability.ts'
+import { SAMPLE_HREF, staticReportState } from '../lib/reports/availability.ts'
 import { PRODUCT_NAME, STATE_LABEL, UNAVAILABLE_TEXT } from '../lib/reports/labels.ts'
 import type { ReportProduct } from '../lib/reports/types.ts'
 import Icon from './Icon.astro'
@@ -9,19 +9,21 @@ import ReportPrice from './ReportPrice.astro'
 
 interface Props {
     company: PublishedCompany
+    inline?: boolean
 }
-const { company } = Astro.props
+const { company, inline = false } = Astro.props
 const DESC: Record<ReportProduct, string> = {
     basic: 'Bokslut, nyckeltal och branschjämförelse samlade i en rapport.',
     ai: 'Som kreditrapporten, med en skriven analys och genomgång av offentliga källor.',
 }
 const products = (['basic', 'ai'] as const).map((p) => ({ p, s: staticReportState(p, company) }))
+const basicAvailable = products.some(({ p, s }) => p === 'basic' && s.kind === 'available')
 // Keep the optional Valuatum model id for compatibility with older order links.
 const fid = company.record.status.source.documentId?.match(/^fid:(\d+)$/)?.[1]
 const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}&produkt=${p === 'basic' ? 'bas' : 'ai'}${fid ? `&fid=${fid}` : ''}`
 ---
 
-<aside class="rp dark grain" aria-labelledby="rp-title">
+<aside id="kreditrapport" class:list={['rp dark grain', { 'rp--inline': inline }]} aria-labelledby="rp-title">
     <h2 id="rp-title" class="rp__title">Rapport om {company.record.name}</h2>
     <ul class="rp__list">
         {
@@ -39,9 +41,12 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
                                     {p === 'basic' ? <ReportPrice orgnr={company.record.orgnr} /> : <>{s.price.amountSek.toLocaleString('sv-SE')} kr <span class="muted small">inkl. moms för konsument i Sverige</span></>}
                                 </p>
                             )}
-                            <a class="btn" href={orderHref(p)}>
-                                Beställ {PRODUCT_NAME[p].toLowerCase()} <Icon name="arrow" />
-                            </a>
+                            <div class="rp__actions">
+                                <a class="btn" href={orderHref(p)}>
+                                    Beställ {PRODUCT_NAME[p].toLowerCase()} <Icon name="arrow" />
+                                </a>
+                                {p === 'basic' && <a class="rp__sample small" href={SAMPLE_HREF.basic}>Se exempelrapport</a>}
+                            </div>
                         </>
                     )}
                     {s.kind === 'sample' && (
@@ -60,13 +65,14 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         }
     </ul>
     <p class="rp__foot small">
-        <a href="/rapporter/">Jämför rapporterna</a> · <a href="/rapporter/exempel/">Exempel</a>
+        <a href="/rapporter/">Jämför rapporterna</a>{!basicAvailable && <> · <a href="/rapporter/exempel/">Exempel</a></>}
     </p>
 </aside>
 
 <style>
     .rp {
         position: relative;
+        scroll-margin-top: 5.5rem;
         overflow: hidden;
         overflow-wrap: anywhere;
         padding: 22px 22px 18px;
@@ -90,6 +96,14 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         list-style: none;
         margin: 14px 0 0;
         padding: 0;
+    }
+    @media (min-width: 721px) {
+        .rp--inline .rp__list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .rp--inline .rp__item { align-content: start; }
     }
     .rp__item {
         min-width: 0;
@@ -147,7 +161,13 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         color: var(--ink-3);
     }
     .rp :global(.btn) { min-height: 2.75rem; }
-    .rp__foot a {
+    .rp__actions {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 12px;
+    }
+    .rp__foot a, .rp__sample {
         display: inline-flex;
         align-items: center;
         min-height: 2.75rem;

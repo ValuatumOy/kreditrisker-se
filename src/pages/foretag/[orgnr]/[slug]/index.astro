@@ -20,6 +20,7 @@ import type { FiscalPeriod, PublishedCompany, Value } from '../../../../lib/cont
 import { SITE } from '../../../../config/site.ts'
 import { formatOrgnr } from '../../../../lib/orgnr.ts'
 import { date, FRESHNESS_TEXT, kommunName, LEGAL_FORM_TEXT, periodLabel, SOURCE_TEXT, STATUS_TEXT } from '../../../../lib/format.ts'
+import { staticReportState } from '../../../../lib/reports/availability.ts'
 import { summarize } from '../../../../lib/summary.ts'
 import { companyJsonLd, companyTitle, crumbsJsonLd } from '../../../../lib/seo.ts'
 
@@ -37,6 +38,7 @@ const { orgnr, redirectTo } = Astro.props as { orgnr: string; redirectTo: string
 const site: Site = getSite()
 const c = site.byOrgnr.get(orgnr) as PublishedCompany
 const r = c.record
+const reportAvailable = staticReportState('basic', c).kind === 'available'
 const [latest] = r.periods
 // Chart series: newest five periods, plus explicit "saknas" slots for calendar
 // years that should have been filed by now but are not in the source.
@@ -116,6 +118,7 @@ const desc = summary.slice(0, 2).join(' ')
                         {r.formerNames[0] && <span class="tag tag--plain">Tidigare {r.formerNames[0].name}</span>}
                     </div>
                     {r.status.code === 'bankruptcy' && <p><a href="/konkurser/">Företag med konkursstatus i underlaget</a> · <a href="/konkurser/om-konkurs/">Vad innebär konkurs?</a></p>}
+                    {reportAvailable && <a class="co__report-link btn" href="#kreditrapport">Kreditrapport och exempel</a>}
                 </header>
                 {latest ? (
                     <div class="co__kpis">
@@ -137,7 +140,7 @@ const desc = summary.slice(0, 2).join(' ')
                     </div>
                 )}
             </NightBand>
-            <div class="shell co">
+            <div class:list={['shell co', { 'co--report-inline': reportAvailable }]}>
                 <section class="co__lead" aria-labelledby="sammanfattning">
                     <div class="fig co__summary">
                         <h2 id="sammanfattning" class="co__summaryh">Sammanfattning</h2>
@@ -173,6 +176,7 @@ const desc = summary.slice(0, 2).join(' ')
                         </section>
                     )}
 
+                    {reportAvailable && <div class="co__sec"><ReportPanel company={c} inline /></div>}
                     {latest && (
                         <section class="co__sec" aria-labelledby="bokslut">
                             <h2 id="bokslut">Bokslut</h2>
@@ -271,7 +275,7 @@ const desc = summary.slice(0, 2).join(' ')
                     )}
                 </div>
                 <div class="co__rail">
-                    <ReportPanel company={c} />
+                    {!reportAvailable && <ReportPanel company={c} />}
                     <p class="co__fix small">
                         Ser något fel ut? <a href="/om/#rattelse">Begär rättelse</a>
                     </p>
@@ -396,6 +400,11 @@ const desc = summary.slice(0, 2).join(' ')
         white-space: normal;
         line-height: 1.4;
         overflow-wrap: anywhere;
+    }
+    .co__report-link {
+        display: inline-flex;
+        min-height: 2.75rem;
+        margin-top: 16px;
     }
     .co__kpihead {
         display: flex;
@@ -580,6 +589,14 @@ const desc = summary.slice(0, 2).join(' ')
         .co__titlerow {
             gap: 14px;
         }
+    }
+    .co--report-inline {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-areas: 'lead' 'main' 'rail';
+    }
+    .co--report-inline .co__rail {
+        position: static;
+        margin-top: 24px;
     }
     @media (prefers-contrast: more) {
         .co__orgnr { background: var(--night-2); border-color: var(--ice-2); }
