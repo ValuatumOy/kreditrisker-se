@@ -136,8 +136,10 @@ Setup, once (nothing in the Jenkinsfile needs editing):
 
 `COMPANIES=all` is limited to 10,000 rows. Larger builds require a separately verified, bounded process; the limit is a safeguard, not a capacity guarantee.
 
-The same serialized job runs every 30 minutes (`H/30 * * * *`). Timer runs select
-up to `AUTOMATIC_BATCH_SIZE` (initially 3,000 in `src/lib/valuatum/params.ts`),
+The same serialized job runs once a week, on Wednesday between 1 and 2 am Finnish
+time (`TZ=Europe/Helsinki`, `H 1 * * 3`), after the Monday weekly import of
+Bolagsverket filings (about 5,500 a week, about 8 hours) has finished. Timer runs select
+up to `AUTOMATIC_BATCH_SIZE` (10,000 in `src/lib/valuatum/params.ts`),
 splitting capacity between existing legacy/changed profiles and unpublished
 companies, then filling spare capacity from either backlog. They compare source
 save times with `IndexRow.rv`, the revision actually rendered and HTML-verified;
@@ -156,13 +158,13 @@ Within each existing/new cohort, selection reserves 80% for five-digit nonzero
 industry codes and 20% for unknown/unallocated codes, filling spare capacity
 from either side. Known codes are spread across two-digit SNI divisions rather
 than taking the first NACE-sorted rows. Stable organisation-number ordering and
-half-hour rotation advance within sectors and unknowns even after rejections.
+the rotation (by half-hour slot of the run time) advance within sectors and unknowns even after rejections.
 Small batches carry fractional reservations across slots, so a one-company
 batch still reaches unknowns. Manual `new:N` uses the same industry selection;
 exact-company and changed-company selections keep their original scope.
-Selection rotates each half-hour to prevent a rejected prefix from blocking a
+Selection rotates between runs to prevent a rejected prefix from blocking a
 larger backlog. Rejections remain retryable: if every remaining candidate fits
-in one batch and all are rejected, that batch will retry each half-hour until
+in one batch and all are rejected, that batch will retry on every run until
 the data/API issue is fixed; no rejection is recorded as a successful render.
 
 The production job requires a nonempty existing index. A named-company run stops before deployment if the source list would remove company pages. Industry, municipality and bankruptcy directories are rebuilt in full and synchronized with deletion of obsolete list pages; company pages and assets are never sync-deleted.

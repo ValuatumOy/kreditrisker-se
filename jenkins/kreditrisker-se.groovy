@@ -6,7 +6,8 @@
 // run, so "Build with Parameters" -> type the org numbers -> Build is enough:
 //   build or rebuild companies  COMPANIES=556448-0282, 5565675906
 //   build new profiles          COMPANIES=new:1000
-//   scheduled every 30 minutes  bounded automatic legacy/changed + unpublished selection
+//   scheduled weekly            bounded automatic legacy/changed + unpublished selection,
+//                               Wednesday 1-2 am Finnish time, after Monday's weekly import
 //   manual changed build       COMPANIES empty: companies updated since SINCE
 //   everything                  COMPANIES=all
 //
@@ -35,13 +36,14 @@ pipeline {
     agent { label 'sweden-build' }
 
     options { disableConcurrentBuilds() } // the index state in STATE_URI is read and written by every run
-    triggers { cron('H/30 * * * *') }
+    // Weekly: Bolagsverket's weekly import starts on Monday at 5 am and takes about 8 hours.
+    triggers { cron('TZ=Europe/Helsinki\nH 1 * * 3') }
 
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
 Empty: companies updated since SINCE. "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
 "new:1000": up to 1,000 companies with models available and no profile in the published index.
-"auto": the same bounded existing/new selection as the half-hour schedule.
+"auto": the same bounded existing/new selection as the weekly schedule.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
@@ -94,6 +96,7 @@ The fields below are already set for a production run; leave them as they are.''
                 }
                 sh '''#!/bin/bash
                     set -e
+                    echo 'Disk at start:'; df -h . || true
                     if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a==22&&b>=12)?0:1)' 2>/dev/null; then
                         arch=$(uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')
                         echo "No Node >= 22.12 on the agent; using node-v$NODE_VERSION-linux-$arch in the workspace"
@@ -170,6 +173,7 @@ The fields below are already set for a production run; leave them as they are.''
                         [ -s "dist/$prefix/index.html" ] || { echo "Missing complete $prefix output" >&2; exit 1; }
                     done
                     NODE_OPTIONS=--max-old-space-size=8192 node scripts/company-sitemaps.ts
+                    echo 'Disk after build:'; df -h . || true; du -sh data dist 2>/dev/null || true
                 '''
             }
         }
@@ -251,6 +255,8 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
+            // The agent's disk is 20 GB and filled up before (ACE https://valuatum.aceproject.com/?TASK_ID=789131).
+            sh 'echo "Disk at end:"; df -h . || true'
             script {
                 def artifacts = env.SE_TIMER_BATCH == '1'
                     ? (env.SE_SKIP_BATCH == '1' ? env.BUILD_STATIC_PARAMS_FILE : "${env.BUILD_STATIC_PARAMS_FILE}, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt")
