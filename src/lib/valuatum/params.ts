@@ -15,7 +15,8 @@ export interface Param {
     updatedAt?: string
 }
 
-export const AUTOMATIC_BATCH_SIZE = 3_000
+// A week of Bolagsverket filings is about 5,500 companies, so one weekly run covers it.
+export const AUTOMATIC_BATCH_SIZE = 10_000
 
 /** Reserve 80% for five-digit nonzero SNI codes, spread across two-digit divisions. */
 export function selectIndustryMix(params: Param[], limit: number, slot = Math.floor(Date.now() / 1_800_000)): Param[] {

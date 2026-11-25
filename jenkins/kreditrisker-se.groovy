@@ -6,7 +6,8 @@
 // run, so "Build with Parameters" -> type the org numbers -> Build is enough:
 //   build or rebuild companies  COMPANIES=556448-0282, 5565675906
 //   build new profiles          COMPANIES=new:1000
-//   scheduled every 30 minutes  bounded automatic legacy/changed + unpublished selection
+//   scheduled weekly            bounded automatic legacy/changed + unpublished selection,
+//                               Wednesday 1-2 am Finnish time, after Monday's weekly import
 //   manual changed build       COMPANIES empty: companies updated since SINCE
 //   everything                  COMPANIES=all
 //
@@ -35,13 +36,14 @@ pipeline {
     agent { label 'sweden-build' }
 
     options { disableConcurrentBuilds() } // the index state in STATE_URI is read and written by every run
-    triggers { cron('H/30 * * * *') }
+    // Weekly: Bolagsverket's weekly import starts on Monday at 5 am and takes about 8 hours.
+    triggers { cron('TZ=Europe/Helsinki\nH 1 * * 3') }
 
     parameters {
         text(name: 'COMPANIES', defaultValue: '', description: '''Organisationsnummer (with or without the hyphen) or model ids (fid), separated by commas, spaces or new lines. Example: 556448-0282, 5565675906. Only these pages are built and published. The run stops if one is not in the directory.
 Empty: companies updated since SINCE. "all": every company, up to the 10,000-row safety limit. A larger build requires a separately verified process.
 "new:1000": up to 1,000 companies with models available and no profile in the published index.
-"auto": the same bounded existing/new selection as the half-hour schedule.
+"auto": the same bounded existing/new selection as the weekly schedule.
 The fields below are already set for a production run; leave them as they are.''')
         string(name: 'SINCE', defaultValue: '24 hours ago', description: 'Empty COMPANIES only: include companies updated since this time (linux date syntax).')
         booleanParam(name: 'DEPLOY', defaultValue: true, description: 'Upload to S3, save the index state and update search. Off: list, fetch and build only (a test run).')
