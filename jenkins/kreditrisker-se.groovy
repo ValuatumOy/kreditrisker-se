@@ -96,6 +96,7 @@ The fields below are already set for a production run; leave them as they are.''
                 }
                 sh '''#!/bin/bash
                     set -e
+                    echo 'Disk at start:'; df -h . || true
                     if ! node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a==22&&b>=12)?0:1)' 2>/dev/null; then
                         arch=$(uname -m | sed 's/x86_64/x64/; s/aarch64/arm64/')
                         echo "No Node >= 22.12 on the agent; using node-v$NODE_VERSION-linux-$arch in the workspace"
@@ -172,6 +173,7 @@ The fields below are already set for a production run; leave them as they are.''
                         [ -s "dist/$prefix/index.html" ] || { echo "Missing complete $prefix output" >&2; exit 1; }
                     done
                     NODE_OPTIONS=--max-old-space-size=8192 node scripts/company-sitemaps.ts
+                    echo 'Disk after build:'; df -h . || true; du -sh data dist 2>/dev/null || true
                 '''
             }
         }
@@ -253,6 +255,8 @@ The fields below are already set for a production run; leave them as they are.''
 
     post {
         always {
+            // The agent's disk is 20 GB and filled up before (ACE https://valuatum.aceproject.com/?TASK_ID=789131).
+            sh 'echo "Disk at end:"; df -h . || true'
             script {
                 def artifacts = env.SE_TIMER_BATCH == '1'
                     ? (env.SE_SKIP_BATCH == '1' ? env.BUILD_STATIC_PARAMS_FILE : "${env.BUILD_STATIC_PARAMS_FILE}, data/build/rejected.jsonl, data/build/warnings.jsonl, data/build/removed.txt")
