@@ -58,7 +58,15 @@ const path = product === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'
                     <div><dt>Leverans</dt><dd>{state.kind === 'available' ? 'PDF via e-post.' : 'PDF. Leveranstid anges vid lansering.'}</dd></div>
                     <div><dt>Betalning</dt><dd>{state.kind === 'available' ? 'Öppen' : 'Inte öppen'}</dd></div>
                 </dl>
-                {state.kind === 'available' && <a class="btn" href="/sok/">Välj företag <Icon name="arrow" /></a>}
+                {state.kind === 'available' && product === 'ai' && (
+                    <form class="rpp__order" action="/bestall/" method="get">
+                        <label for="report-orgnr" class="small">Organisationsnummer</label>
+                        <input id="report-orgnr" name="orgnr" inputmode="numeric" maxlength="11" pattern="[0-9]{6}-?[0-9]{4}" placeholder="NNNNNN-NNNN" required />
+                        <input type="hidden" name="produkt" value="ai" />
+                        <button class="btn" type="submit">Beställ AI-rapport <Icon name="arrow" /></button>
+                    </form>
+                )}
+                {state.kind === 'available' && <a class:list={['btn', product === 'ai' && 'btn--quiet']} href="/sok/">{product === 'ai' ? 'Hitta organisationsnummer' : 'Välj företag'} <Icon name="arrow" /></a>}
                 <a class="btn btn--quiet" href={`/rapporter/exempel/#${product === 'basic' ? 'basrapport' : 'ai-rapport'}`}>
                     <Icon name="doc" /> Se exempel
                 </a>
@@ -142,6 +150,18 @@ const path = product === 'basic' ? '/rapporter/bas/' : '/rapporter/ai/'
     .rpp__facts dd {
         margin: 0;
         text-align: right;
+    }
+    .rpp__order {
+        display: grid;
+        gap: 8px;
+        width: 100%;
+    }
+    .rpp__order input[name='orgnr'] {
+        padding: 10px 12px;
+        border: 1px solid var(--rule);
+        background: var(--sheet);
+        font: inherit;
+        min-width: 0;
     }
     @media (max-width: 900px) {
         .rpp {
