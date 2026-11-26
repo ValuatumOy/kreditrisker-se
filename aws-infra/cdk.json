@@ -22,7 +22,7 @@
     "checkoutApiProd": "lyqbaikd9e.execute-api.eu-west-1.amazonaws.com",
     "contactEmail": "contact25@valuatum.com",
     "reportAdminEmailProd": "lauri.hynonen@valuatum.com",
-    "stripeProductsProd": "{\"STRIPE_PRODUCT_SE_BASIC\":\"prod_VXJrnLn4qkC2Nv\"}",
+    "stripeProductsProd": "{\"STRIPE_PRODUCT_SE_BASIC\":\"prod_VXJrnLn4qkC2Nv\",\"STRIPE_PRODUCT_SE_AI\":\"prod_VhOL096fBy8sSf\"}",
     "termsVersionProd": "2026-10-30",
     "checkoutEnabledProd": "1",
     "@aws-cdk/aws-signer:signingProfileNamePassedToCfn": true,
