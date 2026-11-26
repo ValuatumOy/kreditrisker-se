@@ -220,6 +220,76 @@ test('selected fraud analysis is sent to Stripe, preserved on redelivery and req
     }
 })
 
+test('new paid AI sessions keep fraud disabled with the flag off, including after a later flag change', async () => {
+    const previousFlag = process.env.SE_AI_FRAUD_ADDON
+    try {
+        for (const choice of [undefined, false]) {
+            reset()
+            process.env.SE_AI_FRAUD_ADDON = '0'
+            const quote = await checkout.handler({ requestContext: { http: { method: 'GET' } },
+                queryStringParameters: { reportType: 'se_ai_credit_risk' } })
+            assert.equal(quote.statusCode, 200)
+            assert.equal(JSON.parse(quote.body).unitAmount, 8625)
+            assert.equal(JSON.parse(quote.body).fraudAddonCents, undefined)
+            const session = await createOrder('se_ai_credit_risk', choice)
+            assert.equal(state.sessions[0].params.line_items.length, 1)
+            assert.equal(session.amount_total, 8625)
+            assert.equal(session.metadata.aiFraudAddonVersion, '1')
+            assert.equal(session.metadata.includeFraud, 'false')
+            assert.equal(session.metadata.fraudAddonCents, '0')
+            process.env.SE_AI_FRAUD_ADDON = '1'
+            const event = signedEvent(session)
+            assert.equal((await webhook.handler(event)).statusCode, 200)
+            assert.equal((await webhook.handler(event)).statusCode, 200)
+            assert.equal(state.orders.get(session.id).params.includeFraud, false)
+            assert.equal(state.orders.get(session.id).fraudAddonPurchased, undefined)
+            await poller.handler()
+            assert.equal(state.jobs.length, 1)
+            assert.equal(state.jobs[0].params.includeFraud, false)
+            assert.equal(state.orders.get(session.id).status, 'FULFILLED')
+            assert.deepEqual(state.captures, ['pi_test_local'])
+        }
+        reset()
+        process.env.SE_AI_FRAUD_ADDON = '0'
+        const response = await checkout.handler({
+            requestContext: { http: { method: 'POST' } },
+            body: JSON.stringify({ reportType: 'se_ai_credit_risk', businessId: '556036-9208',
+                acceptedTermsVersion: 'test-v1', includeFraud: true }),
+        })
+        assert.equal(response.statusCode, 409)
+        assert.equal(state.sessions.length, 0)
+    } finally {
+        if (previousFlag === undefined) delete process.env.SE_AI_FRAUD_ADDON
+        else process.env.SE_AI_FRAUD_ADDON = previousFlag
+    }
+})
+
+test('historical AI metadata and persisted choices retain their replay semantics with the flag off', async () => {
+    const previousFlag = process.env.SE_AI_FRAUD_ADDON
+    try {
+        process.env.SE_AI_FRAUD_ADDON = '0'
+        for (const savedChoice of [true, false]) {
+            reset()
+            const session = await createOrder('se_ai_credit_risk')
+            delete session.metadata.aiFraudAddonVersion
+            delete session.metadata.includeFraud
+            delete session.metadata.fraudAddonCents
+            const event = signedEvent(session)
+            assert.equal((await webhook.handler(event)).statusCode, 200)
+            const order = state.orders.get(session.id)
+            assert.equal(order.params.includeFraud, true, 'unversioned historical metadata keeps the legacy catalog default')
+            order.params.includeFraud = savedChoice
+            assert.equal((await webhook.handler(event)).statusCode, 200)
+            assert.equal(order.params.includeFraud, savedChoice, 'replay does not overwrite a persisted choice')
+            await poller.handler()
+            assert.equal(state.jobs[0].params.includeFraud, savedChoice)
+        }
+    } finally {
+        if (previousFlag === undefined) delete process.env.SE_AI_FRAUD_ADDON
+        else process.env.SE_AI_FRAUD_ADDON = previousFlag
+    }
+})
+
 test('an uncertain submission is never automatically repeated or charged', async () => {
     reset()
     state.submitError = true

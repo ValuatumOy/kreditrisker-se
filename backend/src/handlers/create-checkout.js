@@ -232,6 +232,7 @@ exports.handler = async event => {
         return json(400, { error: 'Invalid includeFraud' })
     if (includeFraud && !fraudAddon.available(reportType))
         return json(409, { error: 'Fraud add-on is not available' })
+    const selectedFraud = fraudAddon.available(reportType) && includeFraud === true
 
     if (!config.isolatedFixtureTest && !isSwedishCompany(businessId))
         return json(400, { error: 'A valid Swedish organisation number is required' })
@@ -294,7 +295,7 @@ exports.handler = async event => {
             langDisclosure
         )
         const lineItems = [lineItem]
-        if (includeFraud) {
+        if (selectedFraud) {
             lineItems.push(await buildLineItem(stripe, {
                 currency: product.currency,
                 priceCents: fraudAddon.UNIT_AMOUNT,
@@ -351,8 +352,8 @@ exports.handler = async event => {
                 reportType,
                 ...(reportType === fraudAddon.REPORT_TYPE ? {
                     aiFraudAddonVersion: '1',
-                    includeFraud: String(includeFraud === true),
-                    fraudAddonCents: String(includeFraud === true ? fraudAddon.UNIT_AMOUNT : 0),
+                    includeFraud: String(selectedFraud),
+                    fraudAddonCents: String(selectedFraud ? fraudAddon.UNIT_AMOUNT : 0),
                 } : {}),
                 ...(packageCheckout
                     ? {

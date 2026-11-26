@@ -12,11 +12,11 @@ test('products are independent: basic sample while AI stays unavailable', () => 
     assert.equal(staticReportState('ai', null, 'unavailable').kind, 'unavailable')
 })
 
-test('"live" without checkout is still unavailable; with checkout, no unverified price', () => {
+test('"live" without checkout is still unavailable; AI uses its verified VAT-inclusive price', () => {
     assert.equal(staticReportState('ai', null, 'live', false).kind, 'unavailable')
     const s = staticReportState('ai', null, 'live', true)
     assert.equal(s.kind, 'available')
-    assert.equal(s.kind === 'available' && s.price, undefined)
+    assert.deepEqual(s.kind === 'available' && s.price, { amountSek: 86.25, vatIncluded: true })
 })
 
 test('disabled backend never offers a report', async () => {

@@ -91,6 +91,7 @@ export const APPROVED_PRICES = {
  */
 export const VERIFIED_PRICES: Partial<Record<'basic' | 'ai', { amountSek: number; vatIncluded: boolean; verifiedAt: string }>> = {
     basic: { amountSek: priceTargets.basic / 100, vatIncluded: true, verifiedAt: '2026-10-30' },
+    ai: { amountSek: priceTargets.ai / 100, vatIncluded: true, verifiedAt: '2026-11-26' },
 }
 
 /** Site is allowed to be indexed at all. */

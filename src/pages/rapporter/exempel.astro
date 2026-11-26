@@ -1,6 +1,7 @@
 ---
 import Page from '../../layouts/Page.astro'
 import Icon from '../../components/Icon.astro'
+import { FLAGS } from '../../config/site.ts'
 ---
 
 <Page
@@ -25,7 +26,7 @@ import Icon from '../../components/Icon.astro'
             <h2 id="ai-h">AI-rapport</h2>
             <p>KJS Sport AB</p>
             <p class="small muted">13 sidor · Rapportdatum 6 november 2026 · Utdrag</p>
-            <p>Finansiell analys, riskbedömning och bokslut. Personuppgifter och avsnittet om bakgrundskontroller har utelämnats i utdraget. AI-rapporten kan ännu inte beställas.</p>
+            <p>Finansiell analys, riskbedömning och bokslut. Personuppgifter och avsnittet om bakgrundskontroller har utelämnats i utdraget.{FLAGS.reports.ai !== 'live' && ' AI-rapporten kan ännu inte beställas.'}</p>
             <a class="btn btn--quiet" href="/rapporter/exempel/ai-rapport-kjs-sport-utdrag.pdf">
                 <Icon name="doc" /> Läs utdraget ur AI-rapporten (PDF)
             </a>
