@@ -23,4 +23,4 @@ Safety already enforced in code:
 - `SE_CHECKOUT=1` fails the build without the `http` adapter and an API base, or without a verified price for a live product.
 - The mock adapter fails the build if the site is indexable.
 - Model output is shown only when `SE_PUBLIC_MODEL_OUTPUT=1`, the record carries `validation.validatedForSweden`, the record isn't synthetic, and the statements aren't stale.
-- Prices are never read from the backend; only `VERIFIED_PRICES` can show a price.
+- A live product requires an entry in `VERIFIED_PRICES`. The ordering page checks the current price with the checkout API before showing the form.

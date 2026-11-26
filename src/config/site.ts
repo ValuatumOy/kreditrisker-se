@@ -82,7 +82,7 @@ export const TERMS_VERSION = env('SE_TERMS_VERSION') ?? 'utkast-2026-09'
 /** Approved prices; they are not shown until Stripe and checkout are verified. */
 export const APPROVED_PRICES = {
     basic: { amountSek: priceTargets.basic / 100, vatIncluded: true },
-    ai: { amountSek: priceTargets.ai / 100, vatIncluded: false },
+    ai: { amountSek: priceTargets.ai / 100, vatIncluded: true },
 } as const
 
 /**

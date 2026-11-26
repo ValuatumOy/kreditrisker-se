@@ -1,7 +1,7 @@
 'use strict';
 
 // Poller — triggered by an EventBridge schedule (~every 1 min). For each order
-// CONFIRMING Basic orders first receive an order reference. Withdrawal requests
+// CONFIRMING orders first receive an order reference. Withdrawal requests
 // are handled independently of fulfillment status, with charged payments queued
 // for manual refund review. For each remaining GENERATING order, checks the
 // report-engine job and resolves the manual-capture
@@ -21,7 +21,7 @@ const { listOrdersByStatus } = dynamo;
 const credits = require('../lib/credits');
 const { getJob, downloadPdf } = require('../lib/reportEngine');
 const { generateValuatumReport } = require('../lib/valuatumReports');
-const { getProduct, localizedField, DEFAULT_REPORT_LANG } = require('../lib/products');
+const { getProduct, isSingleReportOrder, localizedField, DEFAULT_REPORT_LANG } = require('../lib/products');
 const emailService = require('../lib/email');
 const config = require('../lib/config');
 const fulfillment = require('../lib/fulfillment');
@@ -98,7 +98,7 @@ async function settleFunding(order, attrs = {}, occurredAt = new Date().toISOStr
   if (order.funding === 'package') {
     return credits.consume(packageSettlementInput(order, orderAttrs, occurredAt));
   }
-  if (order.reportType === 'se_credit_risk') {
+  if (isSingleReportOrder(order)) {
     const completed = await dynamo.finishSingleOrder(order.sessionId, orderAttrs);
     return completed ? { status: 'SETTLED' } : { status: 'WITHDRAWN' };
   }
@@ -110,7 +110,7 @@ async function releaseFunding(order, reason, occurredAt = new Date().toISOString
   if (order.funding === 'package') {
     return credits.release(packageSettlementInput(order, orderAttrs, occurredAt));
   }
-  if (order.reportType === 'se_credit_risk') {
+  if (isSingleReportOrder(order)) {
     const completed = await dynamo.finishSingleOrder(order.sessionId, orderAttrs);
     return completed ? { status: 'SETTLED' } : { status: 'WITHDRAWN' };
   }
@@ -148,8 +148,7 @@ function reportFileName(companyName) {
 
 async function deliver(stripe, order, pdfBuffer) {
   const funding = paymentFunding(order);
-  if (order.reportType === 'se_credit_risk' && order.funding !== 'package'
-      && !(await dynamo.claimDelivery(order.sessionId))) return false;
+  if (isSingleReportOrder(order) && !(await dynamo.claimDelivery(order.sessionId))) return false;
   if (funding === 'STRIPE') {
     try {
       await capturePaymentIntent(stripe, order.paymentIntentId);
@@ -256,6 +255,10 @@ async function processOrder(stripe, order) {
   const job = await getJob(order.jobId);
 
   if (job.status === 'DONE') {
+    if (order.fraudAddonPurchased && job.reportFeatures?.fraudAnalysis !== true) {
+      await fail(stripe, order, 'The PDF engine did not confirm the purchased fraud analysis.');
+      return;
+    }
     if (!job.s3Url) throw new Error('job DONE but no s3Url');
     await fulfill(stripe, order, job);
   } else if (job.status === 'FAILED') {
@@ -270,7 +273,7 @@ async function processOrder(stripe, order) {
   // else PENDING/RUNNING within budget → leave for the next tick.
 }
 
-async function confirmBasicOrder(stripe, order) {
+async function confirmOrder(stripe, order) {
   if (order.withdrawalRequestId) return;
   paymentFunding(order);
   if (ageMinutes(order) > config.maxGenerationMinutes) {
@@ -311,7 +314,7 @@ exports.handler = async () => {
   for (const indexed of confirming) {
     try {
       const order = await dynamo.getOrder(indexed.sessionId);
-      if (order?.status === 'CONFIRMING' && (!config.isolatedFixtureTest || isFixtureOrder(order))) await confirmBasicOrder(stripe, order);
+      if (order?.status === 'CONFIRMING' && (!config.isolatedFixtureTest || isFixtureOrder(order))) await confirmOrder(stripe, order);
     } catch (error) {
       console.error('poller: order error', { sessionId: indexed.sessionId, error: error.message });
     }

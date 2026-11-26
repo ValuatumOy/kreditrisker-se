@@ -10,6 +10,7 @@ const {
   QueryCommand,
 } = require('@aws-sdk/lib-dynamodb');
 const config = require('./config');
+const { isSingleReportOrder } = require('./products');
 
 // Orders table — the single source of truth for the async fulfillment gap
 // between the webhook (submits a generation job) and the poller (captures the
@@ -174,7 +175,7 @@ async function conditionalOrderUpdate(sessionId, attrs, condition, names = {}, v
 
 async function requestWithdrawal({ sessionId, email, requestId, requestedAt, receiptMethod }) {
   const order = await getOrder(sessionId);
-  if (!order || order.reportType !== 'se_credit_risk' || order.funding === 'package'
+  if (!isSingleReportOrder(order)
       || String(order.email || '').trim().toLowerCase() !== email) return null;
   if (order.withdrawalRequestId) return order;
   const attrs = {
@@ -186,10 +187,10 @@ async function requestWithdrawal({ sessionId, email, requestId, requestedAt, rec
   const created = await conditionalOrderUpdate(sessionId, attrs,
     '#email = :email AND #type = :type AND attribute_not_exists(withdrawalRequestId)',
     { '#email': 'email', '#type': 'reportType' },
-    { ':email': order.email, ':type': 'se_credit_risk' });
+    { ':email': order.email, ':type': order.reportType });
   if (created) return { ...order, ...attrs };
   const current = await getOrder(sessionId);
-  return current?.withdrawalRequestId && current.reportType === 'se_credit_risk' && current.funding !== 'package'
+  return current?.withdrawalRequestId && current.reportType === order.reportType && isSingleReportOrder(current)
     && String(current.email || '').trim().toLowerCase() === email ? current : null;
 }
 

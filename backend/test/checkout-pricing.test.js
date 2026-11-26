@@ -126,7 +126,7 @@ test('checkout rejects a default price with the wrong billing contract', async (
 })
 
 test('Swedish single reports accept only the approved SEK amounts and tax treatment', async () => {
-    for (const [reportType, expected, taxBehavior] of [['se_credit_risk', 2900, 'inclusive'], ['se_ai_credit_risk', 6900, 'exclusive']]) {
+    for (const [reportType, expected, taxBehavior] of [['se_credit_risk', 2900, 'inclusive'], ['se_ai_credit_risk', 8625, 'inclusive']]) {
         const product = getProduct(reportType)
         assert.equal(product.taxBehavior, taxBehavior)
         assert.equal(product.expectedUnitAmount, expected)

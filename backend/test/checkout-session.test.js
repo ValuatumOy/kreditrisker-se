@@ -11,7 +11,7 @@ stripeModule.stripeClient = async () => ({
             active: true,
             default_price: {
                 id: 'price_test', active: true, currency: 'sek', type: 'one_time',
-                tax_behavior: id === 'prod_test_se_basic' ? 'inclusive' : 'exclusive', unit_amount: id === 'prod_test_se_basic' ? 2900 : 6900,
+                tax_behavior: 'inclusive', unit_amount: id === 'prod_test_se_basic' ? 2900 : 8625,
             },
         }),
     },
@@ -87,6 +87,22 @@ test('checkout refuses orders without the current terms version', async () => {
         })
         assert.equal(response.statusCode, 400)
     }
+})
+
+test('unavailable or invalid fraud choices never start a Stripe session', async () => {
+    const initialCount = sessions.length
+    for (const [reportType, includeFraud, status] of [
+        ['se_ai_credit_risk', true, 409],
+        ['se_ai_credit_risk', 'true', 400],
+        ['se_credit_risk', true, 400],
+    ]) {
+        const response = await handler({
+            requestContext: { http: { method: 'POST' } },
+            body: JSON.stringify({ reportType, includeFraud, businessId: '556036-9208', acceptedTermsVersion: 'test-v1' }),
+        })
+        assert.equal(response.statusCode, status)
+    }
+    assert.equal(sessions.length, initialCount)
 })
 
 test('real checkout rejects personnummer, synthetic numbers and invalid organisation numbers', async () => {

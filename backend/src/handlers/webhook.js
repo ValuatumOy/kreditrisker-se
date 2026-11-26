@@ -28,6 +28,7 @@ const { paymentFunding } = require('../lib/paymentFunding')
 const config = require('../lib/config')
 const { isFixturePurchase } = require('../lib/fixtureTest')
 const { isSwedishCompany } = require('../lib/swedishCompany')
+const fraudAddon = require('../lib/fraudAddon')
 
 // Manual-capture sessions remain unpaid until the poller captures them. Only
 // immediate-capture products require a settled status here.
@@ -64,6 +65,15 @@ async function fulfillSingleReport(session, product) {
         paymentStatus,
     } = sessionFacts(session)
     const reportType = meta.reportType
+    let includeFraud
+    if (reportType === fraudAddon.REPORT_TYPE) {
+        try {
+            includeFraud = fraudAddon.sessionSelection(meta)
+        } catch (error) {
+            console.error('webhook: payment review required', { sessionId, error: error.message })
+            return text(503, 'Fraud add-on selection could not be verified')
+        }
+    }
 
     try {
         paymentFunding({ amountTotal, paymentIntentId, paymentStatus })
@@ -89,10 +99,11 @@ async function fulfillSingleReport(session, product) {
         fiscalYear: meta.fiscalYear,
         reportLang: normalizeReportLang(meta.reportLang),
     })
+    if (includeFraud !== undefined) params.includeFraud = includeFraud
 
     const claimed = await dynamo.claimOrder({
         sessionId,
-        status: reportType === 'se_credit_risk' ? 'CONFIRMING' : 'GENERATING',
+        status: 'CONFIRMING',
         paymentIntentId,
         paymentStatus,
         email,
@@ -110,6 +121,7 @@ async function fulfillSingleReport(session, product) {
             analyticsExperiment: meta.priceAnalyticsExperiment, analyticsVariant: meta.priceAnalyticsVariant,
         } } : {}),
         termsAcceptedAt: meta.termsAcceptedAt || '',
+        ...(includeFraud === true ? { fraudAddonPurchased: true } : {}),
         params,
         companyName: meta.companyName || '',
         internalTest: meta.internalTest === 'true',
@@ -119,53 +131,7 @@ async function fulfillSingleReport(session, product) {
         console.log('webhook: session already processed, skipping', {
             sessionId,
         })
-        return json(200, { received: true })
     }
-
-    // A durable reference reaches the buyer before the paid Basic job starts.
-    // The poller retries confirmation, then claims submission once.
-    if (reportType === 'se_credit_risk') return json(200, { received: true })
-
-    let jobId
-    try {
-        ;({ jobId } = await fulfillment.startFulfillment(
-            { sessionId, params },
-            product
-        ))
-    } catch (err) {
-        if (err instanceof fulfillment.FulfillmentSubmissionUnknownError) {
-            console.error('webhook: job submission could not be confirmed', {
-                sessionId,
-                error: err.cause?.message || err.message,
-            })
-            // Keep the claim: a redelivery must not submit another job.
-            // The poller releases the authorization if no job is recorded.
-            return json(200, { received: true })
-        }
-        if (err instanceof fulfillment.FulfillmentTrackingError) {
-            console.error('webhook: submitted job could not be recorded', {
-                sessionId,
-                jobId: err.jobId,
-                error: err.cause?.message || err.message,
-            })
-            return text(500, 'Job tracking failed')
-        }
-        console.error('webhook: job submission failed', {
-            sessionId,
-            error: err.message,
-        })
-        await dynamo
-            .deleteOrder(sessionId)
-            .catch(e => console.error('cleanup failed', e.message))
-        return text(500, 'Job submission failed')
-    }
-
-    console.log('webhook: fulfillment started', {
-        sessionId,
-        reportType,
-        generator: product.generator,
-        jobId,
-    })
 
     return json(200, { received: true })
 }

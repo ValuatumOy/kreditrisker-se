@@ -44,7 +44,7 @@ const PRODUCTS = {
   se_ai_credit_risk: {
     stripeProductId: process.env.STRIPE_PRODUCT_SE_AI || '',
     currency: 'sek',
-    taxBehavior: 'exclusive',
+    taxBehavior: 'inclusive',
     expectedUnitAmount: PRICE_TARGETS.ai,
     taxCode: 'txcd_10000000',
     name: {
@@ -136,6 +136,10 @@ function grantFor(product, reportType) {
   return product.grants.find(grant => grant.reportType === reportType) || null;
 }
 
+function isSingleReportOrder(order) {
+  return !!order && order.funding !== 'package' && ['se_credit_risk', 'se_ai_credit_risk'].includes(order.reportType);
+}
+
 function normalizeLang(lang) {
   return SUPPORTED_LANGS.includes(lang) ? lang : DEFAULT_LANG;
 }
@@ -203,6 +207,7 @@ function buildReportParams(product, { businessId, fid, fiscalYear, reportLang })
 module.exports = {
   getProduct,
   grantFor,
+  isSingleReportOrder,
   buildReportParams,
   normalizeLang,
   normalizeReportLang,

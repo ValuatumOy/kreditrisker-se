@@ -13,7 +13,7 @@ export type UnavailableReason =
 export type ReportState =
     | { kind: 'unavailable'; reason: UnavailableReason }
     | { kind: 'sample'; sampleHref: string }
-    | { kind: 'available'; price?: { amountSek: number; vatIncluded: boolean }; offer?: ReportOffer }
+    | { kind: 'available'; price?: { amountSek: number; vatIncluded: boolean }; offer?: ReportOffer; fraudAddonSek?: number }
     | { kind: 'processing'; orderId: string; startedAt: string }
     | { kind: 'success'; orderId: string; downloadHref: string; expiresAt?: string }
     | { kind: 'failure'; orderId?: string; code: string; retryable: boolean }
@@ -34,6 +34,7 @@ export interface OrderRequest {
     /** Same-origin path Stripe returns to (with ?checkout=success) or cancels to. */
     returnPath?: string
     priceQuote?: string
+    includeFraud?: boolean
 }
 
 /** Contract for the future Swedish report backend. */

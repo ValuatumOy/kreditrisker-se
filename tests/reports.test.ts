@@ -50,6 +50,7 @@ test('http adapter: Stripe redirect only to Stripe, errors become states', async
     assert.equal(sent.businessId, '556987-6542')
     assert.equal(sent.fid, '900001')
     assert.equal(sent.acceptedTermsVersion, 'v')
+    assert.equal('includeFraud' in sent, false)
     assert.equal('price' in sent || 'amount' in sent, false, 'the client never sends a price')
     const evil = httpBackend('https://x/api/', async () => Response.json({ url: 'https://evil.example/pay' }))
     assert.equal((await evil.createOrder(req)).kind, 'failure')
@@ -68,4 +69,28 @@ test('http adapter resolves the documented relative API path against the site or
     }, 'https://www.kreditrisker.se')
     const state = await backend.createOrder({ orgnr: '5569876542', product: 'ai', email: 'a@b.se', acceptedTermsVersion: 'v' })
     assert.equal(state.kind, 'redirect')
+})
+
+test('AI add-on appears only with the configured server quote and is sent as a boolean', async () => {
+    const backend = httpBackend('/api/', async (url, init) => {
+        if (init?.method === 'POST') {
+            const body = JSON.parse(String(init.body))
+            assert.equal(body.includeFraud, true)
+            assert.equal('fraudAddonCents' in body, false)
+            return Response.json({ url: 'https://checkout.stripe.com/c/pay/cs_test_1' })
+        }
+        const query = new URL(String(url)).searchParams
+        assert.equal(query.get('businessId'), '556987-6542')
+        assert.equal(query.get('reportType'), 'se_ai_credit_risk')
+        return Response.json({
+            reportType: 'se_ai_credit_risk', unitAmount: 8625, currency: 'sek',
+            taxBehavior: 'inclusive', fraudAddonCents: 2200,
+        })
+    }, 'https://www.kreditrisker.se')
+    const state = await backend.availability('5569876542', 'ai')
+    assert.equal(state.kind, 'available')
+    assert.equal(state.kind === 'available' && state.fraudAddonSek, 22)
+    assert.deepEqual(state.kind === 'available' && state.price, { amountSek: 86.25, vatIncluded: true })
+    const order = await backend.createOrder({ orgnr: '5569876542', product: 'ai', email: 'a@b.se', acceptedTermsVersion: 'v', includeFraud: true })
+    assert.equal(order.kind, 'redirect')
 })

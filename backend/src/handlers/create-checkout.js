@@ -4,7 +4,7 @@
 // generated report. The browser reaches this same-origin through CloudFront.
 //
 // Body: { reportType, fid, businessId, fiscalYear, companyName, lang?,
-//         reportLang?, cancelPath?, promotionCode? }
+//         reportLang?, cancelPath?, promotionCode?, includeFraud? }
 //   - reportType selects the product (`se_ai_credit_risk`); the field
 //     exists so future report types reuse this handler.
 //   - Price + line-item label are derived SERVER-SIDE from reportType. The
@@ -35,6 +35,7 @@ const config = require('../lib/config')
 const { isFixturePurchase } = require('../lib/fixtureTest')
 const { isSwedishCompany } = require('../lib/swedishCompany')
 const offers = require('../lib/report-offers')
+const fraudAddon = require('../lib/fraudAddon')
 const json = (statusCode, body, headers) => jsonResponse(statusCode, body, { ...offers.NO_STORE, ...headers })
 
 const INTERNAL_TEST_CODES = new Set((process.env.INTERNAL_TEST_CODES || '').split(',').filter(Boolean))
@@ -183,6 +184,9 @@ exports.handler = async event => {
                 unitAmount: price.unit_amount,
                 currency: price.currency,
                 taxBehavior: product.taxBehavior,
+                ...(fraudAddon.available(reportType) && !config.isolatedFixtureTest ? {
+                    fraudAddonCents: fraudAddon.UNIT_AMOUNT,
+                } : {}),
                 ...(summaryRequested ? { from: Boolean(pricing && pricing.variants.length > 1) } : {}),
                 ...(quoteRequested || summaryRequested ? {
                     expiresAt: offer?.expiresAt ?? Math.floor(Date.now() / 1000) + offers.TTL_SECONDS,
@@ -212,6 +216,7 @@ exports.handler = async event => {
         requestId,
         fulfillReportType,
         priceQuote,
+        includeFraud,
     } = jsonBody(event)
 
     if (config.isolatedFixtureTest && !isFixturePurchase({ reportType, businessId, email }))
@@ -222,6 +227,11 @@ exports.handler = async event => {
 
     const product = getProduct(reportType)
     if (!product) return json(400, { error: 'Unknown reportType' })
+
+    if (includeFraud !== undefined && (reportType !== fraudAddon.REPORT_TYPE || typeof includeFraud !== 'boolean'))
+        return json(400, { error: 'Invalid includeFraud' })
+    if (includeFraud && !fraudAddon.available(reportType))
+        return json(409, { error: 'Fraud add-on is not available' })
 
     if (!config.isolatedFixtureTest && !isSwedishCompany(businessId))
         return json(400, { error: 'A valid Swedish organisation number is required' })
@@ -251,7 +261,7 @@ exports.handler = async event => {
     const cancelUrl = `${origin}${returnPath}`
     const successPath = appendParams(
         returnPath,
-        `checkout=success${reportType === 'se_credit_risk' ? '' : '&session_id={CHECKOUT_SESSION_ID}'}&report=${encodeURIComponent(reportType)}${
+        `checkout=success${packageCheckout ? '&session_id={CHECKOUT_SESSION_ID}' : ''}&report=${encodeURIComponent(reportType)}${
             companyName
                 ? `&company=${encodeURIComponent(String(companyName))}`
                 : ''
@@ -283,10 +293,21 @@ exports.handler = async event => {
             language,
             langDisclosure
         )
+        const lineItems = [lineItem]
+        if (includeFraud) {
+            lineItems.push(await buildLineItem(stripe, {
+                currency: product.currency,
+                priceCents: fraudAddon.UNIT_AMOUNT,
+                taxBehavior: 'inclusive',
+                taxCode: product.taxCode,
+                name: { sv: 'Bedrägerianalys', en: 'Fraud analysis' },
+                description: { sv: 'Extra avsnitt i AI-kreditriskrapporten.', en: 'Additional section in the AI credit risk report.' },
+            }, language, ''))
+        }
 
         const sessionParams = {
             mode: 'payment',
-            ...(offer ? { currency: 'sek' } : {}),
+            ...(offer || reportType === fraudAddon.REPORT_TYPE ? { currency: 'sek' } : {}),
             locale: language,
             customer_creation: 'always',
             ...(packageCheckout
@@ -297,7 +318,7 @@ exports.handler = async event => {
                 : typeof email === 'string' && EMAIL.test(email.trim()) && email.length <= 254
                   ? { customer_email: email.trim() } // prefill: the order page already asked for it
                   : {}),
-            line_items: [lineItem],
+            line_items: lineItems,
             ...(promotionCodeId
                 ? { discounts: [{ promotion_code: promotionCodeId }] }
                 : { allow_promotion_codes: !offer }),
@@ -328,6 +349,11 @@ exports.handler = async event => {
             metadata: {
                 ...(offer ? offers.attribution(pricing, offer) : {}),
                 reportType,
+                ...(reportType === fraudAddon.REPORT_TYPE ? {
+                    aiFraudAddonVersion: '1',
+                    includeFraud: String(includeFraud === true),
+                    fraudAddonCents: String(includeFraud === true ? fraudAddon.UNIT_AMOUNT : 0),
+                } : {}),
                 ...(packageCheckout
                     ? {
                           requestId: packageCheckout.requestId,

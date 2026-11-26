@@ -49,6 +49,22 @@ test('generation, delivery, and final status writes use conditions that a withdr
     } finally { mock.restoreAll() }
 })
 
+test('an AI single order can be withdrawn, and AI bundle redemption cannot use that flow', async () => {
+    const order = { sessionId: 'cs_test_ai_order', email: 'buyer@example.com', reportType: 'se_ai_credit_risk', status: 'CONFIRMING' }
+    const send = mock.method(dynamo.doc, 'send', async command => {
+        if (command.constructor.name === 'GetCommand') return { Item: { ...order } }
+        assert.equal(command.input.ExpressionAttributeValues[':type'], 'se_ai_credit_risk')
+        return {}
+    })
+    try {
+        const request = { sessionId: order.sessionId, email: order.email, requestId: 'request-ai', requestedAt: '2026-11-26T10:00:00Z', receiptMethod: 'email' }
+        assert.equal((await dynamo.requestWithdrawal(request)).withdrawalState, 'PENDING')
+        order.funding = 'package'
+        assert.equal(await dynamo.requestWithdrawal(request), null)
+        assert.equal(send.mock.callCount(), 3)
+    } finally { mock.restoreAll() }
+})
+
 test('the withdrawal worker queries its durable pending index rather than depending on GENERATING', async () => {
     const queries = []
     mock.method(dynamo.doc, 'send', async command => {

@@ -35,12 +35,18 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             <label for="od-email">E-post för leverans</label>
             <input id="od-email" name="email" type="email" autocomplete="email" required aria-describedby="od-email-err" />
             <p class="od__err small" id="od-email-err" hidden>Skriv en giltig e-postadress, till exempel namn@foretag.se.</p>
+            <div data-fraud-addon hidden>
+                <label class="od__check">
+                    <input type="checkbox" name="includeFraud" />
+                    <span>Lägg till bedrägerianalys <span class="muted" data-fraud-price></span></span>
+                </label>
+            </div>
             <label class="od__check">
                 <input type="checkbox" name="terms" required aria-describedby="od-terms-err" />
                 <span>Jag godkänner <a href="/villkor/">villkoren</a> och har läst om <a href="/leverans/">leverans och ångerrätt</a>.</span>
             </label>
             <p class="od__err small" id="od-terms-err" hidden>Du behöver godkänna villkoren för att beställa.</p>
-            <p class="small muted" data-price></p>
+            <p class="small muted" data-price aria-live="polite"></p>
             <p class="small" data-price-note role="status"></p>
             <p class="small muted">Priset gäller för konsumenter i Sverige. Tillämplig moms och slutbelopp visas i kassan.</p>
             <p class="small">Läs vår <a href="/integritet/">integritetspolicy</a>.</p>
@@ -70,7 +76,6 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
             <p>Om betalningen godkändes skickas rapporten till din e-post när den är klar.</p>
             <p class="small muted">Beloppet reserveras och dras först när rapporten är klar. Om rapporten inte kan tas fram släpps reservationen och du debiteras inget.</p>
             <p data-confirmation-note hidden>Ordernumret skickas till din e-postadress i beställningsbekräftelsen.</p>
-            <p class="small" data-paid-reference hidden>Order: <span class="num" data-paid-order></span></p>
             <a data-withdrawal-link href="/angra-kop/" hidden>Ångra köp</a>
         </div>
 
@@ -84,10 +89,8 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     <noscript><p>Aktuellt pris visas innan du betalar. Aktivera JavaScript för att hämta priset och beställa rapporten.</p></noscript>
     </NightBand>
     <script is:inline>
-        const orderReturnRoot = document.querySelector('[data-order]')
         const orderReturnParams = new URLSearchParams(location.search)
-        if (orderReturnRoot && orderReturnParams.has('session_id')) {
-            orderReturnRoot.dataset.returnParams = location.search
+        if (orderReturnParams.has('session_id')) {
             orderReturnParams.delete('session_id')
             history.replaceState(null, '', `${location.pathname}?${orderReturnParams}`)
         }
@@ -104,7 +107,7 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     import { observePriceExposure } from '../../lib/price-analytics.ts'
 
     const root = document.querySelector<HTMLElement>('[data-order]')!
-    const params = new URLSearchParams(root.dataset.returnParams ?? location.search)
+    const params = new URLSearchParams(location.search)
     const product: ReportProduct = params.get('produkt') === 'ai' ? 'ai' : 'basic'
     const adapter = root.dataset.adapter
     const parsed = parseOrgnr(params.get('orgnr') ?? '')
@@ -117,10 +120,29 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     const views = [...root.querySelectorAll<HTMLElement>('[data-view]')]
     const $ = <T extends Element>(sel: string) => root.querySelectorAll<T>(sel)
     let currentOffer: ReportOffer | undefined
+    let currentPrice: typeof prices[ReportProduct]
+    let fraudAddonSek: number | undefined
     let priceTimer: ReturnType<typeof setTimeout> | undefined
-    const priceExposure = observePriceExposure(root.querySelector<HTMLElement>('[data-price]')!, 'order')
+    const priceDisplay = root.querySelector<HTMLElement>('[data-price]')!
+    const priceExposure = observePriceExposure(priceDisplay, 'order')
+    const fraudAddon = root.querySelector<HTMLElement>('[data-fraud-addon]')!
+    const fraudOption = fraudAddon.querySelector<HTMLInputElement>('input')!
+    const fraudPrice = fraudAddon.querySelector<HTMLElement>('[data-fraud-price]')!
+    const kronor = (amount: number) => amount.toLocaleString('sv-SE') + ' kr'
 
     root.querySelector('[data-product-name]')!.textContent = product === 'ai' ? PRODUCT_NAME.ai : PRODUCT_NAME.basic.toLowerCase()
+
+    function updatePrice() {
+        if (currentOffer) priceDisplay.textContent = offerLabel(currentOffer)
+        else if (!currentPrice) priceDisplay.textContent = 'Priset visas innan du betalar.'
+        else {
+            const { amountSek, vatIncluded } = currentPrice
+            const addon = fraudOption.checked ? fraudAddonSek ?? 0 : 0
+            priceDisplay.textContent = `${kronor(amountSek + addon)} ${vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
+        }
+    }
+
+    fraudOption.addEventListener('change', updatePrice)
 
     function show(s: ReportState) {
         priceExposure.setOffer()
@@ -138,16 +160,19 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         }
         if (s.kind === 'available') {
             currentOffer = s.offer
+            currentPrice = s.price ?? prices[product]
+            fraudAddonSek = product === 'ai' ? s.fraudAddonSek : undefined
+            fraudAddon.hidden = fraudAddonSek === undefined
+            fraudOption.checked = false
+            fraudOption.disabled = fraudAddon.hidden
+            fraudPrice.textContent = fraudAddonSek === undefined ? '' : `+${kronor(fraudAddonSek)} inkl. moms`
             clearTimeout(priceTimer)
             root.querySelector('[data-price-note]')!.textContent = ''
-            const price = prices[product]
-            root.querySelector('[data-price]')!.textContent = currentOffer ? offerLabel(currentOffer) : price
-                ? `${price.amountSek.toLocaleString('sv-SE')} kr ${price.vatIncluded ? 'inkl.' : 'exkl.'} moms. Slutligt belopp visas hos Stripe.`
-                : 'Priset visas innan du betalar.'
+            updatePrice()
             priceExposure.setOffer(currentOffer)
             if (currentOffer) priceTimer = setTimeout(() => {
                 priceExposure.setOffer()
-                root.querySelector('[data-price]')!.textContent = 'Priset behöver hämtas på nytt innan du beställer.'
+                priceDisplay.textContent = 'Priset behöver hämtas på nytt innan du beställer.'
             }, offerRemainingMs(currentOffer))
         }
     }
@@ -166,20 +191,8 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         co.textContent = hit ? `${hit.n}, org.nr ${formatOrgnr(orgnr)}` : `Org.nr ${formatOrgnr(orgnr)}`
         companyName = hit?.n
         if (params.get('checkout') === 'success') {
-            if (product === 'basic') {
-                root.querySelector<HTMLElement>('[data-confirmation-note]')!.hidden = false
-                root.querySelector<HTMLElement>('[data-withdrawal-link]')!.hidden = false
-            }
-            const sessionId = params.get('session_id') ?? ''
-            if (/^cs_(?:test|live)_[A-Za-z0-9_]{8,240}$/.test(sessionId)) {
-                root.querySelector('[data-paid-order]')!.textContent = sessionId
-                root.querySelector<HTMLElement>('[data-paid-reference]')!.hidden = false
-                if (product === 'basic') {
-                    const link = root.querySelector<HTMLAnchorElement>('[data-withdrawal-link]')!
-                    link.href = '/angra-kop/'
-                    link.hidden = false
-                }
-            }
+            root.querySelector<HTMLElement>('[data-confirmation-note]')!.hidden = false
+            root.querySelector<HTMLElement>('[data-withdrawal-link]')!.hidden = false
             return show({ kind: 'paid' })
         }
         if (hit) root.querySelector<HTMLAnchorElement>('[data-back]')!.href = hit.p
@@ -235,7 +248,11 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
         const returnPath = `/bestall/?orgnr=${orgnr}&produkt=${product === 'ai' ? 'ai' : 'bas'}${fid ? `&fid=${fid}` : ''}`
         let redirecting = false
         try {
-            const s = await backend.createOrder({ orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!, fid, companyName, returnPath, priceQuote: currentOffer?.quote })
+            const s = await backend.createOrder({
+                orgnr, product, email: email.value.trim(), acceptedTermsVersion: root.dataset.terms!,
+                fid, companyName, returnPath, priceQuote: currentOffer?.quote,
+                includeFraud: !fraudOption.disabled && fraudOption.checked,
+            })
             if (s.kind === 'failure' && s.code === 'http_409') {
                 await refreshPrice()
                 return
@@ -284,9 +301,6 @@ import { STATE_LABEL, UNAVAILABLE_TEXT } from '../../lib/reports/labels.ts'
     }
     .od__panel[hidden] {
         display: none;
-    }
-    [data-paid-reference] {
-        overflow-wrap: anywhere;
     }
     .od__state {
         display: flex;

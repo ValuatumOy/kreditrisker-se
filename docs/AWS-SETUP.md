@@ -127,8 +127,10 @@ outputs for Swedish companies as part of the report review before opening sales.
 
 1. The Stripe basic product `prod_VXJrnLn4qkC2Nv` uses a SEK 29.00,
    one-time, VAT-inclusive price and tax code `txcd_10000000`. The AI product has
-   not been created; its planned price is SEK 69.00 before VAT. The backend checks amounts and tax
-   treatment against `backend/src/lib/report-price-targets.json`. Confirm the
+   not been created in production. The test target is SEK 86.25 including VAT,
+   based on the prior SEK 69.00 net price. Confirm the production price before
+   adding the AI product and publishing it in `VERIFIED_PRICES`. The backend checks
+   amounts and tax treatment against `backend/src/lib/report-price-targets.json`. Confirm the
    company's tax registration and treatment for each customer before launch.
    The `kreditrisker-se-prod` secret already exists. On a new environment, create
    its secret out of band; for an existing one, update the necessary fields instead:
@@ -146,9 +148,13 @@ outputs for Swedish companies as part of the report review before opening sales.
 5. In Stripe, point a webhook at the direct `…/api/webhook` URL (not through
    CloudFront) and store its signing secret in the secret above.
 6. Deploy the reviewed report-engine version and verify a generated Swedish
-   sample of each product before enabling that product. For Basic, verify its
-   credit-model outputs and confirm fraud analysis is absent. For AI, also verify
-   its fraud-analysis outputs and complete the separate fraud privacy gate.
+   sample of each product before enabling that product. Test a standalone AI
+   report with and without fraud analysis. The add-on uses a separate SEK 22.00
+   VAT-inclusive line in Stripe and remains off unless `fraudAddonEnabledTest=1`
+   or `fraudAddonEnabledProd=1` is set in the corresponding stack. Complete the
+   separate fraud privacy gate before enabling it in production. If a buyer
+   selects the add-on, the payment stays uncaptured unless the completed engine
+   job confirms that the analysis is in the PDF.
 7. Once content, payment, delivery and legal checks pass, set CDK context
    `checkoutEnabledProd=1` and `termsVersionProd` to the approved terms version,
    then deploy the checkout stack. Without this switch

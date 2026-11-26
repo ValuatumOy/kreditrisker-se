@@ -1,11 +1,13 @@
 'use strict'
 
+const { isSingleReportOrder } = require('./products')
+
 // This operation does not create a refund. It closes a manual-review item only
 // after Stripe confirms the complete captured amount has been refunded.
 async function closeWithdrawal(sessionId, stripe, store) {
     if (!/^cs_(?:test|live)_[A-Za-z0-9]+$/.test(sessionId || '')) throw new Error('Invalid Checkout session')
     const order = await store.getOrder(sessionId)
-    if (!order || order.sessionId !== sessionId || order.reportType !== 'se_credit_risk' ||
+    if (!isSingleReportOrder(order) || order.sessionId !== sessionId ||
         typeof order.withdrawalRequestId !== 'string' || !order.withdrawalRequestId ||
         order.status !== 'WITHDRAWN' || order.withdrawalState !== 'REVIEW_REQUIRED' ||
         order.withdrawalPaymentResolution !== 'REFUND_REQUIRED' || !/^pi_[A-Za-z0-9_]+$/.test(order.paymentIntentId || '') ||

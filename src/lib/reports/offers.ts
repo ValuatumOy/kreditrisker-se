@@ -16,18 +16,21 @@ export interface ReportOffer {
     analyticsVariant?: string
 }
 
+export async function fetchCheckoutPrice(url: URL, fetchImpl: typeof fetch) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 10000)
+    try {
+        const response = await fetchImpl(url, { cache: 'no-store', credentials: 'same-origin', signal: controller.signal })
+        if (!response.ok) throw new Error('Price unavailable')
+        return await response.json()
+    } finally { clearTimeout(timeout) }
+}
+
 export async function loadReportOffer(base: string, orgnr: string | undefined, fetchImpl: typeof fetch = fetch, origin = globalThis.location?.origin, now = () => performance.now()): Promise<ReportOffer> {
     const startedAt = now()
     const url = new URL('create-checkout', new URL(base, origin))
     url.search = new URLSearchParams({ reportType: 'se_credit_risk', offer: orgnr ? '1' : 'summary', ...(orgnr ? { businessId: formatOrgnr(orgnr) } : {}) }).toString()
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 10000)
-    let value
-    try {
-        const response = await fetchImpl(url, { cache: 'no-store', credentials: 'same-origin', signal: controller.signal })
-        if (!response.ok) throw new Error('Price unavailable')
-        value = await response.json()
-    } finally { clearTimeout(timeout) }
+    const value = await fetchCheckoutPrice(url, fetchImpl)
     if (value.reportType !== 'se_credit_risk' || !Number.isSafeInteger(value.unitAmount) || value.unitAmount <= 0 ||
         value.currency !== 'sek' || value.taxBehavior !== 'inclusive' || !Number.isInteger(value.expiresAt) ||
         !Number.isFinite(value.remainingMs) || value.remainingMs <= 0 || value.remainingMs > 300000 ||

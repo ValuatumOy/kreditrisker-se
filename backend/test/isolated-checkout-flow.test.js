@@ -7,6 +7,7 @@ const assert = require('node:assert/strict')
 // signed test event; this test cannot create a payment or report.
 process.env.STRIPE_SECRET_KEY = 'sk_test_local_only'
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_local_only'
+process.env.SE_AI_FRAUD_ADDON = '1'
 process.env.SITE_URL = 'https://se-checkout.example.test'
 process.env.AWS_ACCESS_KEY_ID = 'local-test-only'
 process.env.AWS_SECRET_ACCESS_KEY = 'local-test-only'
@@ -50,8 +51,8 @@ const stripe = {
             active: true,
             default_price: {
                 id: `price_${id}`, active: true, currency: 'sek',
-                type: 'one_time', tax_behavior: id === 'prod_test_se_basic' ? 'inclusive' : 'exclusive',
-                unit_amount: id === 'prod_test_se_basic' ? 2900 : 6900,
+                type: 'one_time', tax_behavior: 'inclusive',
+                unit_amount: id === 'prod_test_se_basic' ? 2900 : 8625,
             },
         }),
     },
@@ -103,7 +104,10 @@ reportEngine.submitJob = async request => {
     if (state.submitError) throw new Error('response lost after submission')
     return `job_local_${state.jobs.length}`
 }
-reportEngine.getJob = async () => ({ status: 'DONE', s3Url: 'https://example.test/fake.pdf' })
+reportEngine.getJob = async () => ({
+    status: 'DONE', s3Url: 'https://example.test/fake.pdf',
+    ...(state.fraudAnalysis ? { reportFeatures: { fraudAnalysis: true } } : {}),
+})
 reportEngine.downloadPdf = async () => Buffer.from('%PDF-1.4 local fake')
 emailService.sendReportEmail = async (to, details) => {
     if (state.emailError) throw new Error('test SES failure')
@@ -127,12 +131,12 @@ function signedEvent(session) {
     }
 }
 
-async function createOrder(reportType) {
+async function createOrder(reportType, includeFraud) {
     const result = await checkout.handler({
         requestContext: { http: { method: 'POST' } },
         body: JSON.stringify({
             reportType, businessId: '556036-9208', companyName: 'Älvsjö',
-            lang: 'sv', reportLang: 'sv', acceptedTermsVersion: 'test-v1',
+            lang: 'sv', reportLang: 'sv', acceptedTermsVersion: 'test-v1', includeFraud,
         }),
     })
     assert.equal(result.statusCode, 200)
@@ -141,7 +145,7 @@ async function createOrder(reportType) {
         id: session.id,
         payment_status: 'unpaid',
         payment_intent: 'pi_test_local',
-        amount_total: reportType === 'se_credit_risk' ? 2900 : 6900,
+        amount_total: reportType === 'se_credit_risk' ? 2900 : 8625 + (includeFraud ? 2200 : 0),
         currency: 'sek',
         customer_details: { email: 'buyer@example.test', name: 'Local Test' },
         metadata: session.params.metadata,
@@ -164,18 +168,16 @@ test('both Swedish checkout flows connect to the expected report and delivery in
         const event = signedEvent(session)
         assert.equal((await webhook.handler(event)).statusCode, 200)
         assert.equal((await webhook.handler(event)).statusCode, 200)
-        if (reportType === 'se_credit_risk') {
-            assert.equal(state.jobs.length, 0, 'Basic waits for its order confirmation')
-            await poller.handler()
-            assert.deepEqual(state.confirmations, [session.id])
-        }
+        assert.equal(state.jobs.length, 0, 'Single reports wait for their order confirmation')
+        await poller.handler()
+        assert.deepEqual(state.confirmations, [session.id])
         assert.equal(state.jobs.length, 1, 'a repeated webhook must not start a second report')
         assert.equal(state.jobs[0].templateName, template)
         assert.equal(state.jobs[0].params.companyCode, '556036-9208')
         assert.equal(state.jobs[0].params.aspQueryKey, 'Sweden')
         assert.equal(state.jobs[0].params.lang, 'sv')
         assert.equal(state.jobs[0].params.currency, 'SEK')
-        if (reportType === 'se_ai_credit_risk') assert.equal(state.jobs[0].params.includeFraud, true)
+        if (reportType === 'se_ai_credit_risk') assert.equal(state.jobs[0].params.includeFraud, false)
         else assert.equal(state.jobs[0].params.aiTexts, true)
 
         await poller.handler()
@@ -187,6 +189,37 @@ test('both Swedish checkout flows connect to the expected report and delivery in
     }
 })
 
+test('selected fraud analysis is sent to Stripe, preserved on redelivery and required before capture', async () => {
+    for (const generated of [true, false]) {
+        reset()
+        const session = await createOrder('se_ai_credit_risk', true)
+        const items = state.sessions[0].params.line_items
+        assert.equal(items.length, 2)
+        assert.equal(items[1].price_data.unit_amount, 2200)
+        assert.equal(items[1].price_data.tax_behavior, 'inclusive')
+        assert.equal(items[1].price_data.currency, 'sek')
+        assert.equal(items[1].price_data.product_data.name, 'Bedrägerianalys')
+
+        delete process.env.SE_AI_FRAUD_ADDON
+        try {
+            const event = signedEvent(session)
+            assert.equal((await webhook.handler(event)).statusCode, 200)
+            assert.equal((await webhook.handler(event)).statusCode, 200)
+        } finally {
+            process.env.SE_AI_FRAUD_ADDON = '1'
+        }
+        state.fraudAnalysis = generated
+        await poller.handler()
+        assert.equal(state.jobs.length, 1)
+        assert.equal(state.jobs[0].params.includeFraud, true)
+
+        assert.equal(state.orders.get(session.id).status, generated ? 'FULFILLED' : 'FAILED')
+        assert.deepEqual(state.captures, generated ? ['pi_test_local'] : [])
+        assert.deepEqual(state.cancellations, generated ? [] : ['pi_test_local'])
+        assert.equal(state.emails.length, generated ? 1 : 0)
+    }
+})
+
 test('an uncertain submission is never automatically repeated or charged', async () => {
     reset()
     state.submitError = true
@@ -194,6 +227,7 @@ test('an uncertain submission is never automatically repeated or charged', async
     const event = signedEvent(session)
     assert.equal((await webhook.handler(event)).statusCode, 200)
     assert.equal((await webhook.handler(event)).statusCode, 200)
+    await poller.handler()
     assert.equal(state.jobs.length, 1)
     const order = state.orders.get(session.id)
     assert.equal(order.status, 'GENERATING')

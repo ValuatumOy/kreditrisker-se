@@ -5,7 +5,8 @@
 // Runs in the browser, so it must not import Node modules.
 
 import { formatOrgnr } from '../orgnr.ts'
-import { loadReportOffer } from './offers.ts'
+import { fetchCheckoutPrice, loadReportOffer } from './offers.ts'
+import priceTargets from '../../../backend/src/lib/report-price-targets.json' with { type: 'json' }
 import type { OrderRequest, ReportBackend, ReportProduct, ReportState } from './types.ts'
 
 export const disabledBackend: ReportBackend = {
@@ -27,7 +28,12 @@ export const disabledBackend: ReportBackend = {
 export function mockBackend(processingMs = 2500, now: () => number = Date.now): ReportBackend {
     const orders = new Map<string, { product: ReportProduct; fail: boolean; at: number }>()
     return {
-        async availability() {
+        async availability(_, product) {
+            if (product === 'ai') return {
+                kind: 'available',
+                price: { amountSek: priceTargets.ai / 100, vatIncluded: true },
+                fraudAddonSek: priceTargets.fraudAddon / 100,
+            }
             return { kind: 'available' }
         },
         async createOrder(req: OrderRequest) {
@@ -52,14 +58,26 @@ export const REPORT_TYPE: Record<ReportProduct, string> = { basic: 'se_credit_ri
  * The checkout backend (backend/, ported from the Danish directory): POST
  * /api/create-checkout returns a Stripe Checkout URL. Payment is authorised,
  * the report generated, then captured and emailed; a failed report is never
- * charged. Basic-report prices and signed quotes come from the same backend
- * that selects the Stripe line item; legacy products keep VERIFIED_PRICES.
+ * charged. The backend supplies the prices and selects the Stripe line items.
  */
 export function httpBackend(base: string, fetchImpl: typeof fetch = fetch, origin = globalThis.location?.origin): ReportBackend {
     return {
         async availability(orgnr, product) {
-            if (product !== 'basic') return { kind: 'available' }
             try {
+                if (product === 'ai') {
+                    const url = new URL('create-checkout', new URL(base, origin))
+                    url.search = new URLSearchParams({ reportType: REPORT_TYPE.ai, offer: '1', businessId: formatOrgnr(orgnr) }).toString()
+                    const quote = await fetchCheckoutPrice(url, fetchImpl)
+                    if (quote.reportType !== REPORT_TYPE.ai || quote.currency !== 'sek' ||
+                        quote.unitAmount !== priceTargets.ai || quote.taxBehavior !== 'inclusive' ||
+                        (quote.fraudAddonCents !== undefined && quote.fraudAddonCents !== priceTargets.fraudAddon))
+                        throw new Error('Invalid AI report price')
+                    return {
+                        kind: 'available',
+                        price: { amountSek: quote.unitAmount / 100, vatIncluded: true },
+                        fraudAddonSek: quote.fraudAddonCents === undefined ? undefined : quote.fraudAddonCents / 100,
+                    }
+                }
                 const offer = await loadReportOffer(base, orgnr, fetchImpl, origin)
                 return { kind: 'available', offer, price: { amountSek: offer.unitAmount / 100, vatIncluded: true } }
             } catch { return { kind: 'unavailable', reason: 'backend_unreachable' } }
@@ -78,6 +96,7 @@ export function httpBackend(base: string, fetchImpl: typeof fetch = fetch, origi
                         email: req.email,
                         acceptedTermsVersion: req.acceptedTermsVersion,
                         priceQuote: req.priceQuote,
+                        ...(req.product === 'ai' ? { includeFraud: req.includeFraud === true } : {}),
                         lang: 'sv',
                         reportLang: 'sv',
                         cancelPath: req.returnPath,

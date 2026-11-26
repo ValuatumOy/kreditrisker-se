@@ -32,7 +32,7 @@ test('unavailable, expired and invalid offers leave HTTP availability closed', a
     }
     const backend = httpBackend('/api/', async () => new Response('', { status: 503 }), 'https://www.kreditrisker.se')
     assert.equal((await backend.availability('5560369208', 'basic')).kind, 'unavailable')
-    assert.equal((await backend.availability('5560369208', 'ai')).kind, 'available')
+    assert.equal((await backend.availability('5560369208', 'ai')).kind, 'unavailable')
 })
 
 test('generic pages show verified baseline or from-price without assigning a company offer', async () => {
