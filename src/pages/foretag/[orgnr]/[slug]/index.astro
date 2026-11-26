@@ -38,7 +38,7 @@ const { orgnr, redirectTo } = Astro.props as { orgnr: string; redirectTo: string
 const site: Site = getSite()
 const c = site.byOrgnr.get(orgnr) as PublishedCompany
 const r = c.record
-const reportAvailable = staticReportState('basic', c).kind === 'available'
+const reportAvailable = staticReportState('basic', c).kind === 'available' || staticReportState('ai', c).kind === 'available'
 const [latest] = r.periods
 // Chart series: newest five periods, plus explicit "saknas" slots for calendar
 // years that should have been filed by now but are not in the source.
@@ -141,15 +141,13 @@ const desc = summary.slice(0, 2).join(' ')
                 )}
             </NightBand>
             <div class:list={['shell co', { 'co--report-inline': reportAvailable }]}>
-                <section class="co__lead" aria-labelledby="sammanfattning">
-                    <div class="fig co__summary">
+                <div class="co__lead">
+                    <section class="fig co__summary" aria-labelledby="sammanfattning">
                         <h2 id="sammanfattning" class="co__summaryh">Sammanfattning</h2>
                         <p>{summary[0]}</p>
                         {latest && summary.length > 1 && <p>{summary.slice(1).join(' ')}</p>}
-                    </div>
-                </section>
+                    </section>
 
-                <div class="co__main">
                     {salesSeries.length > 1 && (
                         <section class="co__sec" aria-labelledby="utveckling">
                             <h2 id="utveckling">Utveckling</h2>
@@ -175,8 +173,10 @@ const desc = summary.slice(0, 2).join(' ')
                             </p>
                         </section>
                     )}
+                </div>
 
-                    {reportAvailable && <div class="co__sec"><ReportPanel company={c} inline /></div>}
+                {reportAvailable && <div class="co__rail"><ReportPanel company={c} inline /></div>}
+                <div class="co__main">
                     {latest && (
                         <section class="co__sec" aria-labelledby="bokslut">
                             <h2 id="bokslut">Bokslut</h2>
@@ -274,12 +274,7 @@ const desc = summary.slice(0, 2).join(' ')
                         </section>
                     )}
                 </div>
-                <div class="co__rail">
-                    {!reportAvailable && <ReportPanel company={c} />}
-                    <p class="co__fix small">
-                        Ser något fel ut? <a href="/om/#rattelse">Begär rättelse</a>
-                    </p>
-                </div>
+                {!reportAvailable && <div class="co__rail"><ReportPanel company={c} /></div>}
             </div>
         </Base>
     )
@@ -465,11 +460,6 @@ const desc = summary.slice(0, 2).join(' ')
         top: 92px;
         min-width: 0;
     }
-    .co__fix {
-        margin-top: 12px;
-        color: var(--ink-3);
-        text-align: center;
-    }
     .co__main {
         grid-area: main;
         min-width: 0;
@@ -576,6 +566,12 @@ const desc = summary.slice(0, 2).join(' ')
             position: static;
             margin-top: 24px;
         }
+        .co--report-inline {
+            grid-template-areas: 'lead' 'rail' 'main';
+        }
+        .co--report-inline .co__rail {
+            margin-top: clamp(40px, 5vw, 64px);
+        }
     }
     @media (max-width: 720px) {
         .co__charts,
@@ -589,14 +585,6 @@ const desc = summary.slice(0, 2).join(' ')
         .co__titlerow {
             gap: 14px;
         }
-    }
-    .co--report-inline {
-        grid-template-columns: minmax(0, 1fr);
-        grid-template-areas: 'lead' 'main' 'rail';
-    }
-    .co--report-inline .co__rail {
-        position: static;
-        margin-top: 24px;
     }
     @media (prefers-contrast: more) {
         .co__orgnr { background: var(--night-2); border-color: var(--ice-2); }

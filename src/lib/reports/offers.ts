@@ -44,6 +44,12 @@ export async function loadReportOffer(base: string, orgnr: string | undefined, f
 
 export const offerRemainingMs = (offer: ReportOffer, now = performance.now()) => Math.max(0, offer.validUntil - now)
 
+export const REPORT_VAT_NOTE = 'inkl. moms för konsument i Sverige'
+
+export function offerAmountLabel(offer: ReportOffer): string {
+    return `${offer.from ? 'Från ' : ''}${(offer.unitAmount / 100).toLocaleString('sv-SE')} kr`
+}
+
 export function offerLabel(offer: ReportOffer): string {
-    return `${offer.from ? 'Från ' : ''}${(offer.unitAmount / 100).toLocaleString('sv-SE')} kr inkl. moms för konsument i Sverige`
+    return `${offerAmountLabel(offer)} ${REPORT_VAT_NOTE}`
 }

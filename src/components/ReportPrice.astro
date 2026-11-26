@@ -1,24 +1,34 @@
 ---
 import { FLAGS } from '../config/site.ts'
+import { REPORT_VAT_NOTE } from '../lib/reports/offers.ts'
 interface Props { orgnr?: string }
 const { orgnr } = Astro.props
 ---
-<span data-report-price data-orgnr={orgnr} data-price-api={FLAGS.reportAdapter === 'http' && FLAGS.checkout ? FLAGS.reportApiBase : undefined} aria-live="polite">Aktuellt pris visas när du väljer företag och beställer.</span>
+<span data-report-price data-orgnr={orgnr} data-price-api={FLAGS.reportAdapter === 'http' && FLAGS.checkout ? FLAGS.reportApiBase : undefined} aria-live="polite" aria-atomic="true">
+    <span data-price-amount>Aktuellt pris visas när du väljer företag och beställer.</span>{' '}<span data-price-vat hidden>{REPORT_VAT_NOTE}</span>
+</span>
 
 <script>
-    import { loadReportOffer, offerLabel, offerRemainingMs } from '../lib/reports/offers.ts'
+    import { loadReportOffer, offerAmountLabel, offerRemainingMs } from '../lib/reports/offers.ts'
     import { loadWhenNearViewport, observePriceExposure } from '../lib/price-analytics.ts'
     for (const element of document.querySelectorAll<HTMLElement>('[data-report-price][data-price-api]')) {
+        const amount = element.querySelector<HTMLElement>('[data-price-amount]')!
+        const vat = element.querySelector<HTMLElement>('[data-price-vat]')!
         const exposure = element.dataset.orgnr ? observePriceExposure(element, 'company') : null
+        const showFallback = () => {
+            vat.hidden = true
+            amount.textContent = 'Se aktuellt pris vid beställning.'
+        }
         loadWhenNearViewport(element, () => {
             loadReportOffer(element.dataset.priceApi!, element.dataset.orgnr).then((offer) => {
-                element.textContent = offerLabel(offer)
+                amount.textContent = offerAmountLabel(offer)
+                vat.hidden = false
                 exposure?.setOffer(offer)
                 setTimeout(() => {
                     exposure?.setOffer()
-                    element.textContent = 'Se aktuellt pris vid beställning.'
+                    showFallback()
                 }, offerRemainingMs(offer))
-            }).catch(() => { element.textContent = 'Se aktuellt pris vid beställning.' })
+            }).catch(showFallback)
         })
     }
 </script>

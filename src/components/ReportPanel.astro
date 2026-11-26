@@ -3,6 +3,7 @@
 import type { PublishedCompany } from '../lib/contract/types.ts'
 import { SAMPLE_HREF, staticReportState } from '../lib/reports/availability.ts'
 import { PRODUCT_NAME, STATE_LABEL, UNAVAILABLE_TEXT } from '../lib/reports/labels.ts'
+import { REPORT_VAT_NOTE } from '../lib/reports/offers.ts'
 import type { ReportProduct } from '../lib/reports/types.ts'
 import Icon from './Icon.astro'
 import ReportPrice from './ReportPrice.astro'
@@ -38,7 +39,7 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
                         <>
                             {s.price && (
                                 <p class="rp__price num">
-                                    {p === 'basic' ? <ReportPrice orgnr={company.record.orgnr} /> : <>{s.price.amountSek.toLocaleString('sv-SE')} kr <span class="muted small">inkl. moms för konsument i Sverige</span></>}
+                                    {p === 'basic' ? <ReportPrice orgnr={company.record.orgnr} /> : <>{s.price.amountSek.toLocaleString('sv-SE')} kr <span data-price-vat>{REPORT_VAT_NOTE}</span></>}
                                 </p>
                             )}
                             <div class="rp__actions">
@@ -68,6 +69,9 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         <a href="/rapporter/">Jämför rapporterna</a>{!basicAvailable && <> · <a href="/rapporter/exempel/">Exempel</a></>}
     </p>
 </aside>
+<p class="rp__fix small">
+    Ser något fel ut? <a href="/om/#rattelse">Begär rättelse</a>
+</p>
 
 <style>
     .rp {
@@ -97,7 +101,7 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         margin: 14px 0 0;
         padding: 0;
     }
-    @media (min-width: 721px) {
+    @media (721px <= width <= 1080px) {
         .rp--inline .rp__list {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -144,6 +148,11 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         font-family: var(--serif);
         font-size: 1.5rem;
     }
+    .rp__price :global([data-price-vat]) {
+        color: var(--ink-3);
+        font-family: var(--sans);
+        font-size: 0.82rem;
+    }
     .rp__state {
         display: flex;
         gap: 8px;
@@ -159,6 +168,11 @@ const orderHref = (p: ReportProduct) => `/bestall/?orgnr=${company.record.orgnr}
         padding-top: 12px;
         border-top: 1px solid var(--rule);
         color: var(--ink-3);
+    }
+    .rp__fix {
+        margin-top: 12px;
+        color: var(--ink-3);
+        text-align: center;
     }
     .rp :global(.btn) { min-height: 2.75rem; }
     .rp__actions {
